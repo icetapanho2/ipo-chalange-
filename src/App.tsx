@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Cabecalho, type ItemNav } from "./components/Cabecalho";
 import { Inicio } from "./pages/Inicio";
@@ -10,8 +11,12 @@ import { Triagem } from "./pages/Triagem";
 import { MeusPedidos } from "./pages/MeusPedidos";
 import { Servico } from "./pages/Servico";
 import { Doente } from "./pages/Doente";
-import { Gestao } from "./pages/Gestao";
 import { Guiao } from "./pages/Guiao";
+
+// Carregado à parte: é a única página que usa a biblioteca de gráficos (recharts),
+// de longe a maior dependência do bundle — não vale a pena pagar esse custo em todas
+// as outras páginas, que a maioria dos perfis usa muito mais vezes na demo.
+const Gestao = lazy(() => import("./pages/Gestao").then((m) => ({ default: m.Gestao })));
 
 const ITENS_NAV: ItemNav[] = [
   { caminho: "/", etiqueta: "Início" },
@@ -41,7 +46,14 @@ export function App() {
         <Route path="/meus-pedidos" element={<MeusPedidos />} />
         <Route path="/servico" element={<Servico />} />
         <Route path="/doente/:id" element={<Doente />} />
-        <Route path="/gestao" element={<Gestao />} />
+        <Route
+          path="/gestao"
+          element={
+            <Suspense fallback={<p className="px-4 py-6 text-slate-500">A carregar…</p>}>
+              <Gestao />
+            </Suspense>
+          }
+        />
         <Route path="/guiao" element={<Guiao />} />
       </Routes>
     </BrowserRouter>
