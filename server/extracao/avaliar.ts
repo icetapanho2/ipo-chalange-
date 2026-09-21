@@ -2,10 +2,13 @@
 // de extracção configurado (EXTRACTOR) e mostra a percentagem de acerto por campo (secção 6
 // da especificação / Fase 4 ponto 6 de PROMPTS.md).
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { readJson } from "../csv.ts";
 import { agora } from "../clock.ts";
 import { extrair, fornecedorConfigurado } from "./index.ts";
 import type { Prioridade, TipoPedido } from "../types.ts";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 interface PedidoEsperado {
   tipo_pedido: TipoPedido;
@@ -38,7 +41,7 @@ function conjuntoIgual(a: string[] = [], b: string[] = []): boolean {
 }
 
 async function main() {
-  const caminho = path.join(process.cwd(), "dados", "planos_teste.json");
+  const caminho = path.join(__dirname, "..", "..", "dados", "planos_teste.json");
   const dados = readJson<{ planos: Plano[] }>(caminho);
   const fornecedor = fornecedorConfigurado();
   console.log(`Fornecedor configurado: ${fornecedor}\n`);

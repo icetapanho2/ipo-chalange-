@@ -1,10 +1,12 @@
 // Fornecedor "cache": dados/demo_extracoes_cache.json — fallback determinístico da extracção
 // para os textos da demo (secção 6 da especificação, EXTRACTOR=cache).
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { readJson } from "../../csv.ts";
 import type { EntradaCacheExtracao } from "../schema.ts";
 
-const CAMINHO = path.join(process.cwd(), "dados", "demo_extracoes_cache.json");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const CAMINHO = path.join(__dirname, "..", "..", "..", "dados", "demo_extracoes_cache.json");
 
 /** Remove o prefixo "P:", passa a minúsculas e colapsa espaços (secção Extracção do CLAUDE.md). */
 export function normalizarTexto(texto: string): string {
