@@ -8,6 +8,15 @@ export function criarRotasSistema(store: typeof StoreType) {
     res.json(store.utilizadores);
   });
 
+  router.get("/catalogo", (_req, res) => {
+    res.json({
+      especialidades: store.especialidades,
+      catalogoAtos: store.catalogoAtos,
+      exames: store.exames,
+      analises: store.analises,
+    });
+  });
+
   router.get("/estado", (_req, res) => {
     res.json({
       demoDate: store.parametros.DEMO_DATE,

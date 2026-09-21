@@ -30,6 +30,16 @@ exactamente as horas esperadas na tabela da demo (ex.: colheitas de 24/09 às 07
 
 ## 2026-09-21 — Fase 2 — R2 (colheita pré-QT): tipo de colheita e regra do "amanhã + 1 dia útil"
 
+## 2026-09-21 — Fase 5 — Corrigido um erro de formatação em dicionario.csv
+
+`dados/dicionario.csv` (dicionário inicial, ficheiro estático — não é gerado por
+`gerar_dados.py`, por isso corrigir aqui não contraria a regra de nunca editar os CSV
+gerados à mão) tinha três linhas ("1/12", "3/12", "6/12") com um `;` por escapar dentro do
+campo `significado` (ex.: `1 mês (não antes de 21 dias; prazo 35 dias)`), desalinhando as
+colunas seguintes. Corrigido pondo esse campo entre aspas, ao estilo RFC 4180 já usado em
+`regras_dependencia.csv`. Confirmado no ecrã /dicionario (antes mostrava "1 mês (não antes de
+21 dias" na coluna do significado e "tempo" na coluna do âmbito).
+
 ## 2026-09-21 — Fase 4 — Fornecedores de LLM não testados ao vivo (sem chaves de API)
 
 Este ambiente não tem `GEMINI_API_KEY`/`ANTHROPIC_API_KEY`/Ollama configurados, por isso não é

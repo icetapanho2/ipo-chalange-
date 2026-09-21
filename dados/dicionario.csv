@@ -22,9 +22,9 @@ reav;consulta de reavaliação (mesma especialidade);consulta 2102;GLOBAL;INICIA
 c/ exames;depende dos MCDT pedidos na mesma consulta (regra R3);dependencia;GLOBAL;INICIAL;0;ATIVA
 c/ resultados;depende dos MCDT pedidos na mesma consulta (regra R3);dependencia;GLOBAL;INICIAL;0;ATIVA
 comigo;continuidade com o médico requisitante;medico_preferido=REQUISITANTE;GLOBAL;INICIAL;0;ATIVA
-1/12;1 mês (não antes de 21 dias; prazo 35 dias);tempo;GLOBAL;INICIAL;0;ATIVA
-3/12;3 meses (não antes de 80 dias; prazo 100 dias);tempo;GLOBAL;INICIAL;0;ATIVA
-6/12;6 meses (não antes de 170 dias; prazo 190 dias);tempo;GLOBAL;INICIAL;0;ATIVA
+1/12;"1 mês (não antes de 21 dias; prazo 35 dias)";tempo;GLOBAL;INICIAL;0;ATIVA
+3/12;"3 meses (não antes de 80 dias; prazo 100 dias)";tempo;GLOBAL;INICIAL;0;ATIVA
+6/12;"6 meses (não antes de 170 dias; prazo 190 dias)";tempo;GLOBAL;INICIAL;0;ATIVA
 4/4 sem;recorrência de 4 em 4 semanas;recorrencia;GLOBAL;INICIAL;0;ATIVA
 4/4s;recorrência de 4 em 4 semanas;recorrencia;GLOBAL;INICIAL;0;ATIVA
 cons. Onco;consulta de Oncologia Médica;pedido_consulta 1300/1;GLOBAL;INICIAL;0;ATIVA

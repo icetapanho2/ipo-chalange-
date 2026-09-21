@@ -4,6 +4,8 @@ import express from "express";
 import { store } from "./store.ts";
 import { criarRotasSistema } from "./routes/sistema.ts";
 import { criarRotasOasis } from "./routes/oasis.ts";
+import { criarRotasValidacao } from "./routes/validacao.ts";
+import { criarRotasDicionario } from "./routes/dicionario.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -18,6 +20,8 @@ app.use((req, _res, next) => {
 
 app.use("/api", criarRotasSistema(store));
 app.use("/api/oasis", criarRotasOasis(store));
+app.use("/api/validacao", criarRotasValidacao(store));
+app.use("/api/dicionario", criarRotasDicionario(store));
 
 if (process.env.NODE_ENV === "production") {
   const distDir = path.join(__dirname, "..", "dist");
