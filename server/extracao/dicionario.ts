@@ -3,6 +3,20 @@ import type { DicionarioEntrada } from "../types.ts";
 
 const normalizar = (s: string) => s.trim().toLowerCase();
 
+/**
+ * Passo 1 do pipeline de extracção (secção 6): localiza no texto os termos do dicionário
+ * (globais + do médico requisitante), termos mais compridos primeiro (para que "TC TAP" seja
+ * preferido a "rev", por exemplo). Determinístico — não decide pedidos, só dá pistas fortes
+ * ao LLM (e serve de atalho quando `EXTRACTOR=cache`).
+ */
+export function termosReconhecidos(texto: string, medicoId: string): DicionarioEntrada[] {
+  const textoMin = texto.toLowerCase();
+  return store.dicionario
+    .filter((d) => d.estado === "ATIVA" && (d.ambito === "GLOBAL" || d.ambito === medicoId))
+    .filter((d) => textoMin.includes(normalizar(d.termo)))
+    .sort((a, b) => b.termo.length - a.termo.length);
+}
+
 /** Procura um termo no dicionário: âmbito do médico primeiro, depois GLOBAL (secção 7). */
 export function resolverTermo(termo: string, medicoId: string): DicionarioEntrada | null {
   const alvo = normalizar(termo);

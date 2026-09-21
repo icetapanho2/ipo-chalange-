@@ -6,7 +6,7 @@
 // demo escreveria — o sistema em si nunca lê esse campo.
 import { store } from "../../server/store.ts";
 import { registarEvento } from "../../server/motor/estados.ts";
-import { aprenderCorrecao } from "../../server/motor/dicionario.ts";
+import { aprenderCorrecao } from "../../server/extracao/dicionario.ts";
 import { calcularPrazo } from "../../server/motor/prioridade.ts";
 import { isoData, isoDataHora } from "../../server/util.ts";
 import { extrair, type ResultadoExtracao } from "../../server/extracao/index.ts";
@@ -20,7 +20,7 @@ export function extrairPlanoDemo(
   consultaAtoId: string,
   especialidadeOrigem: string,
   quando: Date,
-): ResultadoExtracao {
+): Promise<ResultadoExtracao> {
   const entrada = procurarNaCachePorDoente(doenteId);
   if (!entrada) throw new Error(`Sem entrada de cache para o doente ${doenteId}`);
   return extrair(entrada.texto_plano, medicoId, doenteId, { consultaAtoId, especialidadeOrigem, quando });

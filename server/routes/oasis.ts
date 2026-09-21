@@ -50,7 +50,7 @@ export function criarRotasOasis(store: typeof StoreType) {
   });
 
   // Guardar a nota SOAP e chamar o agente de extracção sobre o campo P.
-  router.post("/consulta/:atoId/guardar", (req, res) => {
+  router.post("/consulta/:atoId/guardar", async (req, res) => {
     const ato = store.atosMedicos.find((a) => a.mvp_ato_id === req.params.atoId);
     if (!ato) {
       res.status(404).json({ erro: "Consulta não encontrada." });
@@ -76,12 +76,13 @@ export function criarRotasOasis(store: typeof StoreType) {
     }
 
     const resultado = p.trim()
-      ? extrair(p, medicoId, ato.doente_id, {
+      ? await extrair(p, medicoId, ato.doente_id, {
           consultaAtoId: ato.mvp_ato_id,
           especialidadeOrigem: ato.especialidade_codigo,
+          soap: { s, o, a },
           quando,
         })
-      : { pedidos: [], alertas: [] };
+      : { pedidos: [], alertas: [] as string[] };
 
     res.json({
       ok: true,

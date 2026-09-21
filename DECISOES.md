@@ -30,6 +30,30 @@ exactamente as horas esperadas na tabela da demo (ex.: colheitas de 24/09 às 07
 
 ## 2026-09-21 — Fase 2 — R2 (colheita pré-QT): tipo de colheita e regra do "amanhã + 1 dia útil"
 
+## 2026-09-21 — Fase 4 — Fornecedores de LLM não testados ao vivo (sem chaves de API)
+
+Este ambiente não tem `GEMINI_API_KEY`/`ANTHROPIC_API_KEY`/Ollama configurados, por isso não é
+possível testar `server/extracao/providers/{gemini,anthropic,ollama}.ts` contra uma API real.
+Implementei cada um seguindo a documentação oficial do respectivo SDK (`@google/genai` com
+`responseMimeType: "application/json"`, `@anthropic-ai/sdk` com tool use forçado via
+`tool_choice`, Ollama via `POST /api/chat` com `format: "json"`), com o mesmo prompt e schema
+para os três. O que É testado exaustivamente: (1) a selecção de fornecedor por `EXTRACTOR`
+(por omissão `gemini` se houver `GEMINI_API_KEY`, senão `cache`); (2) o *fallback* para a cache
+quando o fornecedor ao vivo falha ou está mal configurado, incluindo o evento registado; (3) o
+caminho `DEMO_CACHE_PRIMEIRO`. Quando o projecto for importado no AI Studio (que define
+`GEMINI_API_KEY` automaticamente), o fornecedor `gemini` passa a ser exercitado a sério; se
+houver algum desalinhamento de versão do SDK, o erro cai sempre no *fallback* da cache em vez
+de partir a demo — nunca fica sem resposta.
+
+## 2026-09-21 — Fase 4 — `server/extracao/dicionario.ts` em vez de `server/motor/`
+
+CLAUDE.md lista `dicionario.ts` dentro de `server/extracao/` na estrutura sugerida (não em
+`server/motor/`, que só lista estados/prioridade/dependências/agendamento/semáforo/alertas).
+Tinha-o colocado em `server/motor/` na Fase 2 por conveniência; mudei-o para
+`server/extracao/dicionario.ts` na Fase 4 para seguir a estrutura à letra — a normalização e a
+aprendizagem por dicionário são mesmo o passo 1 do pipeline de extracção, não regras do motor
+de agendamento/triagem.
+
 A especificação não diz se a colheita pré-QT criada pela regra R2 é "com" ou "sem" jejum;
 escolhi `ato_codigo "4"` (sem jejum), por ser o mais comum clinicamente antes de QT e por não
 haver qualquer cenário da demo que dependa da distinção. Também confirmei, a partir dos dados

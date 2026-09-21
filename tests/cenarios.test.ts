@@ -60,9 +60,9 @@ describe("Cenários da demo (secção 15 da especificação)", () => {
     expect(agora().getHours()).toBe(9);
   });
 
-  it("1. Maria Fernandes (100101): plano A → análises → TC → revisão", () => {
+  it("1. Maria Fernandes (100101): plano A → análises → TC → revisão", async () => {
     const consulta = atoDeHoje("100101", "09:30");
-    const { pedidos } = extrairPlanoDemo("100101", "U01", consulta.mvp_ato_id, "2102", agora());
+    const { pedidos } = await extrairPlanoDemo("100101", "U01", consulta.mvp_ato_id, "2102", agora());
     expect(pedidos).toHaveLength(3);
 
     aprovarPedidos(pedidos, "U03", agora());
@@ -103,9 +103,9 @@ describe("Cenários da demo (secção 15 da especificação)", () => {
     expect(dataMarcada(manuel)).toBe("2026-10-14T08:20");
   });
 
-  it("3. Rosa Teixeira (100105): plano B → alerta 'HPC' → correcção para Manutenção CVC", () => {
+  it("3. Rosa Teixeira (100105): plano B → alerta 'HPC' → correcção para Manutenção CVC", async () => {
     const consulta = atoDeHoje("100105", "09:50");
-    const { pedidos, alertas } = extrairPlanoDemo("100105", "U01", consulta.mvp_ato_id, "2102", agora());
+    const { pedidos, alertas } = await extrairPlanoDemo("100105", "U01", consulta.mvp_ato_id, "2102", agora());
     expect(pedidos).toHaveLength(2);
     expect(alertas).toHaveLength(1);
     expect(alertas[0]).toContain("HPC");
@@ -128,9 +128,9 @@ describe("Cenários da demo (secção 15 da especificação)", () => {
     expect(revisao.continuidade_obrigatoria).toBe(false);
   });
 
-  it("4. Carlos Mendes (100107): 'HPC' reconhecida automaticamente (selo aprendido)", () => {
+  it("4. Carlos Mendes (100107): 'HPC' reconhecida automaticamente (selo aprendido)", async () => {
     const consulta = atoDeHoje("100107", "10:10");
-    const { pedidos } = extrairPlanoDemo("100107", "U01", consulta.mvp_ato_id, "2102", agora());
+    const { pedidos } = await extrairPlanoDemo("100107", "U01", consulta.mvp_ato_id, "2102", agora());
     expect(pedidos).toHaveLength(2);
 
     const cvc = porTipo(pedidos, "tratamento");
