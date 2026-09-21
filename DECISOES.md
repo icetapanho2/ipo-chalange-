@@ -30,6 +30,16 @@ exactamente as horas esperadas na tabela da demo (ex.: colheitas de 24/09 às 07
 
 ## 2026-09-21 — Fase 2 — R2 (colheita pré-QT): tipo de colheita e regra do "amanhã + 1 dia útil"
 
+## 2026-09-21 — Fase 6 — O que a triagem vê do doente
+
+PROMPTS.md diz que a triagem só vê "o pedido + o texto do plano de origem (só isso, nada do
+resto do doente)", mas ESPECIFICACAO.md secção 3 (fonte de verdade) diz que o serviço de
+destino vê "identificação do doente, médico e serviço requisitante, o pedido..., o texto do
+plano... e as dependências desse pedido. Não vê os outros pedidos nem o perfil completo."
+Segui a especificação (CLAUDE.md manda-o fazer quando há contradição): `/api/triagem/fila`
+devolve o nome do doente, o médico e serviço requisitante, o pedido, o texto do plano e as
+dependências — mas nunca os outros pedidos do mesmo doente nem histórico clínico.
+
 ## 2026-09-21 — Fase 5 — Corrigido um erro de formatação em dicionario.csv
 
 `dados/dicionario.csv` (dicionário inicial, ficheiro estático — não é gerado por

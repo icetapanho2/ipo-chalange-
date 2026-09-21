@@ -6,6 +6,9 @@ import { OasisConsulta } from "./pages/oasis/Consulta";
 import { OasisAgendas } from "./pages/oasis/Agendas";
 import { Validacao } from "./pages/Validacao";
 import { Dicionario } from "./pages/Dicionario";
+import { Triagem } from "./pages/Triagem";
+import { MeusPedidos } from "./pages/MeusPedidos";
+import { Servico } from "./pages/Servico";
 
 const ITENS_NAV: ItemNav[] = [
   { caminho: "/", etiqueta: "Início" },
@@ -13,6 +16,9 @@ const ITENS_NAV: ItemNav[] = [
   { caminho: "/oasis/agendas", etiqueta: "Oasis · Agendas" },
   { caminho: "/validacao", etiqueta: "Validação" },
   { caminho: "/dicionario", etiqueta: "Dicionário" },
+  { caminho: "/triagem", etiqueta: "Triagem" },
+  { caminho: "/meus-pedidos", etiqueta: "Meus pedidos" },
+  { caminho: "/servico", etiqueta: "Serviço" },
 ];
 
 export function App() {
@@ -26,6 +32,9 @@ export function App() {
         <Route path="/oasis/agendas" element={<OasisAgendas />} />
         <Route path="/validacao" element={<Validacao />} />
         <Route path="/dicionario" element={<Dicionario />} />
+        <Route path="/triagem" element={<Triagem />} />
+        <Route path="/meus-pedidos" element={<MeusPedidos />} />
+        <Route path="/servico" element={<Servico />} />
       </Routes>
     </BrowserRouter>
   );
