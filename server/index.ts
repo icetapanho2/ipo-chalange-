@@ -10,9 +10,15 @@ import { criarRotasTriagem } from "./routes/triagem.ts";
 import { criarRotasMeusPedidos } from "./routes/meusPedidos.ts";
 import { criarRotasServico } from "./routes/servico.ts";
 import { criarRotasDoente } from "./routes/doente.ts";
+import { criarRotasGestao } from "./routes/gestao.ts";
+import { recalcularAlertas } from "./motor/alertas.ts";
+import { agora } from "./clock.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+
+// Os alertas são recalculados no arranque e depois de cada acção (secção 12 da especificação).
+recalcularAlertas(agora());
 
 app.use(express.json());
 
@@ -30,6 +36,7 @@ app.use("/api/triagem", criarRotasTriagem(store));
 app.use("/api/meus-pedidos", criarRotasMeusPedidos(store));
 app.use("/api/servico", criarRotasServico(store));
 app.use("/api/doente", criarRotasDoente(store));
+app.use("/api/gestao", criarRotasGestao(store));
 
 if (process.env.NODE_ENV === "production") {
   const distDir = path.join(__dirname, "..", "dist");

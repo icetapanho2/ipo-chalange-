@@ -30,6 +30,25 @@ exactamente as horas esperadas na tabela da demo (ex.: colheitas de 24/09 às 07
 
 ## 2026-09-21 — Fase 2 — R2 (colheita pré-QT): tipo de colheita e regra do "amanhã + 1 dia útil"
 
+## 2026-09-21 — Fase 8 — Três correcções encontradas ao construir /gestao
+
+Construir as métricas de gestão expôs três problemas nas fases anteriores, corrigidos aqui:
+1. `server/index.ts`/`server/routes/sistema.ts` nunca chamavam `recalcularAlertas()` no
+   arranque nem depois de "Repor demo" (só depois de acções feitas pelas rotas de
+   validação/triagem/serviço) — corrigido: chamado uma vez no arranque do servidor e outra
+   vez dentro de `POST /api/repor-demo`, tal como a especificação pede ("recalculados no
+   arranque e depois de cada acção").
+2. `server/routes/gestao.ts` e `server/routes/sistema.ts` usavam `Date.now()`/`new Date()`
+   directamente para a antiguidade dos pendentes e o carimbo de "Repor demo" — contra a Regra
+   de ouro #1. Corrigido para usar sempre `agora()` de `server/clock.ts`.
+3. As métricas de triagem (aceites/recusados/reencaminhados) davam sempre 0 para recusados e
+   reencaminhados: `gerar_dados.py` regista essas decisões com `tipo="TRIAGEM"` (distinguindo
+   pelo `estado_novo`), enquanto `server/motor/fluxo.ts` usa tipos mais específicos
+   (`RECUSA`, `REENCAMINHAMENTO`). Em vez de forçar os dados históricos a mudar, a métrica em
+   `server/routes/gestao.ts` passou a identificar a decisão pela transição de estado
+   (`estado_anterior === "EM_TRIAGEM"` e o `estado_novo`), não pelo campo `tipo` — funciona
+   com os dois formatos.
+
 ## 2026-09-21 — Fase 6 — O que a triagem vê do doente
 
 PROMPTS.md diz que a triagem só vê "o pedido + o texto do plano de origem (só isso, nada do

@@ -10,6 +10,7 @@ import { Triagem } from "./pages/Triagem";
 import { MeusPedidos } from "./pages/MeusPedidos";
 import { Servico } from "./pages/Servico";
 import { Doente } from "./pages/Doente";
+import { Gestao } from "./pages/Gestao";
 
 const ITENS_NAV: ItemNav[] = [
   { caminho: "/", etiqueta: "Início" },
@@ -20,6 +21,7 @@ const ITENS_NAV: ItemNav[] = [
   { caminho: "/triagem", etiqueta: "Triagem" },
   { caminho: "/meus-pedidos", etiqueta: "Meus pedidos" },
   { caminho: "/servico", etiqueta: "Serviço" },
+  { caminho: "/gestao", etiqueta: "Gestão" },
 ];
 
 export function App() {
@@ -37,6 +39,7 @@ export function App() {
         <Route path="/meus-pedidos" element={<MeusPedidos />} />
         <Route path="/servico" element={<Servico />} />
         <Route path="/doente/:id" element={<Doente />} />
+        <Route path="/gestao" element={<Gestao />} />
       </Routes>
     </BrowserRouter>
   );
