@@ -108,7 +108,7 @@ describe("Cenários da demo (secção 15 da especificação)", () => {
     const { pedidos, alertas } = extrairPlanoDemo("100105", "U01", consulta.mvp_ato_id, "2102", agora());
     expect(pedidos).toHaveLength(2);
     expect(alertas).toHaveLength(1);
-    expect(alertas[0].texto_origem).toContain("HPC");
+    expect(alertas[0]).toContain("HPC");
     expect(store.alertas.some((a) => a.tipo === "TERMO_DESCONHECIDO" && a.doente_id === "100105")).toBe(true);
 
     const cvc = corrigirTermoDesconhecido("100105", "U01", consulta.mvp_ato_id, "2102", "U03", agora());

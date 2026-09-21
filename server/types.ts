@@ -285,6 +285,17 @@ export interface IntervaloResultado {
   dias_ate_resultado: number;
 }
 
+/** Nota SOAP guardada pelo médico no Oasis 2.0 (não existe no export real do Oasis; é do MVP). */
+export interface NotaConsulta {
+  ato_id: string; // mvp_ato_id da consulta
+  s: string;
+  o: string;
+  a: string;
+  p: string;
+  guardado_em: string;
+  guardado_por: string;
+}
+
 export interface Parametros {
   DEMO_DATE: string;
   congelamento_dias: number;

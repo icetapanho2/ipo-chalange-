@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { store } from "./store.ts";
 import { criarRotasSistema } from "./routes/sistema.ts";
+import { criarRotasOasis } from "./routes/oasis.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -16,6 +17,7 @@ app.use((req, _res, next) => {
 });
 
 app.use("/api", criarRotasSistema(store));
+app.use("/api/oasis", criarRotasOasis(store));
 
 if (process.env.NODE_ENV === "production") {
   const distDir = path.join(__dirname, "..", "dist");

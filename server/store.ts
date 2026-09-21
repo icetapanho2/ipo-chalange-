@@ -24,6 +24,7 @@ import type {
   Parametros,
   Perfil,
   TipoPedido,
+  NotaConsulta,
 } from "./types.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -61,6 +62,8 @@ class Store {
   regrasDependencia: RegraDependencia[] = [];
   intervalosResultado: IntervaloResultado[] = [];
   parametros: Parametros = {} as Parametros;
+  /** Notas SOAP do Oasis 2.0 (não vêm de CSV; estado só do MVP, perdido ao "repor demo"). */
+  notasConsulta: NotaConsulta[] = [];
 
   private contadores: Record<string, number> = {
     pedido: 0,
@@ -245,9 +248,10 @@ class Store {
     };
     definirDataDemo(this.parametros.DEMO_DATE);
 
-    // Alertas e propostas de troca são gerados pela aplicação (não vêm de CSV).
+    // Alertas, propostas de troca e notas SOAP são gerados pela aplicação (não vêm de CSV).
     this.alertas = [];
     this.propostasTroca = [];
+    this.notasConsulta = [];
 
     this.contadores = {
       pedido: maxSufixo(this.pedidos.map((x) => x.pedido_id), "P"),
