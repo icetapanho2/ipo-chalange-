@@ -13,6 +13,8 @@ import {
   AlertCircle,
   RefreshCw,
   ExternalLink,
+  Archive,
+  FlaskConical,
 } from "lucide-react";
 
 export interface DoenteModalProps {
@@ -61,9 +63,12 @@ interface RespostaDoenteModal {
   }[];
   todosPedidos?: {
     pedido_id: string;
+    tipo_pedido: string;
     tipo_pedido_legivel: string;
     descricao: string;
     especialidade_destino_legivel: string;
+    exames: string[];
+    analises: string[];
     prioridade_legivel: string;
     prazo_limite: string;
     estado: string;
@@ -87,7 +92,7 @@ export function DoenteModal({ doenteId, onFechar }: DoenteModalProps) {
   const [dados, setDados] = useState<RespostaDoenteModal | null>(null);
   const [aCarregar, setACarregar] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
-  const [abaAtiva, setAbaAtiva] = useState<"prontidao" | "pedidos" | "historico">("prontidao");
+  const [abaAtiva, setAbaAtiva] = useState<"prontidao" | "pedidos" | "arquivo" | "historico">("prontidao");
   const [aProcessarAcao, setAProcessarAcao] = useState(false);
 
   function carregar() {
@@ -116,6 +121,10 @@ export function DoenteModal({ doenteId, onFechar }: DoenteModalProps) {
       setAProcessarAcao(false);
     }
   }
+
+  const pedidosExameArquivo = (dados?.todosPedidos ?? []).filter(
+    (p) => p.tipo_pedido === "exame" || p.tipo_pedido === "analises",
+  );
 
   async function executarAdiamento(pedidoId: string) {
     setAProcessarAcao(true);
@@ -219,6 +228,23 @@ export function DoenteModal({ doenteId, onFechar }: DoenteModalProps) {
             {dados?.todosPedidos && (
               <span className="ml-1 rounded-full bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold text-slate-600">
                 {dados.todosPedidos.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAbaAtiva("arquivo")}
+            className={`border-b-2 px-4 py-2.5 text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+              abaAtiva === "arquivo"
+                ? "border-oasis-header text-oasis-header"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            <Archive className="h-3.5 w-3.5" />
+            <span>Arquivo de Exames</span>
+            {pedidosExameArquivo.length > 0 && (
+              <span className="ml-1 rounded-full bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold text-slate-600">
+                {pedidosExameArquivo.length}
               </span>
             )}
           </button>
@@ -435,6 +461,65 @@ export function DoenteModal({ doenteId, onFechar }: DoenteModalProps) {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ABA ARQUIVO: EXAMES E ANÁLISES */}
+              {abaAtiva === "arquivo" && (
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center gap-1.5">
+                    <Archive className="h-3.5 w-3.5" />
+                    <span>Arquivo de Exames e Análises</span>
+                  </h4>
+                  {pedidosExameArquivo.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center">
+                      <Archive className="mx-auto h-8 w-8 text-slate-300 mb-2" />
+                      <p className="text-sm font-semibold text-slate-700">Sem exames ou análises registados</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Assim que forem pedidos exames ou análises complementares de diagnóstico, aparecem aqui.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {pedidosExameArquivo.map((ped) => (
+                        <div
+                          key={ped.pedido_id}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm"
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500 shrink-0">
+                              <FlaskConical className="h-3.5 w-3.5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-oasis-header">{ped.tipo_pedido_legivel}</span>
+                                <span className="text-xs text-slate-400">·</span>
+                                <span className="text-xs font-medium text-slate-600">{ped.especialidade_destino_legivel}</span>
+                              </div>
+                              <p className="text-sm font-semibold text-slate-800 mt-0.5">{ped.descricao}</p>
+                              {(ped.exames.length > 0 || ped.analises.length > 0) && (
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  {[...ped.exames, ...ped.analises].join(", ")}
+                                </p>
+                              )}
+                              <p className="text-xs text-slate-500 mt-0.5">Prazo limite: {ped.prazo_limite}</p>
+                            </div>
+                          </div>
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold shrink-0 ${
+                              ped.estado === "REALIZADO"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : ped.estado === "MARCADO"
+                                ? "bg-sky-100 text-sky-800"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {ped.estado === "REALIZADO" ? "Resultado disponível" : ped.estado_legivel}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>

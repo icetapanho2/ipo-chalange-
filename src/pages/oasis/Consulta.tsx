@@ -3,7 +3,6 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { OasisPainel, OasisShell } from "../../oasis/OasisShell";
 import { apiGet, apiPost } from "../../lib/api";
 import { DoenteModal } from "../../components/DoenteModal";
-import { ConstrutorPedidos } from "../../components/ConstrutorPedidos";
 import {
   User,
   Activity,
@@ -12,12 +11,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
-  Layers,
   FileEdit,
   Wand2,
   ExternalLink,
   ChevronRight,
   Info,
+  Users,
+  Sun,
 } from "lucide-react";
 
 interface Ato {
@@ -118,7 +118,13 @@ export function OasisConsulta() {
   const [aGuardar, setAGuardar] = useState(false);
   const [resultado, setResultado] = useState<RespostaGuardar | null>(null);
   const [modalDoenteAberto, setModalDoenteAberto] = useState(false);
-  const [modoAtivo, setModoAtivo] = useState<"soap" | "construtor" | "hibrido">("hibrido");
+  const [modoFormulario, setModoFormulario] = useState<"soap" | "interativo">("soap");
+  const [confirmacaoPendente, setConfirmacaoPendente] = useState(false);
+  const [opcoesExtra, setOpcoesExtra] = useState({
+    consultaGrupo: false,
+    grupoComDoente: true,
+    hospitalDia: false,
+  });
 
   useEffect(() => {
     if (!atoId) return;
@@ -148,6 +154,7 @@ export function OasisConsulta() {
     try {
       const r = await apiPost<RespostaGuardar>(`/oasis/consulta/${atoId}/guardar`, campos);
       setResultado(r);
+      setConfirmacaoPendente(true);
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
@@ -155,29 +162,11 @@ export function OasisConsulta() {
     }
   }
 
-  function aplicarTextoConstrutor(textoGerado: string) {
-    setCampos((prev) => ({
-      ...prev,
-      p: prev.p ? `${prev.p.trim()}\n${textoGerado}` : textoGerado,
-    }));
-  }
-
   return (
     <OasisShell
       titulo="Registo Clínico da Consulta"
       acoes={
         <div className="flex items-center gap-2">
-          {dados?.doente && (
-            <button
-              id="btn-ver-prontidao-topo"
-              type="button"
-              onClick={() => setModalDoenteAberto(true)}
-              className="inline-flex items-center gap-1.5 rounded border border-sky-300 bg-sky-900/60 px-2.5 py-1 text-xs text-white hover:bg-sky-800 transition-colors shadow-2xs"
-            >
-              <Activity className="h-3.5 w-3.5 text-sky-300" />
-              <span>Prontidão do Doente</span>
-            </button>
-          )}
           <button
             type="button"
             onClick={() => navigate("/oasis/medico")}
@@ -216,22 +205,30 @@ export function OasisConsulta() {
                         <User className="h-4 w-4" />
                       </div>
                       <div>
-                        <p className="font-bold text-slate-900 group-hover:text-oasis-accent flex items-center gap-1">
+                        <p className="font-bold text-slate-900 group-hover:text-oasis-accent flex items-center gap-1.5">
                           {dados.doente?.nome ?? "Sem nome"}
-                          <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <span
+                            id="icone-prontidao-doente"
+                            role="button"
+                            title="Ver prontidão e o que falta"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setModalDoenteAberto(true);
+                            }}
+                            className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-100 text-sky-700 hover:bg-sky-200"
+                          >
+                            <Activity className="h-3 w-3" />
+                          </span>
                         </p>
                         <p className="text-xs text-slate-500">Nº {dados.doente?.n_utente}</p>
                       </div>
                     </div>
+                    <ExternalLink className="h-3.5 w-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs text-slate-600 bg-white p-1.5 rounded border border-slate-200">
                     <span>Nasc: {dados.doente?.data_nascimento}</span>
                     <span>Sexo: {dados.doente?.sexo === "M" ? "Masc" : "Fem"}</span>
                   </div>
-                  <p className="mt-1 text-[11px] text-sky-700 font-medium text-right flex items-center justify-end gap-1">
-                    <Activity className="h-3 w-3" />
-                    <span>Ver o que falta / Prontidão</span>
-                  </p>
                 </div>
 
                 <div className="border-t border-oasis-border pt-2 text-xs space-y-1 text-slate-700">
@@ -277,44 +274,86 @@ export function OasisConsulta() {
                 3. Consultas do mesmo serviço e exames são preparados para agendamento direto; interconsultas seguem para triagem.
               </p>
             </div>
+
+            {/* Toggle: Formulário SOAP vs Construtor Interativo */}
+            <div className="rounded-lg border border-slate-200 bg-white p-2 shadow-2xs">
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-md">
+                <button
+                  type="button"
+                  onClick={() => setModoFormulario("soap")}
+                  className={`flex-1 rounded px-2 py-1.5 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                    modoFormulario === "soap" ? "bg-white text-oasis-header shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <FileEdit className="h-3.5 w-3.5" />
+                  <span>Formulário SOAP</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModoFormulario("interativo")}
+                  className={`flex-1 rounded px-2 py-1.5 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
+                    modoFormulario === "interativo" ? "bg-white text-oasis-header shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  <Wand2 className="h-3.5 w-3.5" />
+                  <span>Construtor Interativo</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Campos adicionais (captação apenas — sem lógica associada ainda) */}
+            <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-2xs space-y-2">
+              <h4 className="font-bold text-slate-700 flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5 text-oasis-accent" />
+                <span>Modalidades da Consulta</span>
+              </h4>
+              <label className="flex items-center gap-2 text-slate-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={opcoesExtra.consultaGrupo}
+                  onChange={(e) => setOpcoesExtra((o) => ({ ...o, consultaGrupo: e.target.checked }))}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-oasis-header"
+                />
+                <span>Consulta de grupo</span>
+              </label>
+              {opcoesExtra.consultaGrupo && (
+                <div className="ml-5 flex items-center gap-3 text-[11px] text-slate-500">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="consulta-grupo-doente"
+                      checked={opcoesExtra.grupoComDoente}
+                      onChange={() => setOpcoesExtra((o) => ({ ...o, grupoComDoente: true }))}
+                    />
+                    <span>Com doente</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="consulta-grupo-doente"
+                      checked={!opcoesExtra.grupoComDoente}
+                      onChange={() => setOpcoesExtra((o) => ({ ...o, grupoComDoente: false }))}
+                    />
+                    <span>Sem doente (revisão de caso)</span>
+                  </label>
+                </div>
+              )}
+              <label className="flex items-center gap-2 text-slate-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={opcoesExtra.hospitalDia}
+                  onChange={(e) => setOpcoesExtra((o) => ({ ...o, hospitalDia: e.target.checked }))}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-oasis-header"
+                />
+                <Sun className="h-3.5 w-3.5 text-amber-500" />
+                <span>Hospital de Dia</span>
+              </label>
+            </div>
           </div>
 
           {/* PAINEL DIREITO: REGISTO CLÍNICO & CONSTRUTOR */}
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-2xs">
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-md">
-                <button
-                  type="button"
-                  onClick={() => setModoAtivo("hibrido")}
-                  className={`rounded px-3 py-1 text-xs font-semibold transition-colors flex items-center gap-1.5 ${
-                    modoAtivo === "hibrido" ? "bg-white text-oasis-header shadow-2xs" : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <Layers className="h-3.5 w-3.5" />
-                  <span>Visão Integrada (SOAP + Construtor)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModoAtivo("soap")}
-                  className={`rounded px-3 py-1 text-xs font-semibold transition-colors flex items-center gap-1.5 ${
-                    modoAtivo === "soap" ? "bg-white text-oasis-header shadow-2xs" : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <FileEdit className="h-3.5 w-3.5" />
-                  <span>Modo SOAP Puro</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModoAtivo("construtor")}
-                  className={`rounded px-3 py-1 text-xs font-semibold transition-colors flex items-center gap-1.5 ${
-                    modoAtivo === "construtor" ? "bg-white text-oasis-header shadow-2xs" : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <Wand2 className="h-3.5 w-3.5" />
-                  <span>Apenas Construtor Visual</span>
-                </button>
-              </div>
-
+            <div className="flex flex-wrap items-center justify-end gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-2xs">
               <div className="flex items-center gap-2">
                 <button
                   id="btn-guardar-consulta"
@@ -338,16 +377,27 @@ export function OasisConsulta() {
               </div>
             </div>
 
-            {/* SEPARADOR: CONSTRUTOR DE PEDIDOS ASSISTIDO (SE MODO HÍBRIDO OU CONSTRUTOR) */}
-            {(modoAtivo === "hibrido" || modoAtivo === "construtor") && (
-              <ConstrutorPedidos
-                especialidadeAtual={dados.ato.especialidade_codigo}
-                onAdicionarAoPlano={aplicarTextoConstrutor}
-              />
+            {/* SEPARADOR: CONSTRUTOR DE PEDIDOS ASSISTIDO — em desenvolvimento, fica em stand-by */}
+            {modoFormulario === "interativo" && (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                <Wand2 className="mx-auto h-8 w-8 text-slate-400 mb-2" />
+                <h4 className="text-sm font-bold text-slate-600">Construtor Interativo — em trabalho, brevemente disponível</h4>
+                <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
+                  Este formulário assistido para preencher pedidos por selecção visual está em desenvolvimento. Por
+                  agora, use o Formulário SOAP para registar a consulta e gerar pedidos.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setModoFormulario("soap")}
+                  className="mt-3 rounded-lg bg-oasis-header px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+                >
+                  Usar Formulário SOAP
+                </button>
+              </div>
             )}
 
             {/* SEPARADOR: REGISTO SOAP REALISTA DO OASIS */}
-            {(modoAtivo === "hibrido" || modoAtivo === "soap") && (
+            {modoFormulario === "soap" && (
               <OasisPainel titulo="Folha Clínica de Registo Médico (SOAP)">
                 <div className="space-y-4">
                   {SECOES_SOAP.map((secao) => (
@@ -512,6 +562,45 @@ export function OasisConsulta() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Toast de confirmação pós-gravação: exige confirmação explícita do médico */}
+      {confirmacaoPendente && resultado && (
+        <div
+          id="toast-confirmacao-submissao"
+          className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4 animate-in fade-in slide-in-from-bottom-4 duration-300"
+        >
+          <div className="flex w-full max-w-xl items-start gap-3 rounded-xl border border-emerald-300 bg-white p-4 shadow-2xl">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+              <CheckCircle2 className="h-4.5 w-4.5" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-slate-800">Consulta guardada — confirme antes de avançar</p>
+              <p className="mt-0.5 text-xs text-slate-600">
+                {resultado.pedidosCriados > 0
+                  ? `Foram gerados ${resultado.pedidosCriados} pedido(s) a partir do plano. Confirme que submeteu todas as requisições necessárias para o que foi prescrito nesta consulta.`
+                  : "Não foram identificados pedidos no plano. Confirme que não há requisições pendentes para esta consulta."}
+              </p>
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  id="btn-confirmar-submissao"
+                  type="button"
+                  onClick={() => setConfirmacaoPendente(false)}
+                  className="rounded-lg bg-oasis-header px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-slate-700"
+                >
+                  Avançar, sim
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmacaoPendente(false)}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Rever plano primeiro
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
