@@ -108,3 +108,47 @@ Ao testar a extracção contra a API real do Gemini no AI Studio:
 2. A quota do nível gratuito da API impõe 5 pedidos por minuto por modelo/projecto. Para `npm run avaliar-extracao` não esgotar a quota e cair em fallback espúrio ao correr os 12 planos de teste seguidos, adicionou-se um compasso de espera de 13s entre planos na rotina de avaliação.
 3. Resultado da avaliação com o Gemini real (`gemini-3.6-flash`): 100% de acerto em todos os 6 campos estruturados (tipo_pedido, especialidade_destino, ato_codigo, exames, analises, prioridade) em 12/12 planos.
 
+## 2026-09-21 — Correcção de duas alterações feitas no AI Studio antes de continuar
+
+Ao retomar o trabalho depois de uma sessão no Google AI Studio (Gemini), o `main` tinha um
+commit (`262b4b6`, "feat: update Gemini provider and server configuration") com boas
+adições (server.ts a juntar Vite+Express num único processo/porta, `ConstrutorPedidos.tsx` e
+`DoenteModal.tsx` como pontos de partida para o formulário interactivo e a ficha do doente) mas
+também duas alterações que contrariavam regras de ouro do projecto, corrigidas antes de
+continuar:
+1. `server/extracao/index.ts` tinha `tentarExtracaoHeuristica()`: quando o texto não era
+   reconhecido, em vez de gerar um alerta, **adivinhava pedidos por palavras-chave** (ex.:
+   "tc"/"tac" no texto criava sempre um TC TAP com códigos fixos; "cirurgia" criava um pedido
+   para uma especialidade "1101" que nem existe no catálogo). Isto viola directamente a Regra
+   de ouro #3 ("quando não sabe, não inventa") e o Princípio 3 da especificação. Removida por
+   completo; o comportamento voltou a ser: texto desconhecido → alerta, nunca um palpite.
+2. `compararFila` (server/motor/prioridade.ts) tinha trocado a ordem dos critérios de
+   desempate da fila para "nível" antes de "folga", contrariando a secção 8 da especificação
+   ("(1) menor folga; (2) nível mais alto; (3) mais antigo"). Restaurada a ordem original;
+   o score da equação de prioridade (ver abaixo) fica como critério extra de desempate, depois
+   da folga e do nível, nunca antes.
+Também reescrevi `.env.example`, que tinha perdido todos os comentários e valores por omissão
+(ficou só `CHAVE=` sem contexto nenhum) — provavelmente uma normalização automática do
+AI Studio ao sincronizar variáveis de ambiente.
+
+`tests/cenarios.test.ts` e `tests/guiao.test.ts` continuam a passar sem alterar nenhuma data
+esperada — confirma que nenhuma destas duas alterações erradas estava a ser exercitada pelos
+cenários da demo (a equação de prioridade nunca chegou a ser chamada; ainda não havia nenhum
+sítio no código a invocá-la).
+
+## 2026-09-21 — Prioridade calculada pelo sistema (pedido explícito do utilizador)
+
+Pedido explícito: "a prioridade é o sistema que define, através das equações definidas... e
+depois é usado na altura da marcação." Isto substitui a regra mais simples da especificação
+original (secção 8: "prioridade não indicada assume N"). Decisão de desenho: liguei
+`calcularPrioridadeSistema` (já existente mas morta em `server/motor/prioridade.ts`) a
+`construirPedido` em `server/extracao/index.ts` — só decide o **nível** (MP/P/N) quando
+ninguém o indicou explicitamente (médico, dicionário ou correcção); uma prioridade explícita
+continua sempre a prevalecer, para não tirar controlo a quem já o tinha. O nível calculado
+continua a alimentar `calcularPrazo`/`regras_prazos.csv` exactamente como antes — a tabela de
+prazos por nível continua a ser a fonte de verdade da direcção clínica, só a escolha do nível
+passou a ser automática. O pedido guarda sempre `score_prioridade` e
+`equacao_prioridade_detalhe` (a "justificação em linguagem simples" da Regra de ouro #6),
+visíveis onde o pedido for mostrado. Verificado que isto não muda nenhuma data dos 8 cenários
+da demo (os textos são todos electivos/rotina, ficam classificados como N tal como antes).
+

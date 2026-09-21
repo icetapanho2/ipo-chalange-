@@ -185,18 +185,22 @@ export interface ItemFila {
   dataMinima: Date;
 }
 
-/** Ordem da fila de marcação: equações do sistema (1) nível de prioridade (MP > P > N), (2) menor folga em dias, (3) score de prioridade do sistema, (4) antiguidade do pedido. */
+/**
+ * Ordem da fila (secção 8 da especificação): (1) menor folga, (2) nível mais alto,
+ * (3) score da equação de prioridade do sistema (desempate dentro do mesmo nível/folga,
+ * ver calcularPrioridadeSistema), (4) pedido mais antigo.
+ */
 export function compararFila(a: ItemFila, b: ItemFila): number {
-  const nivelA = PESO_NIVEL[a.pedido.prioridade];
-  const nivelB = PESO_NIVEL[b.pedido.prioridade];
-  if (nivelA !== nivelB) return nivelB - nivelA;
-
   const folgaA = folgaDias(a.pedido, a.dataMinima);
   const folgaB = folgaDias(b.pedido, b.dataMinima);
   if (folgaA !== folgaB) return folgaA - folgaB;
 
-  const scoreA = a.pedido.score_prioridade ?? (nivelA * 30);
-  const scoreB = b.pedido.score_prioridade ?? (nivelB * 30);
+  const nivelA = PESO_NIVEL[a.pedido.prioridade];
+  const nivelB = PESO_NIVEL[b.pedido.prioridade];
+  if (nivelA !== nivelB) return nivelB - nivelA;
+
+  const scoreA = a.pedido.score_prioridade ?? nivelA * 30;
+  const scoreB = b.pedido.score_prioridade ?? nivelB * 30;
   if (scoreA !== scoreB) return scoreB - scoreA;
 
   return parseIso(a.pedido.criado_em).getTime() - parseIso(b.pedido.criado_em).getTime();
