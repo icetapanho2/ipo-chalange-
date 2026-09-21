@@ -9,6 +9,7 @@ import { Dicionario } from "./pages/Dicionario";
 import { Triagem } from "./pages/Triagem";
 import { MeusPedidos } from "./pages/MeusPedidos";
 import { Servico } from "./pages/Servico";
+import { Doente } from "./pages/Doente";
 
 const ITENS_NAV: ItemNav[] = [
   { caminho: "/", etiqueta: "Início" },
@@ -35,6 +36,7 @@ export function App() {
         <Route path="/triagem" element={<Triagem />} />
         <Route path="/meus-pedidos" element={<MeusPedidos />} />
         <Route path="/servico" element={<Servico />} />
+        <Route path="/doente/:id" element={<Doente />} />
       </Routes>
     </BrowserRouter>
   );

@@ -1,3 +1,4 @@
+import { store } from "../store.ts";
 import { agora } from "../clock.ts";
 import { isoDataHora } from "../util.ts";
 import { registarEvento } from "./estados.ts";
@@ -94,6 +95,26 @@ export function remarcarPedido(pedido: Pedido, utilizadorId: string, quando: Dat
   pedido.estado = "ACEITE";
   pedido.n_remarcacoes += 1;
   registarEvento(pedido, "REMARCACAO", "ACEITE", utilizadorId, { motivo: "Remarcação após falta", dataHora: quando });
+  agendar(pedido, quando);
+  recalcularAlertas(quando);
+}
+
+/**
+ * "Adiar consulta" no semáforo vermelho: liberta a marcação actual e volta a agendar,
+ * respeitando de novo a janela (incluindo as dependências, que entretanto podem ter mudado).
+ */
+export function adiarConsulta(pedido: Pedido, utilizadorId: string, quando: Date = agora()): void {
+  const vagaAntiga = store.vagas.find((v) => v.ato_id === pedido.ato_id);
+  const atoAntigo = store.atosMedicos.find((a) => a.mvp_ato_id === pedido.ato_id);
+  if (vagaAntiga) vagaAntiga.ato_id = "";
+  if (atoAntigo) atoAntigo.estado = "DESMARCADA";
+  registarEvento(pedido, "CANCELAMENTO", "ACEITE", utilizadorId, {
+    motivo: "Consulta adiada: dependência em risco",
+    detalhe: atoAntigo ? `data anterior ${atoAntigo.data_hora}` : "",
+    dataHora: quando,
+  });
+  pedido.ato_id = "";
+  pedido.marcado_em = "";
   agendar(pedido, quando);
   recalcularAlertas(quando);
 }

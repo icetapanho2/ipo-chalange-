@@ -1,8 +1,10 @@
 import { Router } from "express";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
+import { apenasData } from "../util.ts";
 import { aprovarPropostaTroca, rejeitarPropostaTroca } from "../motor/agendamento.ts";
 import { resolverAlerta } from "../motor/alertas.ts";
+import { calcularSemaforo } from "../motor/semaforo.ts";
 import {
   descreverDoente,
   descreverEspecialidade,
@@ -106,6 +108,30 @@ export function criarRotasServico(store: typeof StoreType) {
   router.post("/propostas/:id/rejeitar", (req, res) => {
     rejeitarPropostaTroca(req.params.id, req.utilizadorId, agora());
     res.json({ ok: true });
+  });
+
+  // Consultas em risco (semáforo vermelho) nos próximos `semaforo_horizonte_dias` (secção 11).
+  router.get("/consultas-em-risco", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    const hoje = apenasData(agora());
+    const horizonte = store.parametros.semaforo_horizonte_dias;
+    const emRisco = store.pedidos
+      .filter((p) => p.especialidade_destino === especialidade)
+      .map((p) => ({ pedido: p, semaforo: calcularSemaforo(p, hoje, horizonte) }))
+      .filter((x) => x.semaforo?.cor === "vermelho")
+      .map(({ pedido, semaforo }) => {
+        const ato = store.atosMedicos.find((a) => a.mvp_ato_id === pedido.ato_id);
+        return {
+          pedido_id: pedido.pedido_id,
+          doente_id: pedido.doente_id,
+          doente_nome: descreverDoente(pedido.doente_id),
+          descricao: descreverPedido(pedido),
+          data_hora: ato?.data_hora ?? "",
+          porque: semaforo!.porque,
+        };
+      })
+      .sort((a, b) => a.data_hora.localeCompare(b.data_hora));
+    res.json(emRisco);
   });
 
   return router;

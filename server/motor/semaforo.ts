@@ -26,15 +26,26 @@ export function calcularSemaforo(pedido: Pedido, hoje: Date, horizonteDias: numb
   if (diasAteConsulta < 0 || diasAteConsulta > horizonteDias) return null;
 
   let pior: EstadoSemaforo = { cor: "verde", porque: "Todas as dependências realizadas, resultado disponível a tempo." };
-
-  for (const dep of deps) {
-    const requisito = store.pedidos.find((p) => p.pedido_id === dep.depende_de_pedido_id);
-    if (!requisito) continue;
-    const nomeReq = descreverPedido(requisito);
-    const estado = avaliarDependencia(requisito, dataConsulta, nomeReq);
+  for (const { estado } of avaliarDependenciasDetalhado(pedido, dataConsulta)) {
     pior = piorCor(pior, estado);
   }
   return pior;
+}
+
+export interface DependenciaAvaliada {
+  requisito: Pedido;
+  estado: EstadoSemaforo;
+}
+
+/** Avaliação por dependência (usado pelo semáforo agregado e pelo ecrã do doente, secção 11). */
+export function avaliarDependenciasDetalhado(pedido: Pedido, dataConsulta: Date): DependenciaAvaliada[] {
+  const resultado: DependenciaAvaliada[] = [];
+  for (const dep of dependenciasDe(pedido)) {
+    const requisito = store.pedidos.find((p) => p.pedido_id === dep.depende_de_pedido_id);
+    if (!requisito) continue;
+    resultado.push({ requisito, estado: avaliarDependencia(requisito, dataConsulta, descreverPedido(requisito)) });
+  }
+  return resultado;
 }
 
 function piorCor(a: EstadoSemaforo, b: EstadoSemaforo): EstadoSemaforo {

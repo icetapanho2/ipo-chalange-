@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { apiGet, apiPost } from "../lib/api";
 
 interface ResumoPedido {
@@ -36,12 +37,22 @@ interface PropostaServico {
   pedido_urgente_doente: string;
 }
 
+interface ConsultaEmRisco {
+  pedido_id: string;
+  doente_id: string;
+  doente_nome: string;
+  descricao: string;
+  data_hora: string;
+  porque: string;
+}
+
 const ORDEM_ESTADOS = ["EM_TRIAGEM", "ACEITE", "SEM_VAGA", "MARCADO", "DEVOLVIDO", "FALTOU", "REALIZADO", "RECUSADO", "CANCELADO"];
 
 export function Servico() {
   const [pedidos, setPedidos] = useState<RespostaPedidos | null>(null);
   const [alertas, setAlertas] = useState<AlertaServico[] | null>(null);
   const [propostas, setPropostas] = useState<PropostaServico[] | null>(null);
+  const [emRisco, setEmRisco] = useState<ConsultaEmRisco[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [accoes, setAccoes] = useState<Record<string, string>>({});
 
@@ -49,6 +60,7 @@ export function Servico() {
     apiGet<RespostaPedidos>("/servico/pedidos").then(setPedidos).catch((e) => setErro(String(e)));
     apiGet<AlertaServico[]>("/servico/alertas").then(setAlertas);
     apiGet<PropostaServico[]>("/servico/propostas").then(setPropostas);
+    apiGet<ConsultaEmRisco[]>("/servico/consultas-em-risco").then(setEmRisco);
   }
 
   useEffect(recarregar, []);
@@ -79,6 +91,26 @@ export function Servico() {
         Serviço{pedidos ? ` — ${pedidos.especialidade_legivel}` : ""}
       </h1>
       {erro && <p className="mt-3 text-red-600">{erro}</p>}
+
+      {emRisco && emRisco.length > 0 && (
+        <section className="mt-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Consultas em risco (próximos 14 dias)</h2>
+          <div className="mt-2 space-y-2">
+            {emRisco.map((c) => (
+              <Link
+                key={c.pedido_id}
+                to={`/doente/${c.doente_id}`}
+                className="block rounded border border-red-300 bg-red-50 p-3 text-sm hover:bg-red-100"
+              >
+                <p className="font-medium text-red-900">
+                  🔴 {c.doente_nome} — {c.descricao} ({c.data_hora.replace("T", " ")})
+                </p>
+                <p className="text-red-700">{c.porque}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {propostas && propostas.length > 0 && (
         <section className="mt-4">

@@ -9,6 +9,7 @@ import { criarRotasDicionario } from "./routes/dicionario.ts";
 import { criarRotasTriagem } from "./routes/triagem.ts";
 import { criarRotasMeusPedidos } from "./routes/meusPedidos.ts";
 import { criarRotasServico } from "./routes/servico.ts";
+import { criarRotasDoente } from "./routes/doente.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -28,6 +29,7 @@ app.use("/api/dicionario", criarRotasDicionario(store));
 app.use("/api/triagem", criarRotasTriagem(store));
 app.use("/api/meus-pedidos", criarRotasMeusPedidos(store));
 app.use("/api/servico", criarRotasServico(store));
+app.use("/api/doente", criarRotasDoente(store));
 
 if (process.env.NODE_ENV === "production") {
   const distDir = path.join(__dirname, "..", "dist");
