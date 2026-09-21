@@ -25,6 +25,8 @@ import type {
   Perfil,
   TipoPedido,
   NotaConsulta,
+  Notificacao,
+  Silenciamento,
 } from "./types.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -64,6 +66,9 @@ class Store {
   parametros: Parametros = {} as Parametros;
   /** Notas SOAP do Oasis 2.0 (não vêm de CSV; estado só do MVP, perdido ao "repor demo"). */
   notasConsulta: NotaConsulta[] = [];
+  /** Notificações e preferências de silenciamento (Prompt N2) — geradas pela aplicação, não vêm de CSV. */
+  notificacoes: Notificacao[] = [];
+  silenciamentos: Silenciamento[] = [];
 
   private contadores: Record<string, number> = {
     pedido: 0,
@@ -72,6 +77,7 @@ class Store {
     alerta: 0,
     proposta: 0,
     ato: 0,
+    notificacao: 0,
   };
 
   carregar(): void {
@@ -248,10 +254,12 @@ class Store {
     };
     definirDataDemo(this.parametros.DEMO_DATE);
 
-    // Alertas, propostas de troca e notas SOAP são gerados pela aplicação (não vêm de CSV).
+    // Alertas, propostas de troca, notas SOAP e notificações são geradas pela aplicação (não vêm de CSV).
     this.alertas = [];
     this.propostasTroca = [];
     this.notasConsulta = [];
+    this.notificacoes = [];
+    this.silenciamentos = [];
 
     this.contadores = {
       pedido: maxSufixo(this.pedidos.map((x) => x.pedido_id), "P"),
@@ -260,6 +268,7 @@ class Store {
       alerta: 0,
       proposta: 0,
       ato: maxSufixo(this.atosMedicos.map((x) => x.mvp_ato_id), "AT"),
+      notificacao: 0,
     };
   }
 
@@ -306,7 +315,7 @@ class Store {
     return [...porAto.values()];
   }
 
-  proximoId(entidade: "pedido" | "dependencia" | "evento" | "alerta" | "proposta" | "ato"): string {
+  proximoId(entidade: "pedido" | "dependencia" | "evento" | "alerta" | "proposta" | "ato" | "notificacao"): string {
     this.contadores[entidade] += 1;
     const n = this.contadores[entidade];
     const prefixos: Record<typeof entidade, string> = {
@@ -316,6 +325,7 @@ class Store {
       alerta: "AL",
       proposta: "PT",
       ato: "AT",
+      notificacao: "N",
     };
     const casas = entidade === "ato" ? 6 : 5;
     return `${prefixos[entidade]}${String(n).padStart(casas, "0")}`;

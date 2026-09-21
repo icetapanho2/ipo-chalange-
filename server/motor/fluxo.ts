@@ -1,10 +1,45 @@
 import { store } from "../store.ts";
 import { agora } from "../clock.ts";
-import { isoDataHora } from "../util.ts";
+import { formatarDataHoraPt, isoDataHora, parseIso } from "../util.ts";
 import { registarEvento } from "./estados.ts";
-import { agendar, agendarLote } from "./agendamento.ts";
+import { agendar, agendarLote, type ResultadoAgendamento } from "./agendamento.ts";
 import { recalcularAlertas } from "./alertas.ts";
+import { notificar, utilizadoresPorPerfil } from "./notificacoes.ts";
+import { descreverDoente, descreverEspecialidade, descreverPedido, descreverPrioridade } from "../apresentacao.ts";
 import type { Pedido, Prioridade } from "../types.ts";
+
+/** Avisa o médico requisitante e a administração do serviço de origem do resultado da marcação (secção N2). */
+function notificarResultadoAgendamento(pedido: Pedido, resultado: ResultadoAgendamento, quando: Date): void {
+  const destinatarios = [
+    pedido.medico_requisitante_id,
+    ...utilizadoresPorPerfil("ADMINISTRATIVO", pedido.especialidade_origem),
+    // pedidos que passaram por triagem: o triador do serviço de destino também é notificado do desfecho.
+    ...(pedido.fluxo === "TRIAGEM" ? utilizadoresPorPerfil("TRIADOR", pedido.especialidade_destino) : []),
+  ];
+  if (resultado.tipo === "MARCADO") {
+    notificar({
+      tipo: "PEDIDO_MARCADO",
+      destinatarios,
+      titulo: `Marcado: ${descreverPedido(pedido)}`,
+      mensagem: `${descreverDoente(pedido.doente_id)} · ${formatarDataHoraPt(parseIso(resultado.ato.data_hora))} · ${descreverEspecialidade(pedido.especialidade_destino)}`,
+      pedidoId: pedido.pedido_id,
+      doenteId: pedido.doente_id,
+      consultaAtoId: pedido.consulta_origem_ato_id,
+      quando,
+    });
+  } else if (resultado.tipo === "SEM_VAGA") {
+    notificar({
+      tipo: "PEDIDO_SEM_VAGA",
+      destinatarios,
+      titulo: `Sem vaga: ${descreverPedido(pedido)}`,
+      mensagem: `${descreverDoente(pedido.doente_id)} · não foi possível marcar dentro do prazo (${pedido.prazo_limite}). O serviço tem de rever vagas extra ou outsourcing.`,
+      pedidoId: pedido.pedido_id,
+      doenteId: pedido.doente_id,
+      consultaAtoId: pedido.consulta_origem_ato_id,
+      quando,
+    });
+  }
+}
 
 /** EXTRAIDO -> VALIDADO -> (EM_TRIAGEM | ACEITE), conforme o fluxo do pedido (secção 5). */
 export function validarPedido(
@@ -24,8 +59,28 @@ export function validarPedido(
 /** Valida um conjunto de pedidos e agenda de imediato os que ficarem ACEITE (secção 5 da especificação de Validação). */
 export function aprovarPedidos(pedidos: Pedido[], utilizadorId: string, quando: Date = agora()): void {
   for (const pedido of pedidos) validarPedido(pedido, utilizadorId, { quando });
+
+  const emTriagem = pedidos.filter((p) => p.estado === "EM_TRIAGEM");
+  for (const pedido of emTriagem) {
+    notificar({
+      tipo: "PEDIDO_EM_TRIAGEM",
+      destinatarios: utilizadoresPorPerfil("TRIADOR", pedido.especialidade_destino),
+      titulo: `Novo pedido para triagem: ${descreverPedido(pedido)}`,
+      mensagem: `${descreverDoente(pedido.doente_id)} · ${descreverPrioridade(pedido.prioridade)} · prazo ${pedido.prazo_limite}`,
+      pedidoId: pedido.pedido_id,
+      doenteId: pedido.doente_id,
+      consultaAtoId: pedido.consulta_origem_ato_id,
+      quando,
+    });
+  }
+
   const aceites = pedidos.filter((p) => p.estado === "ACEITE").map((p) => p.pedido_id);
-  agendarLote(aceites, quando);
+  const resultados = agendarLote(aceites, quando);
+  for (const [pedidoId, resultado] of resultados) {
+    const pedido = pedidos.find((p) => p.pedido_id === pedidoId);
+    if (pedido) notificarResultadoAgendamento(pedido, resultado, quando);
+  }
+
   recalcularAlertas(quando);
 }
 
@@ -40,7 +95,8 @@ export function aceitarTriagem(
   pedido.triado_em = isoDataHora(quando);
   pedido.decisao_triagem = "ACEITE";
   registarEvento(pedido, "TRIAGEM", "ACEITE", utilizadorId, { dataHora: quando });
-  agendar(pedido, quando);
+  const resultado = agendar(pedido, quando);
+  notificarResultadoAgendamento(pedido, resultado, quando);
   recalcularAlertas(quando);
 }
 
@@ -50,6 +106,16 @@ export function recusarTriagem(pedido: Pedido, utilizadorId: string, motivo: str
   pedido.decisao_triagem = "RECUSADO";
   pedido.motivo_recusa = motivo;
   registarEvento(pedido, "RECUSA", "RECUSADO", utilizadorId, { motivo, dataHora: quando });
+  notificar({
+    tipo: "PEDIDO_RECUSADO",
+    destinatarios: [pedido.medico_requisitante_id, ...utilizadoresPorPerfil("ADMINISTRATIVO", pedido.especialidade_origem)],
+    titulo: `Recusado por ${descreverEspecialidade(pedido.especialidade_destino)}: ${descreverPedido(pedido)}`,
+    mensagem: `${descreverDoente(pedido.doente_id)} · Motivo: ${motivo}`,
+    pedidoId: pedido.pedido_id,
+    doenteId: pedido.doente_id,
+    consultaAtoId: pedido.consulta_origem_ato_id,
+    quando,
+  });
   recalcularAlertas(quando);
 }
 
@@ -69,6 +135,16 @@ export function reencaminharTriagem(
 export function pedirInformacao(pedido: Pedido, utilizadorId: string, pergunta: string, quando: Date = agora()): void {
   pedido.pergunta_triagem = pergunta;
   registarEvento(pedido, "DEVOLUCAO", "DEVOLVIDO", utilizadorId, { motivo: pergunta, dataHora: quando });
+  notificar({
+    tipo: "PEDIDO_DEVOLVIDO",
+    destinatarios: [pedido.medico_requisitante_id],
+    titulo: `${descreverEspecialidade(pedido.especialidade_destino)} pediu mais informação: ${descreverPedido(pedido)}`,
+    mensagem: `${descreverDoente(pedido.doente_id)} · Pergunta: ${pergunta}`,
+    pedidoId: pedido.pedido_id,
+    doenteId: pedido.doente_id,
+    consultaAtoId: pedido.consulta_origem_ato_id,
+    quando,
+  });
   recalcularAlertas(quando);
 }
 

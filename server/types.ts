@@ -218,6 +218,34 @@ export interface Evento {
   detalhe: string;
 }
 
+export type TipoNotificacao =
+  | "CONSULTA_SUBMETIDA"
+  | "PEDIDO_EM_TRIAGEM"
+  | "PEDIDO_MARCADO"
+  | "PEDIDO_SEM_VAGA"
+  | "PEDIDO_DEVOLVIDO"
+  | "PEDIDO_RECUSADO";
+
+/** Notificação dirigida a um utilizador, gerada pelo motor em cada transição relevante do fluxo (secção 5/N2). */
+export interface Notificacao {
+  notificacao_id: string;
+  tipo: TipoNotificacao;
+  destinatario_utilizador_id: string;
+  titulo: string;
+  mensagem: string;
+  pedido_id: string;
+  doente_id: string;
+  consulta_ato_id: string;
+  criado_em: string; // ISO data/hora
+  lida: boolean;
+}
+
+/** Um utilizador silenciou um tipo de notificação (não deixa de as gerar; nascem já lidas). */
+export interface Silenciamento {
+  utilizador_id: string;
+  tipo: TipoNotificacao;
+}
+
 export interface DicionarioEntrada {
   termo: string;
   significado: string;

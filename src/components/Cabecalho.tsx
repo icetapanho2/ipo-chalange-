@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { usePerfil } from "../lib/PerfilContext";
 import { apiPost } from "../lib/api";
+import { NotificacoesSino } from "./NotificacoesSino";
 import {
   Stethoscope,
   RotateCcw,
@@ -99,6 +100,8 @@ export function Cabecalho({ itens }: { itens: ItemNav[] }) {
 
         {/* Perfil Ativo & Ações */}
         <div className="flex items-center gap-2.5">
+          <NotificacoesSino />
+
           <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1">
             <UserCheck className="h-3.5 w-3.5 text-oasis-header shrink-0" />
             <select

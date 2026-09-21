@@ -3,7 +3,8 @@ import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
 import { isoDataHora } from "../util.ts";
 import { extrair } from "../extracao/index.ts";
-import { pedidoParaJson } from "../apresentacao.ts";
+import { pedidoParaJson, descreverDoente, descreverUtilizador } from "../apresentacao.ts";
+import { notificar, utilizadoresPorPerfil } from "../motor/notificacoes.ts";
 
 export function criarRotasOasis(store: typeof StoreType) {
   const router = Router();
@@ -87,6 +88,19 @@ export function criarRotasOasis(store: typeof StoreType) {
           quando,
         })
       : { pedidos: [], alertas: [] as string[] };
+
+    notificar({
+      tipo: "CONSULTA_SUBMETIDA",
+      destinatarios: utilizadoresPorPerfil("ADMINISTRATIVO", ato.especialidade_codigo),
+      titulo: `Fim de consulta: ${descreverDoente(ato.doente_id)}`,
+      mensagem:
+        resultado.pedidos.length > 0
+          ? `${descreverUtilizador(medicoId)} submeteu ${resultado.pedidos.length} pedido(s) para rever e aprovar.`
+          : `${descreverUtilizador(medicoId)} terminou a consulta sem pedidos pendentes. Reveja a transcrição, se necessário.`,
+      doenteId: ato.doente_id,
+      consultaAtoId: ato.mvp_ato_id,
+      quando,
+    });
 
     res.json({
       ok: true,
