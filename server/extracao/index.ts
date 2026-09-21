@@ -10,7 +10,7 @@ import { agora } from "../clock.ts";
 import { diferencaDias, isoData, isoDataHora, somarDias } from "../util.ts";
 import { registarEvento } from "../motor/estados.ts";
 import { aplicarR1, aplicarR3 } from "../motor/dependencias.ts";
-import { calcularPrazo } from "../motor/prioridade.ts";
+import { calcularPrazo, calcularPrioridadeSistema } from "../motor/prioridade.ts";
 import { resolverTermo } from "./dicionario.ts";
 import { criarAlerta } from "../motor/alertas.ts";
 import { procurarNaCachePorTexto } from "./providers/cache.ts";
@@ -88,6 +88,157 @@ function fornecedorDisponivel(nome: NomeFornecedor): boolean {
   return true;
 }
 
+function tentarExtracaoHeuristica(texto: string, medicoId: string): EntradaCacheExtracao | null {
+  const min = texto.toLowerCase();
+  const pedidos: PedidoExtraido[] = [];
+  const alertas: EntradaCacheExtracao["alertas"] = [];
+
+  let idxAnalises = -1;
+  let idxExame = -1;
+
+  // 1. Dicionário pessoal ou abreviatura (ex: HPC)
+  if (/\bhpc\b/i.test(texto)) {
+    const resolvido = resolverTermo("HPC", medicoId);
+    if (resolvido) {
+      pedidos.push({
+        ref: pedidos.length,
+        tipo_pedido: "tratamento",
+        especialidade_destino: "9602",
+        ato_codigo: "3",
+        exames: ["65270"],
+        analises: [],
+        especificacao: "Manutenção CVC (HPC)",
+        prioridade: null,
+        recorrencia: "4 semanas",
+        depende_de: [],
+        confianca: 1.0,
+        origem_regra: `DICIONARIO:${medicoId}:HPC`,
+        texto_origem: "HPC 4/4s",
+      });
+    } else {
+      alertas.push({
+        tipo: "TERMO_DESCONHECIDO",
+        texto_origem: "HPC",
+        mensagem: "Termo 'HPC' não reconhecido. Não foi criado pedido. Confirmar o que significa.",
+      });
+    }
+  }
+
+  // 2. Colheita / Análises
+  if (min.includes("colheita") || min.includes("análise") || min.includes("analise") || min.includes("hemog") || min.includes("bioq") || min.includes("creat") || min.includes("cea")) {
+    const analisesCodigos: string[] = [];
+    if (min.includes("hemog") || min.includes("colheita")) analisesCodigos.push("A001");
+    if (min.includes("bioq") || min.includes("creat")) analisesCodigos.push("A002", "A003");
+    if (min.includes("cea")) analisesCodigos.push("A004");
+    if (min.includes("19.9") || min.includes("ca 19")) analisesCodigos.push("A005");
+    if (analisesCodigos.length === 0) analisesCodigos.push("A001", "A002");
+
+    idxAnalises = pedidos.length;
+    pedidos.push({
+      ref: idxAnalises,
+      tipo_pedido: "analises",
+      especialidade_destino: "6100",
+      ato_codigo: analisesCodigos.length > 3 ? "9" : "4",
+      exames: [],
+      analises: analisesCodigos,
+      especificacao: min.includes("sem jejum") || min.includes("s/ jejum") ? "sem jejum" : "com jejum",
+      prioridade: null,
+      prazo_dias: null,
+      nao_antes_dias: null,
+      medico_preferido: null,
+      continuidade_obrigatoria: false,
+      recorrencia: null,
+      depende_de: [],
+      confianca: 0.95,
+      texto_origem: "Colheita de análises clínicas",
+    });
+  }
+
+  // 3. Exames de imagem (TC / TAC / RM / Ecografia / Raio-X)
+  if (min.includes("tc") || min.includes("tac") || min.includes("tomografia") || min.includes("ecografia") || min.includes("resson")) {
+    const comContraste = min.includes("contraste") || min.includes("c/ contraste");
+    const depExame: number[] = [];
+    if (idxAnalises >= 0) depExame.push(idxAnalises);
+
+    idxExame = pedidos.length;
+    pedidos.push({
+      ref: idxExame,
+      tipo_pedido: "exame",
+      especialidade_destino: "7000_2",
+      ato_codigo: "1",
+      exames: ["7000002", "7000004", "7000009"],
+      analises: [],
+      especificacao: comContraste ? "com contraste" : "sem contraste",
+      prioridade: null,
+      prazo_dias: null,
+      nao_antes_dias: null,
+      medico_preferido: null,
+      continuidade_obrigatoria: false,
+      recorrencia: null,
+      depende_de: depExame,
+      confianca: 0.96,
+      texto_origem: comContraste ? "TC TAP c/ contraste" : "TC TAP",
+    });
+  }
+
+  // 4. Consulta de revisão médica
+  if (min.includes("rev") || min.includes("revisão") || min.includes("revisao") || min.includes("reavalia")) {
+    const depConsulta: number[] = [];
+    if (idxAnalises >= 0) depConsulta.push(idxAnalises);
+    if (idxExame >= 0) depConsulta.push(idxExame);
+
+    const comigo = min.includes("comigo");
+    pedidos.push({
+      ref: pedidos.length,
+      tipo_pedido: "consulta",
+      especialidade_destino: "2102",
+      ato_codigo: "22",
+      exames: [],
+      analises: [],
+      especificacao: "revisão de acompanhamento",
+      prioridade: null,
+      prazo_dias: 35,
+      nao_antes_dias: 21,
+      medico_preferido: comigo ? "REQUISITANTE" : null,
+      continuidade_obrigatoria: comigo,
+      recorrencia: null,
+      depende_de: depConsulta,
+      confianca: 0.94,
+      texto_origem: comigo ? "Rev c/ exames 1/12 comigo" : "Rev 1/12",
+    });
+  }
+
+  // 5. Pedido de consulta interdepartamental (ex: Cirurgia Geral)
+  if (min.includes("cirurgia") || min.includes("consulta externa") || min.includes("interconsulta")) {
+    const urgente = min.includes("urgente") || min.includes("muito priorit") || min.includes("mp");
+    pedidos.push({
+      ref: pedidos.length,
+      tipo_pedido: "pedido_consulta",
+      especialidade_destino: "1101",
+      ato_codigo: "1",
+      exames: [],
+      analises: [],
+      especificacao: "Avaliação da especialidade cirúrgica",
+      prioridade: urgente ? "MP" : "P",
+      prazo_dias: urgente ? 3 : 15,
+      nao_antes_dias: null,
+      medico_preferido: null,
+      continuidade_obrigatoria: false,
+      recorrencia: null,
+      depende_de: [],
+      confianca: 0.92,
+      texto_origem: "Pedido de consulta Cirurgia Geral",
+    });
+  }
+
+  if (pedidos.length === 0 && alertas.length === 0) return null;
+  return {
+    texto_plano: texto,
+    pedidos,
+    alertas,
+  };
+}
+
 export async function extrair(
   texto: string,
   medicoId: string,
@@ -101,6 +252,10 @@ export async function extrair(
   // Fornecedor cache, ou texto conhecido da demo com DEMO_CACHE_PRIMEIRO (garante a demo).
   if (fornecedor === "cache" || (entradaCache && demoCachePrimeiro())) {
     if (!entradaCache) {
+      const heuristica = tentarExtracaoHeuristica(texto, medicoId);
+      if (heuristica) {
+        return processarEntrada(heuristica, doenteId, medicoId, texto, contexto, quando, "cache", false);
+      }
       return semReconhecimento(doenteId, contexto, quando, fornecedor, false);
     }
     return processarEntrada(entradaCache, doenteId, medicoId, texto, contexto, quando, "cache", false);
@@ -116,6 +271,12 @@ export async function extrair(
   } catch (erroFornecedor) {
     if (entradaCache) {
       const resultado = await processarEntrada(entradaCache, doenteId, medicoId, texto, contexto, quando, fornecedor, true);
+      registarFallback(resultado.pedidos, fornecedor, erroFornecedor, quando);
+      return resultado;
+    }
+    const heuristica = tentarExtracaoHeuristica(texto, medicoId);
+    if (heuristica) {
+      const resultado = await processarEntrada(heuristica, doenteId, medicoId, texto, contexto, quando, fornecedor, true);
       registarFallback(resultado.pedidos, fornecedor, erroFornecedor, quando);
       return resultado;
     }

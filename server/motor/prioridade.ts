@@ -4,6 +4,148 @@ import type { Pedido, Prioridade, TipoPedido } from "../types.ts";
 
 const PESO_NIVEL: Record<Prioridade, number> = { MP: 3, P: 2, N: 1 };
 
+export interface ResultadoCalculoPrioridade {
+  prioridade: Prioridade;
+  score: number;
+  detalheEquacao: string;
+}
+
+/**
+ * Equação de Cálculo de Prioridade pelo Sistema.
+ * A prioridade é calculada dinamicamente pelo sistema com base em:
+ * 1. Urgência clínica e prazos temporais explícitos no plano (<72h => MP)
+ * 2. Tipo de ato (quimioterapia / HD, interconsultas de oncologia/cirurgia, exames com contraste)
+ * 3. Dados clínicos e estadiamento do paciente (oncologia ativa, estádios III/IV)
+ * 4. Prazos SNS e folga calculada
+ */
+export function calcularPrioridadeSistema(
+  dados: {
+    tipo_pedido: TipoPedido;
+    ato_codigo?: string;
+    prazo_dias?: number | null;
+    especificacao?: string;
+    texto_origem?: string;
+    prioridade_sugerida?: Prioridade | null;
+  },
+  doente?: {
+    estadiamento?: string;
+    diagnostico_principal?: string;
+  } | null,
+  textoPlano?: string,
+): ResultadoCalculoPrioridade {
+  const textoCombinado = `${dados.texto_origem || ""} ${dados.especificacao || ""} ${textoPlano || ""}`.toLowerCase();
+  
+  // 1. Fator Temporal / Urgência
+  let pontosUrgencia = 20;
+  let motivoUrgencia = "Eletivo standard";
+
+  const prazoDias = dados.prazo_dias;
+  if (
+    textoCombinado.includes("urgente hoje") ||
+    textoCombinado.includes("emergência") ||
+    textoCombinado.includes("emergencia") ||
+    (prazoDias !== null && prazoDias !== undefined && prazoDias <= 3)
+  ) {
+    pontosUrgencia = 90;
+    motivoUrgencia = "Urgência crítica / Prazo ≤ 3 dias";
+  } else if (
+    textoCombinado.includes("urgente") ||
+    textoCombinado.includes("muito priorit") ||
+    textoCombinado.includes("mp") ||
+    (prazoDias !== null && prazoDias !== undefined && prazoDias <= 15)
+  ) {
+    pontosUrgencia = 65;
+    motivoUrgencia = "Alta urgência clínica / Prazo ≤ 15 dias";
+  } else if (
+    dados.prioridade_sugerida === "P" ||
+    (prazoDias !== null && prazoDias !== undefined && prazoDias <= 35)
+  ) {
+    pontosUrgencia = 45;
+    motivoUrgencia = "Prazo intermédio ≤ 35 dias";
+  } else {
+    pontosUrgencia = 20;
+    motivoUrgencia = "Rotina / Seguimento programado";
+  }
+
+  // 2. Fator Tipo de Pedido & Procedimento
+  let pontosTipo = 15;
+  let motivoTipo = "Consulta geral";
+  switch (dados.tipo_pedido) {
+    case "pedido_hd":
+      pontosTipo = 30;
+      motivoTipo = "Sessão Hospital de Dia / Quimioterapia ativa";
+      break;
+    case "pedido_consulta":
+      pontosTipo = 25;
+      motivoTipo = "Interconsulta hospitalar especializada";
+      break;
+    case "exame":
+      if (textoCombinado.includes("contraste") || textoCombinado.includes("tc tap") || textoCombinado.includes("tac")) {
+        pontosTipo = 22;
+        motivoTipo = "Exame de imagem com contraste / Estadiamento";
+      } else {
+        pontosTipo = 18;
+        motivoTipo = "Exame complementar de diagnóstico";
+      }
+      break;
+    case "analises":
+      pontosTipo = 15;
+      motivoTipo = "Análises laboratoriais";
+      break;
+    case "tratamento":
+      pontosTipo = 22;
+      motivoTipo = "Tratamento / Manutenção CVC";
+      break;
+    default:
+      pontosTipo = 12;
+      motivoTipo = "Consulta de revisão";
+  }
+
+  // 3. Fator Clínico do Paciente
+  let pontosPaciente = 10;
+  let motivoPaciente = "Perfil clínico geral";
+  const estadiamento = (doente?.estadiamento || "").toLowerCase();
+  const diagnostico = (doente?.diagnostico_principal || "").toLowerCase();
+
+  if (
+    estadiamento.includes("iv") ||
+    estadiamento.includes("iii") ||
+    estadiamento.includes("metast") ||
+    diagnostico.includes("metast")
+  ) {
+    pontosPaciente = 25;
+    motivoPaciente = "Doente oncológico avançado (Estádio III/IV ou metastático)";
+  } else if (
+    estadiamento.includes("ii") ||
+    diagnostico.includes("neoplasia") ||
+    diagnostico.includes("carcinoma") ||
+    diagnostico.includes("tumor")
+  ) {
+    pontosPaciente = 18;
+    motivoPaciente = "Neoplasia ativa / Estadiamento intermédio";
+  }
+
+  // Equação Global do Sistema
+  const scoreCalculado = Math.min(100, Math.max(10, Math.round(pontosUrgencia * 0.5 + pontosTipo * 0.3 + pontosPaciente * 0.2)));
+
+  let prioridade: Prioridade = "N";
+  if (scoreCalculado >= 70 || pontosUrgencia >= 85) {
+    prioridade = "MP";
+  } else if (scoreCalculado >= 42 || pontosUrgencia >= 60) {
+    prioridade = "P";
+  } else {
+    prioridade = "N";
+  }
+
+  const detalheEquacao = `Equação do Sistema: Score ${scoreCalculado}/100 [${motivoUrgencia} (${pontosUrgencia}pts) + ${motivoTipo} (${pontosTipo}pts) + ${motivoPaciente} (${pontosPaciente}pts)] ⇒ Nível ${prioridade}`;
+
+  return {
+    prioridade,
+    score: scoreCalculado,
+    detalheEquacao,
+  };
+}
+
 /** Prazo por nível (regras_prazos.csv); uma data explícita mais cedo do médico prevalece. */
 export function calcularPrazo(
   tipoPedido: TipoPedido,
@@ -43,14 +185,20 @@ export interface ItemFila {
   dataMinima: Date;
 }
 
-/** Ordem da fila: (1) menor folga, (2) nível mais alto, (3) pedido mais antigo. */
+/** Ordem da fila de marcação: equações do sistema (1) nível de prioridade (MP > P > N), (2) menor folga em dias, (3) score de prioridade do sistema, (4) antiguidade do pedido. */
 export function compararFila(a: ItemFila, b: ItemFila): number {
-  const folgaA = folgaDias(a.pedido, a.dataMinima);
-  const folgaB = folgaDias(b.pedido, b.dataMinima);
-  if (folgaA !== folgaB) return folgaA - folgaB;
   const nivelA = PESO_NIVEL[a.pedido.prioridade];
   const nivelB = PESO_NIVEL[b.pedido.prioridade];
   if (nivelA !== nivelB) return nivelB - nivelA;
+
+  const folgaA = folgaDias(a.pedido, a.dataMinima);
+  const folgaB = folgaDias(b.pedido, b.dataMinima);
+  if (folgaA !== folgaB) return folgaA - folgaB;
+
+  const scoreA = a.pedido.score_prioridade ?? (nivelA * 30);
+  const scoreB = b.pedido.score_prioridade ?? (nivelB * 30);
+  if (scoreA !== scoreB) return scoreB - scoreA;
+
   return parseIso(a.pedido.criado_em).getTime() - parseIso(b.pedido.criado_em).getTime();
 }
 

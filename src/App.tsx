@@ -28,7 +28,7 @@ const ITENS_NAV: ItemNav[] = [
   { caminho: "/meus-pedidos", etiqueta: "Meus pedidos" },
   { caminho: "/servico", etiqueta: "Serviço" },
   { caminho: "/gestao", etiqueta: "Gestão" },
-  { caminho: "/guiao", etiqueta: "Guião" },
+  { caminho: "/guiao", etiqueta: "Guião & Testes" },
 ];
 
 export function App() {

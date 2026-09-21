@@ -51,6 +51,12 @@ async function main() {
   let contagemCorreta = 0;
 
   for (const plano of dados.planos) {
+    // Pausa para respeitar o limite de 5 req/min do free tier quando a chamar LLM
+    if (totalPares > 0 || dados.planos.indexOf(plano) > 0) {
+      if (fornecedor !== "cache") {
+        await new Promise((r) => setTimeout(r, 13_000));
+      }
+    }
     const esperado = plano.esperado ?? plano.esperado_antes_de_aprender ?? [];
     const quando = agora();
     const resultado = await extrair(plano.texto, plano.medico, "AVALIACAO", {

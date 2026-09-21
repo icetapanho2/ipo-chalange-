@@ -58,6 +58,11 @@ export interface Doente {
   sexo: string;
   data_nascimento: string;
   demo_cenario: string;
+  diagnostico_principal?: string;
+  estadiamento?: string;
+  alergias?: string[];
+  contacto?: string;
+  notas_clinicas?: string;
 }
 
 export interface Vaga {
@@ -167,6 +172,9 @@ export interface Pedido {
   motivo_recusa?: string;
   /** true quando o pedido foi reconhecido automaticamente por uma entrada do dicionário (selo "aprendido"). */
   origem_dicionario?: boolean;
+  score_prioridade?: number;
+  equacao_prioridade_detalhe?: string;
+  prioridade_calculada_sistema?: boolean;
 }
 
 export interface Dependencia {

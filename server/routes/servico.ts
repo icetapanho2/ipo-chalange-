@@ -26,6 +26,7 @@ export function criarRotasServico(store: typeof StoreType) {
   function pedidoResumo(p: Pedido) {
     return {
       pedido_id: p.pedido_id,
+      doente_id: p.doente_id,
       doente_nome: descreverDoente(p.doente_id),
       medico_requisitante_nome: descreverUtilizador(p.medico_requisitante_id),
       tipo_pedido_legivel: descreverTipoPedido(p.tipo_pedido),

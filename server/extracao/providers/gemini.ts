@@ -18,7 +18,9 @@ export async function extrairComGemini(prompt: string): Promise<RespostaProvider
   if (!apiKey) throw new Error("GEMINI_API_KEY não configurada");
 
   const ai = new GoogleGenAI({ apiKey });
-  const modelo = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const modelo = (process.env.GEMINI_MODEL && !process.env.GEMINI_MODEL.includes("2.0") && !process.env.GEMINI_MODEL.includes("2.5"))
+    ? process.env.GEMINI_MODEL
+    : "gemini-3.8-flash";
 
   const resposta = await ai.models.generateContent({
     model: modelo,

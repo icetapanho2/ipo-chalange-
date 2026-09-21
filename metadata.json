@@ -1,0 +1,6 @@
+{
+  "name": "Oasis 2.0 - Pedidos pós-consulta",
+  "description": "Gestão e triagem de pedidos pós-consulta com integração Oasis",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

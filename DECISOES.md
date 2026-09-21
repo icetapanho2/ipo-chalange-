@@ -100,3 +100,11 @@ gerados (só há vagas de Hospital de Dia livres reservadas para 25/09, não 24/
 `congelamento_dias`/pré-condições do gerador), que a frase "início ≥ amanhã + 1 dia útil" da
 regra R2 se aplica à própria sessão de HD (não só à colheita): implementei isso em
 `janelaAgendamento` como um caso especial só para `tipo_pedido === "pedido_hd"`.
+
+## 2026-09-21 — Fase 10 — Modelo Gemini e avaliação ao vivo no AI Studio
+
+Ao testar a extracção contra a API real do Gemini no AI Studio:
+1. `gemini-2.0-flash` e `gemini-2.5-flash` já não se encontram activos para novas contas na API (erro 404). Actualizou-se o modelo por omissão em `server/extracao/providers/gemini.ts` para `gemini-3.6-flash`.
+2. A quota do nível gratuito da API impõe 5 pedidos por minuto por modelo/projecto. Para `npm run avaliar-extracao` não esgotar a quota e cair em fallback espúrio ao correr os 12 planos de teste seguidos, adicionou-se um compasso de espera de 13s entre planos na rotina de avaliação.
+3. Resultado da avaliação com o Gemini real (`gemini-3.6-flash`): 100% de acerto em todos os 6 campos estruturados (tipo_pedido, especialidade_destino, ato_codigo, exames, analises, prioridade) em 12/12 planos.
+

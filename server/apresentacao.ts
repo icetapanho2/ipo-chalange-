@@ -84,3 +84,30 @@ const NOME_ESTADO: Record<Pedido["estado"], string> = {
 export function descreverEstado(estado: Pedido["estado"]): string {
   return NOME_ESTADO[estado] ?? estado;
 }
+
+export function pedidoParaJson(p: Pedido, limiarConfianca = 0.8) {
+  return {
+    pedido_id: p.pedido_id,
+    tipo_pedido: p.tipo_pedido,
+    tipo_pedido_legivel: descreverTipoPedido(p.tipo_pedido),
+    especialidade_destino: p.especialidade_destino,
+    especialidade_destino_legivel: descreverEspecialidade(p.especialidade_destino),
+    ato_codigo: p.ato_codigo,
+    exames: p.exames,
+    analises: p.analises,
+    especificacao: p.especificacao,
+    descricao: descreverPedido(p),
+    prioridade: p.prioridade,
+    prioridade_legivel: descreverPrioridade(p.prioridade),
+    prioridade_por_defeito: !!p.prioridade_por_defeito,
+    prazo_limite: p.prazo_limite,
+    nao_antes: p.nao_antes,
+    confianca: p.confianca,
+    baixa_confianca: p.confianca < limiarConfianca,
+    texto_origem: p.texto_origem,
+    origem_dicionario: !!p.origem_dicionario,
+    estado: p.estado,
+    estado_legivel: descreverEstado(p.estado),
+    fluxo: p.fluxo,
+  };
+}

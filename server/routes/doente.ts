@@ -9,11 +9,109 @@ import {
   descreverEstado,
   descreverPedido,
   descreverUtilizador,
+  pedidoParaJson,
 } from "../apresentacao.ts";
-import type { Pedido } from "../types.ts";
+import type { Pedido, Doente } from "../types.ts";
 
 export function criarRotasDoente(store: typeof StoreType) {
   const router = Router();
+
+  // Listar todos os doentes para seleção e gestão
+  router.get("/", (_req, res) => {
+    const lista = store.doentes.map((d) => {
+      const pedidosDoente = store.pedidos.filter((p) => p.doente_id === d.doente_id);
+      const alertasDoente = store.alertas.filter((a) => a.doente_id === d.doente_id && a.estado === "ABERTO");
+      return {
+        ...d,
+        total_pedidos: pedidosDoente.length,
+        total_alertas: alertasDoente.length,
+        pedidos_em_curso: pedidosDoente.filter((p) => p.estado !== "REALIZADO" && p.estado !== "FALTOU").length,
+      };
+    });
+    res.json(lista);
+  });
+
+  // Criar novo perfil de doente
+  router.post("/", (req, res) => {
+    const {
+      nome,
+      n_utente,
+      sexo = "M",
+      data_nascimento = "1975-01-01",
+      diagnostico_principal = "",
+      estadiamento = "",
+      alergias = [],
+      contacto = "",
+      notas_clinicas = "",
+    } = req.body ?? {};
+
+    if (!nome || !nome.trim()) {
+      res.status(400).json({ erro: "Nome do paciente é obrigatório." });
+      return;
+    }
+
+    const proximoNumero = store.doentes.length + 1;
+    const doente_id = `100${String(100 + proximoNumero)}`;
+    const novoDoente: Doente = {
+      doente_id,
+      n_utente: n_utente ? String(n_utente).trim() : `999${String(100000 + proximoNumero)}`,
+      nome: nome.trim(),
+      sexo: String(sexo).toUpperCase(),
+      data_nascimento,
+      demo_cenario: "NOVO_PACIENTE",
+      diagnostico_principal: diagnostico_principal || "Sem diagnóstico preliminar",
+      estadiamento,
+      alergias: Array.isArray(alergias)
+        ? alergias
+        : typeof alergias === "string"
+        ? alergias.split(",").map((s: string) => s.trim()).filter(Boolean)
+        : [],
+      contacto: contacto ? String(contacto).trim() : "910 000 000",
+      notas_clinicas,
+    };
+
+    store.doentes.push(novoDoente);
+    res.json({ ok: true, doente: novoDoente });
+  });
+
+  // Atualizar / completar perfil de doente existente
+  router.put("/:id", (req, res) => {
+    const doente = store.doentes.find((d) => d.doente_id === req.params.id);
+    if (!doente) {
+      res.status(404).json({ erro: "Doente não encontrado." });
+      return;
+    }
+
+    const {
+      nome,
+      n_utente,
+      sexo,
+      data_nascimento,
+      diagnostico_principal,
+      estadiamento,
+      alergias,
+      contacto,
+      notas_clinicas,
+    } = req.body ?? {};
+
+    if (nome) doente.nome = String(nome).trim();
+    if (n_utente) doente.n_utente = String(n_utente).trim();
+    if (sexo) doente.sexo = String(sexo).toUpperCase();
+    if (data_nascimento) doente.data_nascimento = data_nascimento;
+    if (diagnostico_principal !== undefined) doente.diagnostico_principal = diagnostico_principal;
+    if (estadiamento !== undefined) doente.estadiamento = estadiamento;
+    if (alergias !== undefined) {
+      doente.alergias = Array.isArray(alergias)
+        ? alergias
+        : typeof alergias === "string"
+        ? alergias.split(",").map((s: string) => s.trim()).filter(Boolean)
+        : [];
+    }
+    if (contacto !== undefined) doente.contacto = String(contacto).trim();
+    if (notas_clinicas !== undefined) doente.notas_clinicas = notas_clinicas;
+
+    res.json({ ok: true, doente });
+  });
 
   router.get("/:id", (req, res) => {
     const doente = store.doentes.find((d) => d.doente_id === req.params.id);
@@ -72,7 +170,76 @@ export function criarRotasDoente(store: typeof StoreType) {
       .filter((m): m is NonNullable<typeof m> => !!m)
       .sort((a, b) => a.data_hora.localeCompare(b.data_hora));
 
-    res.json({ doente, timeline, marcacoesFuturas });
+    const todosPedidos = pedidos.map((p) => pedidoParaJson(p, store.parametros.limiar_confianca));
+
+    const alertas = store.alertas
+      .filter((a) => a.doente_id === doente.doente_id && a.estado === "ABERTO")
+      .map((a) => ({
+        alerta_id: a.alerta_id,
+        tipo: a.tipo,
+        gravidade: a.gravidade,
+        descricao: a.descricao,
+        criado_em: a.criado_em,
+      }));
+
+    // Análise de prontidão clínica (o que falta)
+    const oQueFalta: { nivel: "vermelho" | "amarelo" | "azul"; titulo: string; detalhe: string; pedido_id?: string }[] = [];
+
+    // Faltas ou dependências bloqueadas
+    for (const m of marcacoesFuturas) {
+      for (const d of m.dependencias) {
+        if (d.cor === "vermelho") {
+          oQueFalta.push({
+            nivel: "vermelho",
+            titulo: `Exame/Análise em Falta: ${d.descricao}`,
+            detalhe: `${d.porque} Bloqueia a consulta de ${m.descricao} (${m.data_hora.replace("T", " ")}).`,
+            pedido_id: d.pedido_id,
+          });
+        } else if (d.cor === "amarelo") {
+          oQueFalta.push({
+            nivel: "amarelo",
+            titulo: `Aviso de Prazo: ${d.descricao}`,
+            detalhe: d.porque,
+            pedido_id: d.pedido_id,
+          });
+        }
+      }
+    }
+
+    // Pedidos devolvidos à espera de esclarecimento do médico
+    const devolvidos = pedidos.filter((p) => p.estado === "DEVOLVIDO");
+    for (const dev of devolvidos) {
+      oQueFalta.push({
+        nivel: "vermelho",
+        titulo: `Aguardar Resposta do Médico: ${descreverPedido(dev)}`,
+        detalhe: `Dúvida do triador: "${dev.pergunta_triagem || "Informação clínica pendente"}".`,
+        pedido_id: dev.pedido_id,
+      });
+    }
+
+    // Pedidos sem vaga
+    const semVaga = pedidos.filter((p) => p.estado === "SEM_VAGA");
+    for (const sv of semVaga) {
+      oQueFalta.push({
+        nivel: "amarelo",
+        titulo: `Sem Vaga Disponível: ${descreverPedido(sv)}`,
+        detalhe: `Exige encaixe ou proposta de troca de agenda na especialidade ${descreverEspecialidade(sv.especialidade_destino)}.`,
+        pedido_id: sv.pedido_id,
+      });
+    }
+
+    // Pedidos ainda em triagem
+    const emTriagem = pedidos.filter((p) => p.estado === "EM_TRIAGEM");
+    for (const et of emTriagem) {
+      oQueFalta.push({
+        nivel: "azul",
+        titulo: `Em Triagem Externa: ${descreverPedido(et)}`,
+        detalhe: `A aguardar avaliação clínica pelo serviço de ${descreverEspecialidade(et.especialidade_destino)}.`,
+        pedido_id: et.pedido_id,
+      });
+    }
+
+    res.json({ doente, timeline, marcacoesFuturas, todosPedidos, alertas, oQueFalta });
   });
 
   router.post("/:id/pedidos/:pedidoId/remarcar-exame", (req, res) => {

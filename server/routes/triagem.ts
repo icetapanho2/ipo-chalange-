@@ -44,6 +44,7 @@ export function criarRotasTriagem(store: typeof StoreType) {
       });
       return {
         pedido_id: pedido.pedido_id,
+        doente_id: pedido.doente_id,
         doente_nome: descreverDoente(pedido.doente_id),
         medico_requisitante_nome: descreverUtilizador(pedido.medico_requisitante_id),
         especialidade_origem_legivel: descreverEspecialidade(pedido.especialidade_origem),
