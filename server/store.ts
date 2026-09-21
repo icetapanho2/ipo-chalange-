@@ -1,6 +1,6 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readCsv, readJson } from "./csv.ts";
+import { readCsv } from "./csv.ts";
 import { definirDataDemo } from "./clock.ts";
 import type {
   Especialidade,
@@ -68,6 +68,7 @@ class Store {
     evento: 0,
     alerta: 0,
     proposta: 0,
+    ato: 0,
   };
 
   carregar(): void {
@@ -254,6 +255,7 @@ class Store {
       evento: maxSufixo(this.eventos.map((x) => x.evento_id), "E"),
       alerta: 0,
       proposta: 0,
+      ato: maxSufixo(this.atosMedicos.map((x) => x.mvp_ato_id), "AT"),
     };
   }
 
@@ -300,7 +302,7 @@ class Store {
     return [...porAto.values()];
   }
 
-  proximoId(entidade: "pedido" | "dependencia" | "evento" | "alerta" | "proposta"): string {
+  proximoId(entidade: "pedido" | "dependencia" | "evento" | "alerta" | "proposta" | "ato"): string {
     this.contadores[entidade] += 1;
     const n = this.contadores[entidade];
     const prefixos: Record<typeof entidade, string> = {
@@ -309,8 +311,10 @@ class Store {
       evento: "E",
       alerta: "AL",
       proposta: "PT",
+      ato: "AT",
     };
-    return `${prefixos[entidade]}${String(n).padStart(5, "0")}`;
+    const casas = entidade === "ato" ? 6 : 5;
+    return `${prefixos[entidade]}${String(n).padStart(casas, "0")}`;
   }
 }
 

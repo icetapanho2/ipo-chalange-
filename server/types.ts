@@ -165,6 +165,8 @@ export interface Pedido {
   pergunta_triagem?: string;
   resposta_medico?: string;
   motivo_recusa?: string;
+  /** true quando o pedido foi reconhecido automaticamente por uma entrada do dicionário (selo "aprendido"). */
+  origem_dicionario?: boolean;
 }
 
 export interface Dependencia {
