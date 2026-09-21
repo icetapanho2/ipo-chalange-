@@ -1,0 +1,300 @@
+{
+  "_nota": "Planos FICTÍCIOS para testar o agente de extracção. 'esperado' é o resultado correcto (gold). Prazos relativos à data da consulta. Substituir/complementar com os planos reais anonimizados.",
+  "_formato_pedido": {
+    "tipo_pedido": "consulta | pedido_consulta | exame | analises | tratamento | pedido_hd",
+    "especialidade_destino": "código de especialidades.csv",
+    "ato_codigo": "código de catalogo_atos.csv",
+    "exames": "lista de códigos de exames.csv",
+    "analises": "lista de códigos de analises.csv",
+    "especificacao": "texto livre curto (contraste, sedação, protocolo…)",
+    "prioridade": "MP | P | N | null (se o médico não indicar -> N por defeito, a confirmar na validação)",
+    "prazo_dias": "número ou null",
+    "nao_antes_dias": "número ou null",
+    "medico_preferido": "REQUISITANTE | id de utilizador | null",
+    "continuidade_obrigatoria": "true | false",
+    "recorrencia": "texto ou null",
+    "depende_de": "índices de outros pedidos do mesmo plano",
+    "alertas": "lista de problemas que o agente deve assinalar em vez de inventar"
+  },
+  "planos": [
+    {
+      "id": "T01",
+      "medico": "U01",
+      "texto": "P: TC TAP c/ contraste + colheita c/ jejum (hemog, bioq c/ creat, CEA, CA 19.9). Rev c/ exames 1/12 comigo.",
+      "esperado": [
+        {
+          "tipo_pedido": "analises",
+          "especialidade_destino": "6100",
+          "ato_codigo": "9",
+          "analises": [
+            "A001",
+            "A002",
+            "A003",
+            "A004",
+            "A005"
+          ],
+          "prioridade": null,
+          "depende_de": []
+        },
+        {
+          "tipo_pedido": "exame",
+          "especialidade_destino": "7000_2",
+          "ato_codigo": "1",
+          "exames": [
+            "7000002",
+            "7000004",
+            "7000009"
+          ],
+          "especificacao": "com contraste",
+          "prioridade": null,
+          "depende_de": [
+            0
+          ]
+        },
+        {
+          "tipo_pedido": "consulta",
+          "especialidade_destino": "2102",
+          "ato_codigo": "22",
+          "nao_antes_dias": 21,
+          "prazo_dias": 35,
+          "medico_preferido": "REQUISITANTE",
+          "continuidade_obrigatoria": true,
+          "depende_de": [
+            0,
+            1
+          ]
+        }
+      ],
+      "alertas": []
+    },
+    {
+      "id": "T02",
+      "medico": "U02",
+      "texto": "Ped. cons. Onco Médica p/ QT adjuvante. Prio.",
+      "esperado": [
+        {
+          "tipo_pedido": "pedido_consulta",
+          "especialidade_destino": "1300",
+          "ato_codigo": "1",
+          "prioridade": "P",
+          "depende_de": []
+        }
+      ],
+      "alertas": []
+    },
+    {
+      "id": "T03",
+      "medico": "U01",
+      "texto": "Eco abd dentro de 3 sem. Se normal, alta p/ MGF.",
+      "esperado": [
+        {
+          "tipo_pedido": "exame",
+          "especialidade_destino": "7000_3",
+          "ato_codigo": "1",
+          "exames": [
+            "7100010"
+          ],
+          "prazo_dias": 21,
+          "depende_de": []
+        }
+      ],
+      "alertas": [
+        "'alta p/ MGF' não gera pedido; registar como nota"
+      ]
+    },
+    {
+      "id": "T04",
+      "medico": "U01",
+      "texto": "Ped. HD p/ C1 FOLFOX. Colheita s/ jejum (hemog, bioq) na véspera do HD.",
+      "esperado": [
+        {
+          "tipo_pedido": "pedido_hd",
+          "especialidade_destino": "9610",
+          "ato_codigo": "1",
+          "exames": [
+            "9610001"
+          ],
+          "especificacao": "FOLFOX ciclo 1",
+          "depende_de": [
+            1
+          ]
+        },
+        {
+          "tipo_pedido": "analises",
+          "especialidade_destino": "6100",
+          "ato_codigo": "4",
+          "analises": [
+            "A001",
+            "A002"
+          ],
+          "especificacao": "pré-QT, véspera",
+          "depende_de": []
+        }
+      ],
+      "alertas": []
+    },
+    {
+      "id": "T05",
+      "medico": "U02",
+      "texto": "Manut. CVC 4/4 sem no enf.",
+      "esperado": [
+        {
+          "tipo_pedido": "tratamento",
+          "especialidade_destino": "9602",
+          "ato_codigo": "3",
+          "exames": [
+            "65270"
+          ],
+          "recorrencia": "4 semanas",
+          "depende_de": []
+        }
+      ],
+      "alertas": [],
+      "nota": "Recorrência: a data da próxima sessão é calculada pelo agendamento (última sessão + intervalo), não pelo agente."
+    },
+    {
+      "id": "T06",
+      "medico": "U01",
+      "texto": "TC AP s/ contraste (alergia ao iodo). Rev 3/12.",
+      "esperado": [
+        {
+          "tipo_pedido": "exame",
+          "especialidade_destino": "7000_2",
+          "ato_codigo": "1",
+          "exames": [
+            "7000004",
+            "7000009"
+          ],
+          "especificacao": "sem contraste - alergia ao iodo",
+          "depende_de": []
+        },
+        {
+          "tipo_pedido": "consulta",
+          "especialidade_destino": "2102",
+          "ato_codigo": "22",
+          "nao_antes_dias": 80,
+          "prazo_dias": 100,
+          "depende_de": []
+        }
+      ],
+      "alertas": [
+        "não está escrito que a revisão é com o resultado do TC: NÃO criar dependência; assinalar para confirmação"
+      ]
+    },
+    {
+      "id": "T07",
+      "medico": "U01",
+      "texto": "CE pós-op em 15 dias c/ Dra. Sofia. Retirar agrafos no enf antes (D10).",
+      "esperado": [
+        {
+          "tipo_pedido": "tratamento",
+          "especialidade_destino": "9602",
+          "ato_codigo": "1",
+          "especificacao": "retirar agrafos",
+          "nao_antes_dias": 10,
+          "prazo_dias": 12,
+          "depende_de": []
+        },
+        {
+          "tipo_pedido": "consulta",
+          "especialidade_destino": "2102",
+          "ato_codigo": "7",
+          "prazo_dias": 15,
+          "medico_preferido": "U02",
+          "continuidade_obrigatoria": true,
+          "depende_de": [
+            0
+          ]
+        }
+      ],
+      "alertas": []
+    },
+    {
+      "id": "T08",
+      "medico": "U02",
+      "texto": "Ped. cons RT p/ avaliação de RT paliativa (dor óssea). MP.",
+      "esperado": [
+        {
+          "tipo_pedido": "pedido_consulta",
+          "especialidade_destino": "2300",
+          "ato_codigo": "1",
+          "prioridade": "MP",
+          "depende_de": []
+        }
+      ],
+      "alertas": []
+    },
+    {
+      "id": "T09",
+      "medico": "U01",
+      "texto": "Ped. consulta de estomaterapia.",
+      "esperado": [],
+      "alertas": [
+        "serviço não existe no directório: NÃO inventar destino; enviar para validação manual"
+      ]
+    },
+    {
+      "id": "T10",
+      "medico": "U02",
+      "texto": "Repetir análises antes da próxima.",
+      "esperado": [
+        {
+          "tipo_pedido": "analises",
+          "especialidade_destino": "6100",
+          "ato_codigo": "4",
+          "analises": [],
+          "depende_de": []
+        }
+      ],
+      "alertas": [
+        "análises não especificadas e 'próxima' consulta indefinida: baixa confiança"
+      ]
+    },
+    {
+      "id": "T11",
+      "medico": "U01",
+      "texto": "Suspeita de recidiva. TC TAP c/ contraste urgente p/ reestadiamento, até 2 sem.",
+      "esperado": [
+        {
+          "tipo_pedido": "exame",
+          "especialidade_destino": "7000_2",
+          "ato_codigo": "1",
+          "exames": [
+            "7000002",
+            "7000004",
+            "7000009"
+          ],
+          "especificacao": "com contraste; reestadiamento",
+          "prioridade": "MP",
+          "prazo_dias": 14,
+          "depende_de": []
+        }
+      ],
+      "alertas": [
+        "'urgente' com prazo de 2 semanas = MP, não urgência < 72h"
+      ]
+    },
+    {
+      "id": "T12",
+      "medico": "U01",
+      "texto": "HPC 4/4s.",
+      "esperado_antes_de_aprender": [],
+      "alertas_antes_de_aprender": [
+        "termo desconhecido 'HPC': NÃO adivinhar; enviar para validação"
+      ],
+      "esperado_depois_de_aprender": [
+        {
+          "tipo_pedido": "tratamento",
+          "especialidade_destino": "9602",
+          "ato_codigo": "3",
+          "exames": [
+            "65270"
+          ],
+          "recorrencia": "4 semanas",
+          "depende_de": []
+        }
+      ],
+      "nota": "Abreviatura pessoal do Dr. Pedro (U01) = heparinização do cateter. É o caso da demo de aprendizagem."
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+﻿parametro;valor;descricao
+DEMO_DATE;2026-09-23;Data 'hoje' da demo
+congelamento_dias;7;Nunca propor mexer em marcações a menos de N dias
+limiar_confianca;0.8;Abaixo disto o pedido fica destacado na validação
+promover_regra_apos;3;Correcções iguais (em médicos diferentes ou aprovadas) para uma regra do médico passar a GLOBAL
+alerta_triagem_parada_dias;3;Pedido em triagem há mais de N dias úteis gera alerta
+semaforo_horizonte_dias;14;Consultas com dependências avaliadas nos próximos N dias
+alerta_remarcacoes;2;Doente remarcado N ou mais vezes gera alerta
+cromos_dia;300;Estimativa do utilizador (a validar)
+copias_por_cromo;3;Pressuposto (a validar)
+minutos_admin_por_cromo;5;Pressuposto (a validar)
+dias_uteis_mes;22;

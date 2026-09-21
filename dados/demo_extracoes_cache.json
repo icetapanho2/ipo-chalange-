@@ -1,0 +1,31 @@
+{
+  "_nota": "Resultado esperado da extracção para os textos escritos ao vivo na demo. Usado como fallback (EXTRACTOR_FALLBACK=cache) se a API falhar ou demorar > 15 s. A chave é o doente; o texto tem de coincidir (normalizado: minúsculas, espaços colapsados) para usar a cache.",
+  "100101": {
+    "texto_plano": "TC TAP c/ contraste + colheita c/ jejum (hemog, bioq c/ creat, CEA, CA 19.9). Rev c/ exames 1/12 comigo.",
+    "pedidos": [
+      {"ref": 0, "tipo_pedido": "analises", "especialidade_destino": "6100", "ato_codigo": "9", "exames": [], "analises": ["A001","A002","A003","A004","A005"], "especificacao": "", "prioridade": null, "prazo_dias": null, "nao_antes_dias": null, "medico_preferido": null, "continuidade_obrigatoria": false, "recorrencia": null, "depende_de": [], "confianca": 0.96, "texto_origem": "colheita c/ jejum (hemog, bioq c/ creat, CEA, CA 19.9)"},
+      {"ref": 1, "tipo_pedido": "exame", "especialidade_destino": "7000_2", "ato_codigo": "1", "exames": ["7000002","7000004","7000009"], "analises": [], "especificacao": "com contraste", "prioridade": null, "prazo_dias": null, "nao_antes_dias": null, "medico_preferido": null, "continuidade_obrigatoria": false, "recorrencia": null, "depende_de": [0], "confianca": 0.97, "texto_origem": "TC TAP c/ contraste"},
+      {"ref": 2, "tipo_pedido": "consulta", "especialidade_destino": "2102", "ato_codigo": "22", "exames": [], "analises": [], "especificacao": "revisão com exames", "prioridade": null, "prazo_dias": 35, "nao_antes_dias": 21, "medico_preferido": "REQUISITANTE", "continuidade_obrigatoria": true, "recorrencia": null, "depende_de": [0, 1], "confianca": 0.95, "texto_origem": "Rev c/ exames 1/12 comigo"}
+    ],
+    "alertas": []
+  },
+  "100105": {
+    "texto_plano": "HPC 4/4s. Colheita s/ jejum (hemog, CEA). Rev c/ resultados 1/12.",
+    "pedidos": [
+      {"ref": 0, "tipo_pedido": "analises", "especialidade_destino": "6100", "ato_codigo": "4", "exames": [], "analises": ["A001","A004"], "especificacao": "", "prioridade": null, "prazo_dias": null, "nao_antes_dias": null, "medico_preferido": null, "continuidade_obrigatoria": false, "recorrencia": null, "depende_de": [], "confianca": 0.95, "texto_origem": "Colheita s/ jejum (hemog, CEA)"},
+      {"ref": 1, "tipo_pedido": "consulta", "especialidade_destino": "2102", "ato_codigo": "23", "exames": [], "analises": [], "especificacao": "revisão com resultados", "prioridade": null, "prazo_dias": 35, "nao_antes_dias": 21, "medico_preferido": null, "continuidade_obrigatoria": false, "recorrencia": null, "depende_de": [0], "confianca": 0.93, "texto_origem": "Rev c/ resultados 1/12"}
+    ],
+    "alertas": [{"tipo": "TERMO_DESCONHECIDO", "texto_origem": "HPC 4/4s", "mensagem": "Termo 'HPC' não reconhecido. Não foi criado pedido. Confirmar o que significa."}],
+    "correcao_esperada": {"termo": "HPC", "significado": "manutenção e heparinização de cateter", "mapeia_para": "tratamento 9602/3: 65270", "ambito": "U01",
+      "pedido": {"tipo_pedido": "tratamento", "especialidade_destino": "9602", "ato_codigo": "3", "exames": ["65270"], "recorrencia": "4 semanas", "depende_de": []}}
+  },
+  "100107": {
+    "texto_plano": "Mantém vigilância. HPC 4/4s. Rev 1/12 comigo.",
+    "requer_dicionario": "entrada 'HPC' do Dr. Pedro (U01) criada no cenário da Rosa",
+    "pedidos": [
+      {"ref": 0, "tipo_pedido": "tratamento", "especialidade_destino": "9602", "ato_codigo": "3", "exames": ["65270"], "analises": [], "especificacao": "", "prioridade": null, "prazo_dias": null, "nao_antes_dias": null, "medico_preferido": null, "continuidade_obrigatoria": false, "recorrencia": "4 semanas", "depende_de": [], "confianca": 1.0, "origem_regra": "DICIONARIO:U01:HPC", "texto_origem": "HPC 4/4s"},
+      {"ref": 1, "tipo_pedido": "consulta", "especialidade_destino": "2102", "ato_codigo": "23", "exames": [], "analises": [], "especificacao": "", "prioridade": null, "prazo_dias": 35, "nao_antes_dias": 21, "medico_preferido": "REQUISITANTE", "continuidade_obrigatoria": true, "recorrencia": null, "depende_de": [], "confianca": 0.95, "texto_origem": "Rev 1/12 comigo"}
+    ],
+    "alertas": []
+  }
+}

@@ -1,0 +1,15 @@
+﻿especialidade_codigo;ato_codigo;ato_descricao;tipo_atividade;tipo_ato_medico;duracao_min;tipo_pedido
+2102;22;CE PRESENCIAL ESÓFAGO/GÁSTRICO;Consultas;Presencial;20;consulta
+2102;23;CE PRESENCIAL CÓLON/RECTO;Consultas;Presencial;20;consulta
+2102;7;CE PÓS-OPERATÓRIO;Consultas;Presencial;20;consulta
+2102;5;CE TELEFÓNICA;Consultas;Não Presencial;10;consulta
+1300;1;CE PRIMEIRA ONCOLOGIA MÉDICA;Consultas;Presencial;40;pedido_consulta
+1300;2;CE SUBSEQUENTE ONCOLOGIA MÉDICA;Consultas;Presencial;20;consulta
+2300;1;CE PRIMEIRA RADIOTERAPIA;Consultas;Presencial;40;pedido_consulta
+7000_2;1;TC CORPO;MCDT;Presencial;20;exame
+7000_3;1;ECOGRAFIA;MCDT;Presencial;20;exame
+6100;4;COLHEITA S/ JEJUM;MCDT;Presencial;10;analises
+6100;9;COLHEITA C/ JEJUM;MCDT;Presencial;10;analises
+9610;1;SESSÃO HOSPITAL DE DIA;Hospital de Dia;Presencial;240;pedido_hd
+9602;3;MANUTENÇÃO CVC;ENF Consultas;Presencial;30;tratamento
+9602;1;CE ENFERMAGEM;ENF Consultas;Presencial;30;tratamento

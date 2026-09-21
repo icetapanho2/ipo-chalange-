@@ -1,0 +1,9 @@
+﻿codigo;descricao;tipo_atividade;entrada_pedidos_externos
+2102;Onc. Cirúrgica-C. Digestivo;Consultas;TRIAGEM
+1300;Oncologia Médica-Geral;Consultas;TRIAGEM
+2300;Radioterapia-Geral;Consultas;TRIAGEM
+7000_2;Radiologia-Geral (TAC);MCDT;DIRETO
+7000_3;Radiologia-Geral (Ecografia);MCDT;DIRETO
+6100;Patologia Clínica-Geral;MCDT;DIRETO
+9610;Hospital de Dia-Oncologia;Hospital de Dia;TRIAGEM
+9602;Cons. Enferm.-Onc. Cirúrgica;ENF Consultas;DIRETO

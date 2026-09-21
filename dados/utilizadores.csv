@@ -1,0 +1,13 @@
+﻿utilizador_id;nome;perfil;especialidade_codigo;e_medico
+U01;Dr. Pedro Almeida;MEDICO;2102;1
+U02;Dra. Sofia Lemos;MEDICO;2102;1
+U03;Joana Moreira;ADMINISTRATIVO;2102;0
+U04;Dr. Rui Carvalho;TRIADOR;1300;1
+U05;Dra. Inês Faria;MEDICO;1300;1
+U06;Dra. Marta Sousa;TRIADOR;2300;1
+U07;Paula Gomes;ADMINISTRATIVO;7000_2;0
+U08;Rita Vieira;ADMINISTRATIVO;6100;0
+U09;Enf. Carla Dias;ADMINISTRATIVO;9602;0
+U10;Dra. Helena Pinto;TRIADOR;9610;1
+U11;Tiago Neves;ADMINISTRATIVO;7000_3;0
+U12;Dr. Nuno Reis;GESTAO;;0

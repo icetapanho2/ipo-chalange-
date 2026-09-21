@@ -1,0 +1,4 @@
+﻿regra_id;quando;exige;validade_dias;intervalo_min_dias;critica;descricao
+R1;exame 7000_2 com contraste;analises com Creatinina (A003);90;1;1;"TC com contraste exige creatinina com menos de 90 dias; se não existir, cria pedido de análises antes"
+R2;pedido_hd (QT);analises Hemograma+Bioquímica;3;1;1;Sessão de HD exige análises entre 1 e 3 dias antes
+R3;consulta com 'c/ exames' / 'c/ resultados';todos os MCDT pedidos na mesma consulta;0;0;1;"Revisão com exames depende dos exames pedidos na mesma consulta; intervalo = intervalos_resultado"

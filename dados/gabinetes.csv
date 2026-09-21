@@ -1,0 +1,15 @@
+﻿codigo;descricao;especialidade_codigo;tipo_recurso
+A031707;Gabinete de consulta 3;2102;Gabinete
+A031708;Gabinete de consulta 4;2102;Gabinete
+A032101;Gabinete de consulta 1;1300;Gabinete
+A032102;Gabinete de consulta 2;1300;Gabinete
+A032501;Gabinete RT 1;2300;Gabinete
+A033403;Sala de Exames TC Siemens;7000_2;Equipamento
+A033410;Sala Ecografia 2;7000_3;Equipamento
+E020305;Sala colheita 1;6100;Sala
+E020306;Sala colheita 2;6100;Sala
+H010101;Cadeirão HD 1;9610;Cadeirão
+H010102;Cadeirão HD 2;9610;Cadeirão
+H010103;Cadeirão HD 3;9610;Cadeirão
+H010104;Cadeirão HD 4;9610;Cadeirão
+A031903;Gabinete de Enfermagem 1;9602;Gabinete

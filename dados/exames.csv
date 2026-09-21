@@ -1,0 +1,7 @@
+﻿codigo_exame;descricao_exame;especialidade_codigo;ato_codigo
+7000002;TC Tórax;7000_2;1
+7000004;TC Abdominal;7000_2;1
+7000009;TC Pélvica (Visceral);7000_2;1
+7100010;Ecografia Abdominal;7000_3;1
+65270;Manutenção e heparinização de cateter com ou sem reservatório subcutâneo;9602;3
+9610001;Administração de terapêutica antineoplásica;9610;1

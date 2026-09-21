@@ -1,0 +1,40 @@
+termo;significado;mapeia_para;ambito;origem;ocorrencias;estado
+TC TAP;TC tórax, abdominal e pélvica;exame 7000_2/1: 7000002|7000004|7000009;GLOBAL;INICIAL;0;ATIVA
+TAC TAP;TC tórax, abdominal e pélvica;exame 7000_2/1: 7000002|7000004|7000009;GLOBAL;INICIAL;0;ATIVA
+TC AP;TC abdominal e pélvica;exame 7000_2/1: 7000004|7000009;GLOBAL;INICIAL;0;ATIVA
+c/ contraste;com contraste (activa regra R1);especificacao;GLOBAL;INICIAL;0;ATIVA
+c/ ctr;com contraste (activa regra R1);especificacao;GLOBAL;INICIAL;0;ATIVA
+s/ contraste;sem contraste;especificacao;GLOBAL;INICIAL;0;ATIVA
+eco abd;ecografia abdominal;exame 7000_3/1: 7100010;GLOBAL;INICIAL;0;ATIVA
+colheita c/ jejum;colheita em jejum;analises 6100/9;GLOBAL;INICIAL;0;ATIVA
+colheita s/ jejum;colheita sem jejum;analises 6100/4;GLOBAL;INICIAL;0;ATIVA
+ana;análises;analises 6100;GLOBAL;INICIAL;0;ATIVA
+hemog;hemograma;A001;GLOBAL;INICIAL;0;ATIVA
+hgm;hemograma;A001;GLOBAL;INICIAL;0;ATIVA
+bioq;bioquímica;A002;GLOBAL;INICIAL;0;ATIVA
+creat;creatinina;A003;GLOBAL;INICIAL;0;ATIVA
+CEA;antigénio carcinoembrionário;A004;GLOBAL;INICIAL;0;ATIVA
+CA 19.9;CA 19.9;A005;GLOBAL;INICIAL;0;ATIVA
+CA19.9;CA 19.9;A005;GLOBAL;INICIAL;0;ATIVA
+marcadores;CEA + CA 19.9;A004|A005;GLOBAL;INICIAL;0;ATIVA
+rev;consulta de revisão (mesma especialidade);consulta 2102;GLOBAL;INICIAL;0;ATIVA
+reav;consulta de reavaliação (mesma especialidade);consulta 2102;GLOBAL;INICIAL;0;ATIVA
+c/ exames;depende dos MCDT pedidos na mesma consulta (regra R3);dependencia;GLOBAL;INICIAL;0;ATIVA
+c/ resultados;depende dos MCDT pedidos na mesma consulta (regra R3);dependencia;GLOBAL;INICIAL;0;ATIVA
+comigo;continuidade com o médico requisitante;medico_preferido=REQUISITANTE;GLOBAL;INICIAL;0;ATIVA
+1/12;1 mês (não antes de 21 dias; prazo 35 dias);tempo;GLOBAL;INICIAL;0;ATIVA
+3/12;3 meses (não antes de 80 dias; prazo 100 dias);tempo;GLOBAL;INICIAL;0;ATIVA
+6/12;6 meses (não antes de 170 dias; prazo 190 dias);tempo;GLOBAL;INICIAL;0;ATIVA
+4/4 sem;recorrência de 4 em 4 semanas;recorrencia;GLOBAL;INICIAL;0;ATIVA
+4/4s;recorrência de 4 em 4 semanas;recorrencia;GLOBAL;INICIAL;0;ATIVA
+cons. Onco;consulta de Oncologia Médica;pedido_consulta 1300/1;GLOBAL;INICIAL;0;ATIVA
+Onco Médica;consulta de Oncologia Médica;pedido_consulta 1300/1;GLOBAL;INICIAL;0;ATIVA
+cons RT;consulta de Radioterapia;pedido_consulta 2300/1;GLOBAL;INICIAL;0;ATIVA
+HD;Hospital de Dia;pedido_hd 9610/1;GLOBAL;INICIAL;0;ATIVA
+QT;quimioterapia;especificacao;GLOBAL;INICIAL;0;ATIVA
+manut. CVC;manutenção e heparinização de cateter;tratamento 9602/3: 65270;GLOBAL;INICIAL;0;ATIVA
+CVC;cateter venoso central;contexto;GLOBAL;INICIAL;0;ATIVA
+enf;enfermagem;9602;GLOBAL;INICIAL;0;ATIVA
+pós-op;pós-operatório;consulta 2102/7;GLOBAL;INICIAL;0;ATIVA
+Prio.;prioritário;prioridade=P;GLOBAL;INICIAL;0;ATIVA
+MP;muito prioritário;prioridade=MP;GLOBAL;INICIAL;0;ATIVA
