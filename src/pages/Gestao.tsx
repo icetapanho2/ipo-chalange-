@@ -93,6 +93,7 @@ export function Gestao() {
         </select>
       </div>
       {erro && <p className="mt-3 text-red-600">{erro}</p>}
+      {!metricas && !erro && <p className="mt-4 text-slate-500">A carregar métricas…</p>}
 
       {metricas && (
         <>

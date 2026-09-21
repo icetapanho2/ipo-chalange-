@@ -84,6 +84,7 @@ export function Triagem() {
         Fila ordenada por urgência (folga → nível → antiguidade). Só se vê o pedido e o plano de origem.
       </p>
       {erro && <p className="mt-3 text-red-600">{erro}</p>}
+      {!resposta && !erro && <p className="mt-6 text-slate-500">A carregar…</p>}
 
       {resposta?.fila.length === 0 && <p className="mt-6 text-slate-500">Sem pedidos em triagem.</p>}
 

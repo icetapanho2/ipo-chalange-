@@ -33,6 +33,7 @@ export function OasisAgendas() {
   const [especialidade, setEspecialidade] = useState("");
   const [dia, setDia] = useState("");
   const [vagas, setVagas] = useState<Vaga[]>([]);
+  const [aCarregar, setACarregar] = useState(true);
   const [destacadas, setDestacadas] = useState<Set<string>>(new Set());
   const [erro, setErro] = useState<string | null>(null);
   const ocupadasAntes = useRef<Set<string>>(new Set());
@@ -71,6 +72,8 @@ export function OasisAgendas() {
         setErro(null);
       } catch (e) {
         if (activo) setErro(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (activo) setACarregar(false);
       }
     }
     actualizar();
@@ -106,7 +109,9 @@ export function OasisAgendas() {
       {erro && <p className="text-red-700">{erro}</p>}
 
       <OasisPainel>
-        {vagas.length === 0 ? (
+        {aCarregar ? (
+          <p className="text-slate-500">A carregar…</p>
+        ) : vagas.length === 0 ? (
           <p className="text-slate-500">Sem vagas nesta especialidade para este dia.</p>
         ) : (
           <table className="w-full border-collapse text-left">

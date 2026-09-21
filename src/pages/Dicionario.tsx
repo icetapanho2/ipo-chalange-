@@ -36,7 +36,9 @@ export function Dicionario() {
       </label>
 
       {erro && <p className="mt-3 text-red-600">{erro}</p>}
+      {!entradas && !erro && <p className="mt-4 text-slate-500">A carregar…</p>}
 
+      {entradas && (
       <table className="mt-4 w-full border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-slate-300 text-xs uppercase text-slate-500">
@@ -61,7 +63,8 @@ export function Dicionario() {
           ))}
         </tbody>
       </table>
-      {visiveis.length === 0 && <p className="mt-4 text-slate-500">Sem entradas para mostrar.</p>}
+      )}
+      {entradas && visiveis.length === 0 && <p className="mt-4 text-slate-500">Sem entradas para mostrar.</p>}
     </div>
   );
 }

@@ -91,6 +91,7 @@ export function Servico() {
         Serviço{pedidos ? ` — ${pedidos.especialidade_legivel}` : ""}
       </h1>
       {erro && <p className="mt-3 text-red-600">{erro}</p>}
+      {!pedidos && !erro && <p className="mt-3 text-slate-500">A carregar…</p>}
 
       {emRisco && emRisco.length > 0 && (
         <section className="mt-4">
@@ -173,6 +174,9 @@ export function Servico() {
 
       <section className="mt-6">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Pedidos por estado</h2>
+        {pedidos && Object.keys(pedidos.porEstado).length === 0 && (
+          <p className="mt-1 text-sm text-slate-400">Sem pedidos para este serviço.</p>
+        )}
         {pedidos &&
           ORDEM_ESTADOS.filter((estado) => pedidos.porEstado[estado]?.length).map((estado) => (
             <div key={estado} className="mt-3">
