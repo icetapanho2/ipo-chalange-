@@ -72,7 +72,15 @@ export interface Doente {
   contacto?: string;
   notas_clinicas?: string;
   estadio_cuidado?: EstadioCuidado;
+  // Perfil logístico (ESPECIFICACAO.md secção 8A): pesa no custo de remarcar e na lista de chamadas.
+  concelho?: string;
+  distancia_km?: number;
+  contacto_digital?: ContactoDigital;
+  aceita_antecipacao?: boolean;
+  transporte_nao_urgente?: boolean;
 }
+
+export type ContactoDigital = "SMS" | "EMAIL" | "NENHUM";
 
 export interface Vaga {
   vaga_id: string;
@@ -83,6 +91,8 @@ export interface Vaga {
   duracao_min: number;
   atos_permitidos: string[];
   ato_id: string; // vazio = livre
+  /** Vaga libertada que está guardada para uma oferta de antecipação PENDENTE (secção 8A, R-E). */
+  oferta_id?: string;
 }
 
 export interface AtoMedicoExame {
@@ -218,7 +228,11 @@ export type TipoEvento =
   | "CANCELAMENTO"
   | "ALERTA"
   | "OUTSOURCING"
-  | "DECISAO_MEDICO";
+  | "DECISAO_MEDICO"
+  | "DESMARCACAO"
+  | "ANTECIPACAO"
+  | "OFERTA_ANTECIPACAO"
+  | "CHAMADA";
 
 export interface Evento {
   evento_id: string;
@@ -303,7 +317,8 @@ export type TipoAlerta =
   | "REMARCACAO_QUEBRA_DEPENDENCIA"
   | "REMARCACOES_EXCESSIVAS"
   | "PRAZO_ULTRAPASSADO"
-  | "URGENCIA";
+  | "URGENCIA"
+  | "SEGUNDA_REMARCACAO";
 
 export type Gravidade = "media" | "alta";
 
@@ -334,6 +349,129 @@ export interface PropostaTroca {
   decidido_em: string;
   criado_em: string;
   especialidade: string;
+  /** Retrato de todos os candidatos avaliados no momento da proposta (painel "Porquê esta escolha?"). */
+  avaliacao?: CandidatoTroca[];
+  /** Quem teria sido escolhido pela regra antiga (só folga), para mostrar a diferença. */
+  escolhido_regra_antiga?: string;
+}
+
+/** Factos de um candidato a ceder a vaga — tudo o que as regras R-A/R-B usam (secção 8A). */
+export interface FactosCandidato {
+  ato_id: string;
+  pedido_id: string;
+  doente_id: string;
+  doente_nome: string;
+  data_hora: string;
+  vaga_origem_id: string;
+  vaga_destino_id: string; // "" = sem alternativa dentro do próprio prazo
+  data_destino: string;
+  prazo_limite: string;
+  marcado_em: string;
+  estadio_cuidado: EstadioCuidado;
+  idade: number;
+  concelho: string;
+  distancia_km: number;
+  contacto_digital: ContactoDigital;
+  transporte_nao_urgente: boolean;
+  dia_agrupado: boolean;
+  remarcacoes_hospital: number;
+  folga_dias: number;
+  dias_ate_marcacao: number;
+}
+
+export interface ParcelaCusto {
+  rotulo: string;
+  pontos: number;
+}
+
+export interface CandidatoTroca extends FactosCandidato {
+  excluido: boolean;
+  motivo_exclusao: string;
+  parcelas: ParcelaCusto[];
+  custo: number;
+  escolhido: boolean;
+  escolhido_regra_antiga: boolean;
+}
+
+/** Oferta de uma vaga libertada a um doente que ganha em ser antecipado (secção 8A, R-E). */
+export interface OfertaAntecipacao {
+  oferta_id: string;
+  vaga_id: string;
+  especialidade: string;
+  data_hora_vaga: string;
+  pedido_id: string;
+  doente_id: string;
+  data_hora_atual: string; // marcação actual do doente ("" = ainda sem marcação)
+  motivo: string;
+  estado: "PENDENTE" | "ACEITE" | "RECUSADA" | "EXPIRADA";
+  criado_em: string;
+  expira_em: string;
+  respondido_por: string;
+  respondido_em: string;
+  nivel_cascata: number;
+  origem: string; // ex.: "Desmarcação de Rui Fonseca Lima (aviso de 7 dias)"
+  candidatos: CandidatoAntecipacao[];
+}
+
+export interface CandidatoAntecipacao {
+  pedido_id: string;
+  doente_id: string;
+  doente_nome: string;
+  estadio_cuidado: EstadioCuidado;
+  prioridade: Prioridade;
+  prazo_limite: string;
+  data_hora_atual: string;
+  dias_ganhos: number | null;
+  atraso_previsto_dias: number | null;
+  grupo: 1 | 2;
+  motivo: string;
+}
+
+/** Registo de cada vaga libertada (para as métricas: quantas foram reaproveitadas). */
+export interface VagaLibertada {
+  vaga_id: string;
+  especialidade: string;
+  data_hora: string;
+  libertada_em: string;
+  aviso_horas: number;
+  origem: string;
+  desfecho: "OFERTA" | "SEM_CANDIDATO" | "CURTO_PRAZO";
+}
+
+export interface Preparacao {
+  especialidade_codigo: string;
+  ato_codigo: string;
+  instrucoes: string;
+  requer_confirmacao: boolean;
+}
+
+export interface RegraCapacidade {
+  especialidade_codigo: string;
+  horizonte_protegido_dias: number;
+  niveis_permitidos: Prioridade[];
+}
+
+/** Comunicação ao doente (SMS/email/carta). Simulada: nada é enviado, fica registada e visível na timeline. */
+export interface ComunicacaoDoente {
+  comunicacao_id: string;
+  doente_id: string;
+  pedido_id: string;
+  canal: "SMS" | "EMAIL" | "CARTA";
+  tipo: "MARCACAO" | "LEMBRETE" | "REMARCACAO" | "OFERTA" | "ANTECIPACAO" | "DESMARCACAO";
+  texto: string;
+  criado_em: string;
+  enviar_em: string;
+  estado: "ENVIADA" | "AGENDADA";
+}
+
+/** Uma chamada da administrativa a um doente da lista de chamadas (R-G). */
+export interface ChamadaRegistada {
+  ato_id: string;
+  doente_id: string;
+  resultado: "CONFIRMADO" | "NAO_ATENDEU" | "VAI_DESMARCAR";
+  utilizador_id: string;
+  registado_em: string;
+  nota: string;
 }
 
 export interface RegraPrazo {
@@ -384,4 +522,24 @@ export interface Parametros {
    * sistema atribui MP/P — editáveis pela Gestão, repostos ao valor do CSV em "Repor demo". */
   limiar_prioridade_mp: number;
   limiar_prioridade_p: number;
+  // Regras de remarcação e de vagas libertadas (secção 8A) — todas em parametros.csv.
+  max_remarcacoes_hospital: number;
+  custo_idade_75: number;
+  custo_sem_contacto_digital: number;
+  custo_distancia_50km: number;
+  custo_distancia_150km: number;
+  custo_transporte: number;
+  custo_dia_agrupado: number;
+  custo_estadio_novo: number;
+  bonus_folga_max: number;
+  libertar_protegidas_dias: number;
+  antecipacao_ganho_min_dias: number;
+  antecipacao_ganho_diagnostico_dias: number;
+  oferta_resposta_horas: number;
+  cascata_max: number;
+  distancia_agrupar_km: number;
+  lista_chamadas_dias: number;
+  idade_chamada: number;
+  custo_medio_vaga_tac: number;
+  reducao_faltas_lembrete: number;
 }

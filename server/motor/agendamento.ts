@@ -14,8 +14,10 @@ import {
 } from "../util.ts";
 import { registarEvento } from "./estados.ts";
 import { dataMinimaPorDependencias, dependenciasProntas, criarDependencia, criarPedidoColheitaPreQt } from "./dependencias.ts";
-import { folgaDias, ordenarFila, type ItemFila } from "./prioridade.ts";
-import type { AtoMedico, Pedido, PropostaTroca, Vaga } from "../types.ts";
+import { ordenarFila, type ItemFila } from "./prioridade.ts";
+import { avaliarFactos, factosDoCandidato, justificacaoTroca } from "./remarcacao.ts";
+import { comunicarMarcacao } from "./comunicacoes.ts";
+import type { AtoMedico, CandidatoTroca, FactosCandidato, Pedido, PropostaTroca, Vaga } from "../types.ts";
 
 export type ResultadoAgendamento =
   | { tipo: "MARCADO"; ato: AtoMedico }
@@ -52,16 +54,60 @@ export function vagaBloqueadaPorAvaria(vaga: Vaga, atoCodigo: string): boolean {
   });
 }
 
+/**
+ * Vagas protegidas (secção 8A, R-D): num serviço com regra em regras_capacidade.csv, uma vaga livre
+ * nos próximos `horizonte_protegido_dias` fica guardada para pedidos MP/P, para quem já está fora
+ * do prazo, ou para quem tem o prazo dentro desse horizonte. A partir de D-libertar_protegidas_dias
+ * fica aberta a todos. Evita que quem pode esperar gaste as vagas de curto prazo — que é o que
+ * obriga, mais tarde, a trocas e remarcações. Devolve "" se o pedido pode usar a vaga.
+ */
+export function motivoVagaProtegida(vaga: Vaga, pedido: Pedido, quando: Date): string {
+  const regra = store.regrasCapacidade.find((r) => r.especialidade_codigo === vaga.especialidade_codigo);
+  if (!regra) return "";
+  const hoje = apenasData(quando);
+  const dias = diferencaDias(apenasData(parseIso(vaga.data_hora)), hoje);
+  if (dias > regra.horizonte_protegido_dias) return "";
+  if (dias <= store.parametros.libertar_protegidas_dias) return "";
+  if (regra.niveis_permitidos.includes(pedido.prioridade)) return "";
+  if (diferencaDias(parseIso(pedido.prazo_limite), hoje) <= regra.horizonte_protegido_dias) return "";
+  return `vaga protegida para pedidos ${regra.niveis_permitidos.join("/")} (próximos ${regra.horizonte_protegido_dias} dias)`;
+}
+
 /** Nº de vagas livres compatíveis na janela [inicio, fim] (para detectar sobrelotação antes de faltar vaga a alguém). */
 export function contarVagasLivres(especialidadeCodigo: string, atoCodigo: string, inicio: Date, fim: Date): number {
   return store.vagas.filter(
     (v) =>
       v.especialidade_codigo === especialidadeCodigo &&
       !v.ato_id &&
+      !v.oferta_id &&
       v.atos_permitidos.includes(atoCodigo) &&
       dentroDaJanela(v.data_hora, inicio, fim) &&
       !vagaBloqueadaPorAvaria(v, atoCodigo),
   ).length;
+}
+
+/** Vagas livres compatíveis (especialidade, atos_permitidos, médico se pedido) na janela, por ordem de data. */
+export function vagasLivresCompativeis(
+  especialidadeCodigo: string,
+  atoCodigo: string,
+  inicio: Date,
+  fim: Date,
+  medicoId?: string,
+  opts: { pedido?: Pedido; quando?: Date } = {},
+): Vaga[] {
+  const candidatas = store.vagas.filter(
+    (v) =>
+      v.especialidade_codigo === especialidadeCodigo &&
+      !v.ato_id &&
+      !v.oferta_id &&
+      v.atos_permitidos.includes(atoCodigo) &&
+      dentroDaJanela(v.data_hora, inicio, fim) &&
+      (!medicoId || v.medico_id === medicoId) &&
+      !vagaBloqueadaPorAvaria(v, atoCodigo) &&
+      !(opts.pedido && motivoVagaProtegida(v, opts.pedido, opts.quando ?? agora())),
+  );
+  candidatas.sort((a, b) => a.data_hora.localeCompare(b.data_hora));
+  return candidatas;
 }
 
 /** Primeira vaga livre compatível (especialidade, atos_permitidos, médico se pedido) na janela [inicio, fim]. */
@@ -71,21 +117,75 @@ export function encontrarVagaLivre(
   inicio: Date,
   fim: Date,
   medicoId?: string,
+  opts: { pedido?: Pedido; quando?: Date } = {},
 ): Vaga | null {
-  const candidatas = store.vagas.filter(
-    (v) =>
-      v.especialidade_codigo === especialidadeCodigo &&
-      !v.ato_id &&
-      v.atos_permitidos.includes(atoCodigo) &&
-      dentroDaJanela(v.data_hora, inicio, fim) &&
-      (!medicoId || v.medico_id === medicoId) &&
-      !vagaBloqueadaPorAvaria(v, atoCodigo),
-  );
-  candidatas.sort((a, b) => a.data_hora.localeCompare(b.data_hora));
-  return candidatas[0] ?? null;
+  return vagasLivresCompativeis(especialidadeCodigo, atoCodigo, inicio, fim, medicoId, opts)[0] ?? null;
 }
 
-function marcarPedidoNaVaga(pedido: Pedido, vaga: Vaga, quando: Date): AtoMedico {
+const MINUTOS_ENTRE_MARCACOES = 30;
+const HORA_MINIMA_LONGE = 10;
+
+/**
+ * Dia único (secção 8A, R-H): para um doente que mora a >= distancia_agrupar_km, prefere uma vaga
+ * num dia em que ele já vem ao hospital (com >= 30 min de intervalo das outras marcações). Entre
+ * vagas do mesmo dia, evita as de antes das 10:00. Nunca sai da janela (logo, nunca do prazo).
+ */
+function vagaDiaUnico(
+  pedido: Pedido,
+  inicio: Date,
+  fim: Date,
+  medicoId: string | undefined,
+  quando: Date,
+): { vaga: Vaga; motivo: string } | null {
+  const doente = store.doentes.find((d) => d.doente_id === pedido.doente_id);
+  if (!doente || (doente.distancia_km ?? 0) < store.parametros.distancia_agrupar_km) return null;
+  const outras = store.atosMedicos.filter(
+    (a) => a.doente_id === pedido.doente_id && a.estado === "MARCADA" && dentroDaJanela(a.data_hora, inicio, fim),
+  );
+  const dias = [...new Set(outras.map((a) => a.data_hora.slice(0, 10)))].sort();
+  for (const dia of dias) {
+    const d = parseIso(dia);
+    const noDia = outras.filter((a) => a.data_hora.startsWith(dia));
+    const livres = vagasLivresCompativeis(pedido.especialidade_destino, pedido.ato_codigo, maxData(inicio, d) ?? d, d, medicoId, {
+      pedido,
+      quando,
+    }).filter((v) => {
+      const ini = parseIso(v.data_hora).getTime();
+      const fimV = ini + v.duracao_min * 60000;
+      return noDia.every((a) => {
+        const aIni = parseIso(a.data_hora).getTime();
+        const aFim = aIni + a.duracao_min * 60000;
+        return ini >= aFim + MINUTOS_ENTRE_MARCACOES * 60000 || fimV + MINUTOS_ENTRE_MARCACOES * 60000 <= aIni;
+      });
+    });
+    const vaga = livres.find((v) => parseIso(v.data_hora).getHours() >= HORA_MINIMA_LONGE) ?? livres[0];
+    if (vaga) {
+      const outrasTxt = noDia
+        .map((a) => `${a.ato_descricao || a.especialidade_descricao} às ${a.data_hora.slice(11, 16)}`)
+        .join(" e ");
+      return {
+        vaga,
+        motivo: `Dia único: marcado a ${formatarDataPt(d)}, dia em que já vem ao hospital (${outrasTxt}). Mora em ${doente.concelho} (${doente.distancia_km} km): evita uma deslocação.`,
+      };
+    }
+  }
+  return null;
+}
+
+/** Para doentes de longe, dentro do mesmo dia evita vagas antes das 10:00 (R-H). */
+function preferirHoraTardiaSeLonge(pedido: Pedido, vaga: Vaga | null, inicio: Date, fim: Date, medicoId: string | undefined, quando: Date): Vaga | null {
+  if (!vaga || parseIso(vaga.data_hora).getHours() >= HORA_MINIMA_LONGE) return vaga;
+  const doente = store.doentes.find((d) => d.doente_id === pedido.doente_id);
+  if (!doente || (doente.distancia_km ?? 0) < store.parametros.distancia_agrupar_km) return vaga;
+  const dia = apenasData(parseIso(vaga.data_hora));
+  const alternativa = vagasLivresCompativeis(pedido.especialidade_destino, pedido.ato_codigo, maxData(inicio, dia) ?? dia, dia, medicoId, {
+    pedido,
+    quando,
+  }).find((v) => parseIso(v.data_hora).getHours() >= HORA_MINIMA_LONGE && apenasData(parseIso(v.data_hora)).getTime() <= apenasData(fim).getTime());
+  return alternativa ?? vaga;
+}
+
+export function marcarPedidoNaVaga(pedido: Pedido, vaga: Vaga, quando: Date, motivo = ""): AtoMedico {
   const catalogo = store.catalogoAtos.find(
     (c) => c.especialidade_codigo === vaga.especialidade_codigo && c.ato_codigo === pedido.ato_codigo,
   );
@@ -123,9 +223,11 @@ function marcarPedidoNaVaga(pedido: Pedido, vaga: Vaga, quando: Date): AtoMedico
   pedido.marcado_em = isoDataHora(quando);
   pedido.ato_id = ato.mvp_ato_id;
   registarEvento(pedido, "MARCACAO", "MARCADO", "AGENTE", {
+    motivo,
     detalhe: `${vaga.vaga_id} ${formatarDataHoraPt(parseIso(vaga.data_hora))}`,
     dataHora: quando,
   });
+  comunicarMarcacao(pedido, ato, "MARCACAO", quando);
   return ato;
 }
 
@@ -138,14 +240,19 @@ export function agendar(pedido: Pedido, quando: Date = agora()): ResultadoAgenda
   const { inicio, fim } = janelaAgendamento(pedido, hoje);
   const medicoFiltro = pedido.continuidade_obrigatoria ? pedido.medico_preferido_id || undefined : undefined;
 
-  let vaga = encontrarVagaLivre(pedido.especialidade_destino, pedido.ato_codigo, inicio, fim, medicoFiltro);
+  const opts = { pedido, quando };
+  const diaUnico = vagaDiaUnico(pedido, inicio, fim, medicoFiltro, quando) ?? (medicoFiltro ? vagaDiaUnico(pedido, inicio, fim, undefined, quando) : null);
+  let vaga = diaUnico?.vaga ?? encontrarVagaLivre(pedido.especialidade_destino, pedido.ato_codigo, inicio, fim, medicoFiltro, opts);
+  let medicoUsado = medicoFiltro;
   if (!vaga && medicoFiltro) {
     // sem vaga com o médico de continuidade -> repetir com qualquer médico (passo 3)
-    vaga = encontrarVagaLivre(pedido.especialidade_destino, pedido.ato_codigo, inicio, fim);
+    vaga = encontrarVagaLivre(pedido.especialidade_destino, pedido.ato_codigo, inicio, fim, undefined, opts);
+    medicoUsado = undefined;
   }
+  if (!diaUnico) vaga = preferirHoraTardiaSeLonge(pedido, vaga, inicio, fim, medicoUsado, quando);
 
   if (vaga) {
-    const ato = marcarPedidoNaVaga(pedido, vaga, quando);
+    const ato = marcarPedidoNaVaga(pedido, vaga, quando, diaUnico?.motivo ?? "");
     if (pedido.tipo_pedido === "pedido_hd") aplicarR2EAgendar(pedido, quando);
     return { tipo: "MARCADO", ato };
   }
@@ -184,32 +291,22 @@ export function agendarLote(pedidoIds: string[], quando: Date = agora()): Map<st
 }
 
 // ---------------------------------------------------------------- troca segura
-interface CandidatoTroca {
-  atoOcupante: AtoMedico;
-  pedidoOcupante: Pedido;
-  vagaOrigem: Vaga;
-  vagaDestino: Vaga;
-}
-
-function procurarTrocaSegura(
-  pedidoUrgente: Pedido,
-  inicio: Date,
-  fim: Date,
-  quando: Date,
-): PropostaTroca | null {
-  const congelamentoDias = store.parametros.congelamento_dias;
-  const candidatos: CandidatoTroca[] = [];
-
+/**
+ * Todos os doentes marcados na janela que poderiam ceder a vaga, avaliados pelas regras da secção
+ * 8A (exclusões R-A + custo R-B). Não altera o estado — usada tanto pela troca segura como pelo
+ * Laboratório de prioridades (/api/prioridades/simular), para a demo mostrar a lógica real.
+ */
+export function factosCandidatosTroca(pedidoUrgente: Pedido, inicio: Date, fim: Date, quando: Date): FactosCandidato[] {
+  const factos: FactosCandidato[] = [];
   for (const ato of store.atosMedicos) {
     if (ato.especialidade_codigo !== pedidoUrgente.especialidade_destino) continue;
     if (ato.estado !== "MARCADA") continue;
+    if (ato.doente_id === pedidoUrgente.doente_id) continue;
     if (!dentroDaJanela(ato.data_hora, inicio, fim)) continue;
     const vagaOrigem = store.vagas.find((v) => v.vaga_id === ato.mvp_vaga_id);
     if (!vagaOrigem || !vagaOrigem.atos_permitidos.includes(pedidoUrgente.ato_codigo)) continue;
-    if (diferencaDias(apenasData(parseIso(ato.data_hora)), apenasData(quando)) <= congelamentoDias) continue; // (a)
-
     const pedidoOcupante = store.pedidos.find((p) => p.pedido_id === ato.mvp_pedido_id);
-    if (!pedidoOcupante) continue;
+    if (!pedidoOcupante) continue; // marcação sem pedido no sistema: não sabemos o prazo, não se mexe
 
     const medicoOcupante = pedidoOcupante.continuidade_obrigatoria ? pedidoOcupante.medico_preferido_id || undefined : undefined;
     const vagaDestino = encontrarVagaLivre(
@@ -218,39 +315,42 @@ function procurarTrocaSegura(
       amanha(apenasData(quando)),
       parseIso(pedidoOcupante.prazo_limite),
       medicoOcupante,
+      { pedido: pedidoOcupante, quando },
     );
-    if (!vagaDestino) continue; // (b) sem alternativa sem ultrapassar o próprio prazo
-
-    candidatos.push({ atoOcupante: ato, pedidoOcupante, vagaOrigem, vagaDestino });
+    factos.push(factosDoCandidato(ato, pedidoOcupante, vagaDestino, quando));
   }
+  return factos;
+}
 
-  if (candidatos.length === 0) return null;
+export function avaliarCandidatosTroca(pedidoUrgente: Pedido, inicio: Date, fim: Date, quando: Date): CandidatoTroca[] {
+  return avaliarFactos(factosCandidatosTroca(pedidoUrgente, inicio, fim, quando));
+}
 
-  candidatos.sort((a, b) => {
-    const folgaA = folgaDias(a.pedidoOcupante, apenasData(quando));
-    const folgaB = folgaDias(b.pedidoOcupante, apenasData(quando));
-    if (folgaA !== folgaB) return folgaB - folgaA; // maior folga primeiro
-    if (a.pedidoOcupante.n_remarcacoes !== b.pedidoOcupante.n_remarcacoes) {
-      return a.pedidoOcupante.n_remarcacoes - b.pedidoOcupante.n_remarcacoes; // menos remarcações primeiro
-    }
-    const marcadoA = a.pedidoOcupante.marcado_em ? parseIso(a.pedidoOcupante.marcado_em).getTime() : 0;
-    const marcadoB = b.pedidoOcupante.marcado_em ? parseIso(b.pedidoOcupante.marcado_em).getTime() : 0;
-    return marcadoB - marcadoA; // marcada há menos tempo primeiro (mais recente)
-  });
+function procurarTrocaSegura(
+  pedidoUrgente: Pedido,
+  inicio: Date,
+  fim: Date,
+  quando: Date,
+): PropostaTroca | null {
+  const avaliacao = avaliarCandidatosTroca(pedidoUrgente, inicio, fim, quando);
+  const escolhido = avaliacao.find((c) => c.escolhido);
+  if (!escolhido) return null;
+  const regraAntiga = avaliacao.find((c) => c.escolhido_regra_antiga);
 
-  const escolhido = candidatos[0];
   const proposta: PropostaTroca = {
     proposta_id: store.proximoId("proposta"),
     pedido_urgente: pedidoUrgente.pedido_id,
-    ato_a_mover: escolhido.atoOcupante.mvp_ato_id,
-    vaga_origem: escolhido.vagaOrigem.vaga_id,
-    vaga_destino: escolhido.vagaDestino.vaga_id,
-    justificacao: gerarJustificacaoTroca(escolhido),
+    ato_a_mover: escolhido.ato_id,
+    vaga_origem: escolhido.vaga_origem_id,
+    vaga_destino: escolhido.vaga_destino_id,
+    justificacao: justificacaoTroca(avaliacao),
     estado: "PENDENTE",
     decidido_por: "",
     decidido_em: "",
     criado_em: isoDataHora(quando),
     especialidade: pedidoUrgente.especialidade_destino,
+    avaliacao,
+    escolhido_regra_antiga: regraAntiga?.doente_nome ?? "",
   };
   store.propostasTroca.push(proposta);
   registarEvento(pedidoUrgente, "PROPOSTA_TROCA", "", "AGENTE", {
@@ -259,14 +359,6 @@ function procurarTrocaSegura(
     dataHora: quando,
   });
   return proposta;
-}
-
-function gerarJustificacaoTroca(c: CandidatoTroca): string {
-  const doente = store.doentes.find((d) => d.doente_id === c.atoOcupante.doente_id);
-  const dataOrigem = formatarDataPt(parseIso(c.vagaOrigem.data_hora));
-  const dataDestino = formatarDataPt(parseIso(c.vagaDestino.data_hora));
-  const prazoTxt = formatarDataPt(parseIso(c.pedidoOcupante.prazo_limite));
-  return `Vaga de ${dataOrigem} cedida por ${doente?.nome ?? c.atoOcupante.doente_id}: prazo até ${prazoTxt}, passa para ${dataDestino}`;
 }
 
 /** O serviço aprova a troca: desloca o ocupante e marca o pedido urgente na vaga libertada. */
@@ -296,6 +388,7 @@ export function aprovarPropostaTroca(propostaId: string, utilizadorId: string, q
     detalhe: `de ${formatarDataHoraPt(parseIso(dataAntiga))} para ${formatarDataHoraPt(parseIso(atoOcupante.data_hora))}`,
     dataHora: quando,
   });
+  comunicarMarcacao(pedidoOcupante, atoOcupante, "REMARCACAO", quando);
 
   marcarPedidoNaVaga(pedidoUrgente, vagaOrigem, quando);
   if (pedidoUrgente.tipo_pedido === "pedido_hd") aplicarR2EAgendar(pedidoUrgente, quando);

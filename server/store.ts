@@ -28,6 +28,12 @@ import type {
   Notificacao,
   Silenciamento,
   Avaria,
+  OfertaAntecipacao,
+  VagaLibertada,
+  Preparacao,
+  RegraCapacidade,
+  ComunicacaoDoente,
+  ChamadaRegistada,
 } from "./types.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -75,6 +81,14 @@ class Store {
   /** Pesos da equação de prioridade personalizados por serviço (especialidade_codigo); um serviço
    * sem entrada aqui usa os pesos por omissão. Estado só do MVP, não vem de CSV. */
   pesosPrioridadePorServico: Record<string, { urgencia: number; tipo: number; paciente: number }> = {};
+  /** Regras de preparação por acto e vagas protegidas por serviço (secção 8A) — vêm de CSV. */
+  preparacoes: Preparacao[] = [];
+  regrasCapacidade: RegraCapacidade[] = [];
+  /** Vagas libertadas, ofertas de antecipação, comunicações ao doente e chamadas — geradas pela aplicação. */
+  vagasLibertadas: VagaLibertada[] = [];
+  ofertasAntecipacao: OfertaAntecipacao[] = [];
+  comunicacoesDoente: ComunicacaoDoente[] = [];
+  chamadas: ChamadaRegistada[] = [];
 
   private contadores: Record<string, number> = {
     pedido: 0,
@@ -85,6 +99,8 @@ class Store {
     ato: 0,
     notificacao: 0,
     avaria: 0,
+    oferta: 0,
+    comunicacao: 0,
   };
 
   carregar(): void {
@@ -149,6 +165,11 @@ class Store {
       contacto: r.contacto || "",
       notas_clinicas: r.notas_clinicas || "",
       estadio_cuidado: (r.estadio_cuidado || "") as Doente["estadio_cuidado"],
+      concelho: r.concelho || "",
+      distancia_km: num(r.distancia_km),
+      contacto_digital: (r.contacto_digital || "SMS") as Doente["contacto_digital"],
+      aceita_antecipacao: bool(r.aceita_antecipacao || ""),
+      transporte_nao_urgente: bool(r.transporte_nao_urgente || ""),
     }));
 
     this.vagas = readCsv<Record<string, string>>(p("vagas.csv")).map((r) => ({
@@ -251,6 +272,19 @@ class Store {
       dias_ate_resultado: num(r.dias_ate_resultado),
     }));
 
+    this.preparacoes = readCsv<Record<string, string>>(p("preparacoes.csv")).map((r) => ({
+      especialidade_codigo: r.especialidade_codigo,
+      ato_codigo: r.ato_codigo,
+      instrucoes: r.instrucoes,
+      requer_confirmacao: bool(r.requer_confirmacao),
+    }));
+
+    this.regrasCapacidade = readCsv<Record<string, string>>(p("regras_capacidade.csv")).map((r) => ({
+      especialidade_codigo: r.especialidade_codigo,
+      horizonte_protegido_dias: num(r.horizonte_protegido_dias),
+      niveis_permitidos: list(r.niveis_permitidos) as RegraCapacidade["niveis_permitidos"],
+    }));
+
     const paramRows = readCsv<Record<string, string>>(p("parametros.csv"));
     const paramMap: Record<string, string> = {};
     for (const r of paramRows) paramMap[r.parametro] = r.valor;
@@ -268,6 +302,25 @@ class Store {
       dias_uteis_mes: num(paramMap.dias_uteis_mes),
       limiar_prioridade_mp: num(paramMap.limiar_prioridade_mp, 70),
       limiar_prioridade_p: num(paramMap.limiar_prioridade_p, 42),
+      max_remarcacoes_hospital: num(paramMap.max_remarcacoes_hospital, 1),
+      custo_idade_75: num(paramMap.custo_idade_75, 20),
+      custo_sem_contacto_digital: num(paramMap.custo_sem_contacto_digital, 25),
+      custo_distancia_50km: num(paramMap.custo_distancia_50km, 15),
+      custo_distancia_150km: num(paramMap.custo_distancia_150km, 25),
+      custo_transporte: num(paramMap.custo_transporte, 10),
+      custo_dia_agrupado: num(paramMap.custo_dia_agrupado, 20),
+      custo_estadio_novo: num(paramMap.custo_estadio_novo, 30),
+      bonus_folga_max: num(paramMap.bonus_folga_max, 30),
+      libertar_protegidas_dias: num(paramMap.libertar_protegidas_dias, 3),
+      antecipacao_ganho_min_dias: num(paramMap.antecipacao_ganho_min_dias, 3),
+      antecipacao_ganho_diagnostico_dias: num(paramMap.antecipacao_ganho_diagnostico_dias, 7),
+      oferta_resposta_horas: num(paramMap.oferta_resposta_horas, 24),
+      cascata_max: num(paramMap.cascata_max, 3),
+      distancia_agrupar_km: num(paramMap.distancia_agrupar_km, 50),
+      lista_chamadas_dias: num(paramMap.lista_chamadas_dias, 10),
+      idade_chamada: num(paramMap.idade_chamada, 80),
+      custo_medio_vaga_tac: num(paramMap.custo_medio_vaga_tac, 120),
+      reducao_faltas_lembrete: num(paramMap.reducao_faltas_lembrete, 0.3),
     };
     definirDataDemo(this.parametros.DEMO_DATE);
 
@@ -279,6 +332,10 @@ class Store {
     this.silenciamentos = [];
     this.avarias = [];
     this.pesosPrioridadePorServico = {};
+    this.vagasLibertadas = [];
+    this.ofertasAntecipacao = [];
+    this.comunicacoesDoente = [];
+    this.chamadas = [];
 
     this.contadores = {
       pedido: maxSufixo(this.pedidos.map((x) => x.pedido_id), "P"),
@@ -289,6 +346,8 @@ class Store {
       ato: maxSufixo(this.atosMedicos.map((x) => x.mvp_ato_id), "AT"),
       notificacao: 0,
       avaria: 0,
+      oferta: 0,
+      comunicacao: 0,
     };
   }
 
@@ -335,7 +394,9 @@ class Store {
     return [...porAto.values()];
   }
 
-  proximoId(entidade: "pedido" | "dependencia" | "evento" | "alerta" | "proposta" | "ato" | "notificacao" | "avaria"): string {
+  proximoId(
+    entidade: "pedido" | "dependencia" | "evento" | "alerta" | "proposta" | "ato" | "notificacao" | "avaria" | "oferta" | "comunicacao",
+  ): string {
     this.contadores[entidade] += 1;
     const n = this.contadores[entidade];
     const prefixos: Record<typeof entidade, string> = {
@@ -347,6 +408,8 @@ class Store {
       ato: "AT",
       notificacao: "N",
       avaria: "AV",
+      oferta: "OF",
+      comunicacao: "CM",
     };
     const casas = entidade === "ato" ? 6 : 5;
     return `${prefixos[entidade]}${String(n).padStart(casas, "0")}`;

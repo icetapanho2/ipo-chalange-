@@ -49,6 +49,7 @@ export function calcularPrioridadeSistema(
   doente?: {
     estadiamento?: string;
     diagnostico_principal?: string;
+    estadio_cuidado?: string;
   } | null,
   textoPlano?: string,
   especialidadeCodigo?: string,
@@ -143,6 +144,15 @@ export function calcularPrioridadeSistema(
   ) {
     pontosPaciente = 18;
     motivoPaciente = "Neoplasia ativa / Estadiamento intermédio";
+  }
+
+  // Estádio do percurso (ESPECIFICACAO.md secção 8A, R-C): em diagnóstico o relógio até ao início
+  // do tratamento é o que mais pesa; em tratamento, os intervalos entre ciclos. Máximo de 25 pontos.
+  const estadioCuidado = doente?.estadio_cuidado || "";
+  const bonusEstadio = estadioCuidado === "NOVO" || estadioCuidado === "PRE_TRATAMENTO" ? 8 : estadioCuidado === "EM_TRATAMENTO" ? 5 : 0;
+  if (bonusEstadio > 0) {
+    pontosPaciente = Math.min(25, pontosPaciente + bonusEstadio);
+    motivoPaciente += estadioCuidado === "EM_TRATAMENTO" ? " + em tratamento" : " + em diagnóstico";
   }
 
   // Equação do Sistema — pesos por omissão, ou personalizados pelo serviço de destino (secção

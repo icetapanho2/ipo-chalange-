@@ -1,0 +1,12 @@
+﻿especialidade_codigo;ato_codigo;instrucoes;requer_confirmacao
+7000_2;1;Jejum de 6 horas. Beber 1 litro de água na hora antes do exame. Se toma metformina, tem diabetes ou doença renal, avise o serviço: o contraste pode exigir cuidados.;1
+7000_3;1;Jejum de 6 horas. Bexiga cheia: beber 1 litro de água 1 hora antes.;0
+6100;9;Jejum de 8 a 12 horas (pode beber água). Traga a lista da medicação habitual.;0
+6100;4;Não precisa de jejum.;0
+9610;1;Traga a medicação habitual. As análises pré-tratamento são marcadas 1 a 3 dias antes.;0
+9602;3;Sem preparação especial.;0
+9602;1;Sem preparação especial.;0
+2102;22;Traga os exames realizados fora do IPO e a lista da medicação habitual.;0
+2102;23;Traga os exames realizados fora do IPO e a lista da medicação habitual.;0
+1300;1;Traga os exames e relatórios anteriores.;0
+2300;1;Traga os exames de imagem e relatórios anteriores.;0

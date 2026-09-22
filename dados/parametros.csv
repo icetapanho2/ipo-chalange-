@@ -12,3 +12,22 @@ minutos_admin_por_cromo;5;Pressuposto (a validar)
 dias_uteis_mes;22;
 limiar_prioridade_mp;70;Score da equação (0-100) a partir do qual a prioridade calculada é Muito Prioritário
 limiar_prioridade_p;42;Score da equação (0-100) a partir do qual a prioridade calculada é Prioritário
+max_remarcacoes_hospital;1;Remarcações por iniciativa do hospital (90 dias) a partir das quais o doente nunca mais cede a vaga
+custo_idade_75;20;Custo de remarcar: doente com 75 anos ou mais
+custo_sem_contacto_digital;25;Custo de remarcar: sem SMS nem email (risco de não ver o aviso)
+custo_distancia_50km;15;Custo de remarcar: mora a 50 km ou mais
+custo_distancia_150km;25;Custo de remarcar: mora a 150 km ou mais (substitui o anterior)
+custo_transporte;10;Custo de remarcar: transporte não urgente já combinado
+custo_dia_agrupado;20;Custo de remarcar: tem outra marcação no hospital no mesmo dia
+custo_estadio_novo;30;Custo de remarcar: doente em diagnóstico (NOVO ou PRE_TRATAMENTO)
+bonus_folga_max;30;Desconto máximo no custo pela folga até ao prazo (1 ponto por cada 3 dias)
+libertar_protegidas_dias;3;Uma vaga protegida fica aberta a qualquer pedido a partir de D-N
+antecipacao_ganho_min_dias;3;Só se oferece uma antecipação se o doente ganhar pelo menos N dias
+antecipacao_ganho_diagnostico_dias;7;Doente em diagnóstico dentro do prazo: ganho mínimo para lhe oferecer a vaga
+oferta_resposta_horas;24;Prazo para o doente responder a uma oferta de antecipação
+cascata_max;3;Níveis máximos de cascata quando uma antecipação liberta outra vaga
+distancia_agrupar_km;50;A partir desta distância, o agendamento prefere dias em que o doente já vem ao hospital
+lista_chamadas_dias;10;Horizonte da lista de chamadas da administrativa
+idade_chamada;80;Idade a partir da qual o doente entra na lista de chamadas
+custo_medio_vaga_tac;120;Estimativa (a validar): valor de uma vaga de TAC, em euros, para o impacto
+reducao_faltas_lembrete;0.3;Pressuposto (a validar): fracção das faltas evitadas com lembrete + chamada

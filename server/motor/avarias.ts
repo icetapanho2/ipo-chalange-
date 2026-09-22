@@ -1,9 +1,11 @@
 import { store } from "../store.ts";
 import { agora } from "../clock.ts";
-import { isoDataHora, parseIso, somarDias } from "../util.ts";
+import { formatarDataHoraPt, isoDataHora, parseIso, somarDias } from "../util.ts";
 import { adiarConsulta } from "./fluxo.ts";
 import { agendar } from "./agendamento.ts";
-import { recalcularAlertas } from "./alertas.ts";
+import { criarAlerta, recalcularAlertas } from "./alertas.ts";
+import { registarEvento } from "./estados.ts";
+import { remarcacoesHospital } from "./remarcacao.ts";
 import { notificar, utilizadoresPorPerfil } from "./notificacoes.ts";
 import { descreverEspecialidade, descreverDoente, descreverAto } from "../apresentacao.ts";
 import type { Avaria } from "../types.ts";
@@ -73,15 +75,48 @@ export function resolverAvaria(
     return dh.getTime() >= inicioJanela.getTime() && dh.getTime() <= fimJanela.getTime();
   });
 
+  // R-F (secção 8A): quem já foi remarcado pelo hospital escolhe primeiro a nova vaga; depois,
+  // quem tem menos folga até ao prazo.
+  const pedidosAfetados = afetados
+    .map((ato) => ({ ato, pedido: store.pedidos.find((p) => p.pedido_id === ato.mvp_pedido_id) }))
+    .filter((x): x is { ato: (typeof afetados)[number]; pedido: NonNullable<typeof x.pedido> } => !!x.pedido)
+    .sort(
+      (a, b) =>
+        remarcacoesHospital(b.pedido.doente_id, quando) - remarcacoesHospital(a.pedido.doente_id, quando) ||
+        a.pedido.prazo_limite.localeCompare(b.pedido.prazo_limite),
+    );
+
   let nAfetados = 0;
-  for (const ato of afetados) {
-    const pedido = store.pedidos.find((p) => p.pedido_id === ato.mvp_pedido_id);
-    if (!pedido) continue;
+  for (const { ato, pedido } of pedidosAfetados) {
     nAfetados += 1;
+    const jaRemarcado = remarcacoesHospital(pedido.doente_id, quando) >= store.parametros.max_remarcacoes_hospital;
+    const dataAntiga = ato.data_hora;
     adiarConsulta(pedido, utilizadorId, quando);
     // adiarConsulta já chama agendar(); se continuar sem vaga (ex.: avaria prolongada), o
     // próprio pedido fica SEM_VAGA — o médico é avisado de qual dos dois desfechos ocorreu.
     const remarcado = pedido.estado === "MARCADO";
+    if (remarcado) {
+      pedido.n_remarcacoes += 1;
+      const novoAto = store.atosMedicos.find((a) => a.mvp_ato_id === pedido.ato_id);
+      registarEvento(pedido, "REMARCACAO", "", "SISTEMA", {
+        motivo: `Avaria: ${avaria.descricao}`,
+        detalhe: `de ${formatarDataHoraPt(parseIso(dataAntiga))}${novoAto ? ` para ${formatarDataHoraPt(parseIso(novoAto.data_hora))}` : ""}`,
+        dataHora: quando,
+      });
+    }
+    if (jaRemarcado) {
+      criarAlerta(
+        {
+          tipo: "SEGUNDA_REMARCACAO",
+          gravidade: "alta",
+          especialidade: pedido.especialidade_destino,
+          pedido_id: pedido.pedido_id,
+          doente_id: pedido.doente_id,
+          descricao: `${descreverDoente(pedido.doente_id)} já tinha sido remarcado pelo hospital: 2.ª remarcação inevitável (avaria). Ligar ao doente a explicar.`,
+        },
+        quando,
+      );
+    }
     notificar({
       tipo: remarcado ? "PEDIDO_MARCADO" : "PEDIDO_SEM_VAGA",
       destinatarios: [pedido.medico_requisitante_id],

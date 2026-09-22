@@ -658,6 +658,152 @@ for v in vagas:
 for a in atos:
     if a["data_hora"].date() >= DEMO_DATE and a["estado"] not in ("FALTOU",): a["estado"] = "MARCADA"
 
+# ================================================================ PERFIL LOGÍSTICO + CENÁRIOS DE PRIORIDADE
+# Tudo o que está abaixo corre DEPOIS de toda a geração aleatória acima e usa um gerador
+# aleatório próprio (rng), para não alterar a sequência aleatória principal — e, com ela, as
+# datas exactas dos cenários 1-8 da demo. Os doentes novos (100109-100113) reaproveitam
+# marcações de fundo que já existiam no TAC (só muda quem lá está), em vez de ocupar vagas novas.
+rng = random.Random(2026)
+CONCELHOS_PERTO = [("Lisboa", 6), ("Amadora", 12), ("Odivelas", 14), ("Loures", 18), ("Oeiras", 16),
+                   ("Sintra", 28), ("Cascais", 30), ("Almada", 15), ("Seixal", 22), ("Barreiro", 35),
+                   ("Vila Franca de Xira", 32)]
+CONCELHOS_LONGE = [("Setúbal", 50), ("Santarém", 85), ("Évora", 135), ("Leiria", 145), ("Beja", 180),
+                   ("Portalegre", 220), ("Castelo Branco", 230), ("Faro", 280)]
+
+def idade_em(nasc_iso, ref=DEMO_DATE):
+    n = date.fromisoformat(nasc_iso)
+    return ref.year - n.year - ((ref.month, ref.day) < (n.month, n.day))
+
+for x in doentes.values():
+    longe = rng.random() < 0.15
+    conc, km = rng.choice(CONCELHOS_LONGE if longe else CONCELHOS_PERTO)
+    p_sem = 0.35 if idade_em(x["data_nascimento"]) >= 75 else 0.06
+    r = rng.random()
+    x.update(concelho=conc, distancia_km=km,
+             contacto_digital="NENHUM" if r < p_sem else ("EMAIL" if r < p_sem + 0.15 else "SMS"),
+             aceita_antecipacao=int(rng.random() < (0.25 if longe else 0.5)),
+             transporte_nao_urgente=int(rng.random() < (0.5 if longe else 0.08)))
+
+# doentes-cenário 1-8: todos perto de Lisboa e contactáveis por SMS (o Manuel tem de ter custo de
+# remarcação mínimo: é ele que cede a vaga ao José, tal como antes)
+for _pid, conc, km in [(D1, "Lisboa", 8), (D2, "Loures", 18), (D3, "Oeiras", 16), (D4, "Amadora", 12),
+                       (D5, "Odivelas", 14), (D6, "Lisboa", 12), (D7, "Almada", 15), (D8, "Seixal", 22)]:
+    doentes[_pid].update(concelho=conc, distancia_km=km, contacto_digital="SMS", aceita_antecipacao=1,
+                         transporte_nao_urgente=0)
+doentes[D1]["notas_clinicas"] += " Diabetes tipo 2 — metformina."
+
+def demo_doente_prioridade(pid, nome, sexo, idade, cen, **perfil):
+    nasc = date(DEMO_DATE.year - idade, rng.randint(1, 8), rng.randint(1, 28))
+    doentes[pid] = dict(doente_id=pid, n_utente=str(rng.randint(100000000, 399999999)), nome=nome, sexo=sexo,
+                        data_nascimento=nasc.isoformat(), demo_cenario=cen, diagnostico_principal="",
+                        estadiamento="", alergias=[], contacto="", notas_clinicas="", estadio_cuidado="",
+                        concelho="", distancia_km=0, contacto_digital="SMS", aceita_antecipacao=0,
+                        transporte_nao_urgente=0)
+    doentes[pid].update(perfil)
+    return pid
+
+D9 = demo_doente_prioridade(
+    "100109", "Joaquim Alves Pereira", "M", 81, "9 - custo de remarcação alto (idoso, longe, sem telemóvel)",
+    diagnostico_principal="Neoplasia do cólon, em remissão", estadiamento="Estádio II", contacto="272 000 109 (fixo)",
+    notas_clinicas="Vive sozinho. Vem de transporte não urgente (ambulância) a partir de Castelo Branco.",
+    estadio_cuidado="FOLLOW_UP", concelho="Castelo Branco", distancia_km=230, contacto_digital="NENHUM",
+    aceita_antecipacao=0, transporte_nao_urgente=1)
+D10 = demo_doente_prioridade(
+    "100110", "Beatriz Sousa Rocha", "F", 52, "9 - já remarcada uma vez (excluída de nova troca)",
+    diagnostico_principal="Neoplasia da mama, em vigilância", estadiamento="Estádio I", contacto="913 000 110",
+    estadio_cuidado="FOLLOW_UP", concelho="Lisboa", distancia_km=7, contacto_digital="SMS", aceita_antecipacao=1)
+D11 = demo_doente_prioridade(
+    "100111", "Tiago Marques Silva", "M", 47, "9 - em tratamento (excluído de trocas)",
+    diagnostico_principal="Adenocarcinoma do recto, QT neoadjuvante em curso", estadiamento="Estádio III",
+    contacto="913 000 111", notas_clinicas="TC de avaliação de resposta a meio da quimioterapia.",
+    estadio_cuidado="EM_TRATAMENTO", concelho="Oeiras", distancia_km=16, contacto_digital="SMS", aceita_antecipacao=1)
+D12 = demo_doente_prioridade(
+    "100112", "Helena Duarte Matos", "F", 58, "10 - em diagnóstico, marcada fora do prazo (antecipação)",
+    diagnostico_principal="Suspeita de neoplasia do pâncreas (em estudo)", contacto="913 000 112",
+    notas_clinicas="Perda de peso e icterícia. Aguarda TC para estadiamento.", estadio_cuidado="NOVO",
+    concelho="Almada", distancia_km=15, contacto_digital="SMS", aceita_antecipacao=1)
+D13 = demo_doente_prioridade(
+    "100113", "Rui Fonseca Lima", "M", 66, "10 - desmarca o TC com uma semana de aviso",
+    diagnostico_principal="Neoplasia do cólon, em vigilância", estadiamento="Estádio I", contacto="913 000 113",
+    estadio_cuidado="FOLLOW_UP", concelho="Lisboa", distancia_km=9, contacto_digital="EMAIL", aceita_antecipacao=0)
+
+def assumir_vaga(p, vaga, marcado_em, user="AGENTE"):
+    """Coloca o pedido p na marcação de fundo que já ocupava esta vaga (sem gastar vagas novas)."""
+    a = next(x for x in atos if x["ato_id"] == vaga["ato_id"])
+    a.update(doente_id=p["doente_id"], exames=p["exames"].split("|") if p["exames"] else [], pedido_id=p["pedido_id"],
+             prazo=p["prazo_limite"], prio=p["prioridade"], estado="MARCADA", criado=marcado_em, atualizado=marcado_em,
+             n_rem=p["n_remarcacoes"])
+    p["marcado_em"], p["ato_id"], p["estado"] = marcado_em, a["ato_id"], "MARCADO"
+    ev(p["pedido_id"], marcado_em, "MARCACAO", "ACEITE", "MARCADO", user, detalhe=f"{vaga['vaga_id']} {pt(vaga['data_hora'])}")
+    return a
+
+def tac(dia, hh): return get_vaga("7000_2", datetime.combine(dia, t(hh)))
+
+# Joaquim: TC AP de controlo 01/10 09:00 e consulta no MESMO dia (dia agrupado) — tem mais folga
+# do que o Manuel (pela regra antiga seria ele a ceder a vaga ao José). Hoje: consulta com o Dr. Pedro.
+cr = datetime.combine(date(2026, 9, 10), t("11:20"))
+pj = novo_pedido(D9, "", "U02", cr, "exame", "7000_2", "1", "N", exames=TC_AP, prazo=date(2027, 1, 31),
+                 texto="TC AP de controlo antes da próxima consulta.", confianca=0.95)
+validar(pj, cr + timedelta(minutes=40))
+assumir_vaga(pj, tac(date(2026, 10, 1), "09:00"), cr + timedelta(minutes=50))
+pjr = novo_pedido(D9, "", "U02", cr, "consulta", "2102", "22", "N", nao_antes=date(2026, 9, 28),
+                  prazo=date(2026, 10, 15), texto="Consulta de vigilância no mesmo dia do TC.", confianca=0.95)
+validar(pjr, cr + timedelta(minutes=40))
+marcar(pjr, get_vaga("2102", datetime.combine(date(2026, 10, 1), t("11:10")), "U02"), cr + timedelta(minutes=55))
+book(get_vaga("2102", datetime.combine(DEMO_DATE, t("11:50")), "U01"), D9, "2102", "22",
+     criado=datetime.combine(DEMO_DATE - timedelta(days=21), t("10:00")), estado="MARCADA")
+
+# Beatriz: TC 01/10 10:00, prazo largo, mas já foi remarcada uma vez pelo hospital há 3 semanas
+cr = datetime.combine(date(2026, 8, 20), t("10:10"))
+pb = novo_pedido(D10, "", "U02", cr, "exame", "7000_2", "1", "N", exames=TC_AP, prazo=date(2027, 1, 15),
+                 texto="TC AP de vigilância.", confianca=0.96)
+validar(pb, cr + timedelta(minutes=30))
+assumir_vaga(pb, tac(date(2026, 10, 1), "10:00"), cr + timedelta(minutes=45))
+pb["n_remarcacoes"] = 1
+next(x for x in atos if x["ato_id"] == pb["ato_id"])["n_rem"] = 1
+ev(pb["pedido_id"], datetime.combine(date(2026, 9, 2), t("15:00")), "REMARCACAO", "MARCADO", "MARCADO", "SISTEMA",
+   motivo="Equipamento avariado", detalhe="de 03/09/2026 para 01/10/2026 10:00")
+
+# Tiago: em quimioterapia, TC de avaliação de resposta 02/10 08:00 (prazo curto)
+cr = datetime.combine(date(2026, 9, 18), t("09:40"))
+pt_ = novo_pedido(D11, "", "U01", cr, "exame", "7000_2", "1", "P", exames=TC_TAP, especificacao="com contraste",
+                  prazo=date(2026, 10, 9), texto="TC TAP c/ contraste de avaliação de resposta a meio da QT.", confianca=0.97)
+validar(pt_, cr + timedelta(minutes=30))
+assumir_vaga(pt_, tac(date(2026, 10, 2), "08:00"), cr + timedelta(minutes=40))
+
+# Helena: em diagnóstico, TC MP pedido a 25/08 com prazo 08/09, marcada à mão no Oasis na primeira
+# vaga que havia (13/10) — está marcada FORA do prazo.
+cr = datetime.combine(date(2026, 8, 25), t("12:00"))
+ph = novo_pedido(D12, "", "U01", cr, "exame", "7000_2", "1", "MP", exames=TC_TAP, especificacao="com contraste",
+                 prazo=date(2026, 9, 8), texto="Suspeita de neoplasia do pâncreas. TC TAP c/ contraste urgente p/ estadiamento.",
+                 confianca=0.94)
+validar(ph, cr + timedelta(minutes=35))
+assumir_vaga(ph, tac(date(2026, 10, 13), "09:00"), cr + timedelta(days=1), user="U07")
+
+# Rui: TC AP de controlo 30/09 09:00, prazo largo — vai desmarcar ao vivo (viagem)
+cr = datetime.combine(date(2026, 9, 10), t("10:30"))
+pr_ = novo_pedido(D13, "", "U01", cr, "exame", "7000_2", "1", "N", exames=TC_AP, prazo=date(2026, 12, 31),
+                  texto="TC AP de controlo até ao final do ano.", confianca=0.97)
+validar(pr_, cr + timedelta(minutes=30))
+assumir_vaga(pr_, tac(date(2026, 9, 30), "09:00"), cr + timedelta(minutes=45))
+
+# Preparação dos exames (texto PROVISÓRIO — a validar com cada serviço). requer_confirmacao = o
+# serviço quer confirmar por telefone quando há um factor de risco (ver server/motor/chamadas.ts).
+PREPARACOES = [
+    ("7000_2", "1", "Jejum de 6 horas. Beber 1 litro de água na hora antes do exame. Se toma metformina, tem "
+                    "diabetes ou doença renal, avise o serviço: o contraste pode exigir cuidados.", 1),
+    ("7000_3", "1", "Jejum de 6 horas. Bexiga cheia: beber 1 litro de água 1 hora antes.", 0),
+    ("6100", "9", "Jejum de 8 a 12 horas (pode beber água). Traga a lista da medicação habitual.", 0),
+    ("6100", "4", "Não precisa de jejum.", 0),
+    ("9610", "1", "Traga a medicação habitual. As análises pré-tratamento são marcadas 1 a 3 dias antes.", 0),
+    ("9602", "3", "Sem preparação especial.", 0),
+    ("9602", "1", "Sem preparação especial.", 0),
+    ("2102", "22", "Traga os exames realizados fora do IPO e a lista da medicação habitual.", 0),
+    ("2102", "23", "Traga os exames realizados fora do IPO e a lista da medicação habitual.", 0),
+    ("1300", "1", "Traga os exames e relatórios anteriores.", 0),
+    ("2300", "1", "Traga os exames de imagem e relatórios anteriores.", 0),
+]
+
 # ================================================================ ESCRITA
 def wcsv(name, rows, cols):
     with open(os.path.join(OUT, name), "w", newline="", encoding="utf-8-sig") as f:
@@ -674,10 +820,17 @@ wcsv("gabinetes.csv", GABINETES, ["codigo", "descricao", "especialidade_codigo",
 wcsv("utilizadores.csv", UTILIZADORES, ["utilizador_id", "nome", "perfil", "especialidade_codigo", "e_medico"])
 wcsv("doentes.csv", [(x["doente_id"], x["n_utente"], x["nome"], x["sexo"], x["data_nascimento"], x["demo_cenario"],
                       x["diagnostico_principal"], x["estadiamento"], "|".join(x["alergias"]), x["contacto"],
-                      x["notas_clinicas"], x["estadio_cuidado"])
+                      x["notas_clinicas"], x["estadio_cuidado"], x["concelho"], x["distancia_km"],
+                      x["contacto_digital"], x["aceita_antecipacao"], x["transporte_nao_urgente"])
                      for x in doentes.values()],
      ["doente_id", "n_utente", "nome", "sexo", "data_nascimento", "demo_cenario",
-      "diagnostico_principal", "estadiamento", "alergias", "contacto", "notas_clinicas", "estadio_cuidado"])
+      "diagnostico_principal", "estadiamento", "alergias", "contacto", "notas_clinicas", "estadio_cuidado",
+      "concelho", "distancia_km", "contacto_digital", "aceita_antecipacao", "transporte_nao_urgente"])
+wcsv("preparacoes.csv", PREPARACOES, ["especialidade_codigo", "ato_codigo", "instrucoes", "requer_confirmacao"])
+# Vagas protegidas (regra R-D): só o TAC, que é o recurso escasso da demo. As restantes especialidades
+# não têm linha e mantêm o comportamento de "primeira vaga livre".
+wcsv("regras_capacidade.csv", [("7000_2", 10, "MP|P")],
+     ["especialidade_codigo", "horizonte_protegido_dias", "niveis_permitidos"])
 wcsv("vagas.csv", [(v["vaga_id"], v["especialidade_codigo"], v["gabinete_codigo"], v["medico_id"], iso(v["data_hora"]),
                     v["duracao_min"], v["atos_permitidos"], v["ato_id"] or "") for v in vagas],
      ["vaga_id", "especialidade_codigo", "gabinete_codigo", "medico_id", "data_hora", "duracao_min", "atos_permitidos", "ato_id"])
@@ -739,6 +892,26 @@ wcsv("parametros.csv", [
     ("dias_uteis_mes", 22, ""),
     ("limiar_prioridade_mp", 70, "Score da equação (0-100) a partir do qual a prioridade calculada é Muito Prioritário"),
     ("limiar_prioridade_p", 42, "Score da equação (0-100) a partir do qual a prioridade calculada é Prioritário"),
+    # --- regras de remarcação e de vagas libertadas (ESPECIFICACAO.md secção 8A) — a validar com a direcção clínica
+    ("max_remarcacoes_hospital", 1, "Remarcações por iniciativa do hospital (90 dias) a partir das quais o doente nunca mais cede a vaga"),
+    ("custo_idade_75", 20, "Custo de remarcar: doente com 75 anos ou mais"),
+    ("custo_sem_contacto_digital", 25, "Custo de remarcar: sem SMS nem email (risco de não ver o aviso)"),
+    ("custo_distancia_50km", 15, "Custo de remarcar: mora a 50 km ou mais"),
+    ("custo_distancia_150km", 25, "Custo de remarcar: mora a 150 km ou mais (substitui o anterior)"),
+    ("custo_transporte", 10, "Custo de remarcar: transporte não urgente já combinado"),
+    ("custo_dia_agrupado", 20, "Custo de remarcar: tem outra marcação no hospital no mesmo dia"),
+    ("custo_estadio_novo", 30, "Custo de remarcar: doente em diagnóstico (NOVO ou PRE_TRATAMENTO)"),
+    ("bonus_folga_max", 30, "Desconto máximo no custo pela folga até ao prazo (1 ponto por cada 3 dias)"),
+    ("libertar_protegidas_dias", 3, "Uma vaga protegida fica aberta a qualquer pedido a partir de D-N"),
+    ("antecipacao_ganho_min_dias", 3, "Só se oferece uma antecipação se o doente ganhar pelo menos N dias"),
+    ("antecipacao_ganho_diagnostico_dias", 7, "Doente em diagnóstico dentro do prazo: ganho mínimo para lhe oferecer a vaga"),
+    ("oferta_resposta_horas", 24, "Prazo para o doente responder a uma oferta de antecipação"),
+    ("cascata_max", 3, "Níveis máximos de cascata quando uma antecipação liberta outra vaga"),
+    ("distancia_agrupar_km", 50, "A partir desta distância, o agendamento prefere dias em que o doente já vem ao hospital"),
+    ("lista_chamadas_dias", 10, "Horizonte da lista de chamadas da administrativa"),
+    ("idade_chamada", 80, "Idade a partir da qual o doente entra na lista de chamadas"),
+    ("custo_medio_vaga_tac", 120, "Estimativa (a validar): valor de uma vaga de TAC, em euros, para o impacto"),
+    ("reducao_faltas_lembrete", 0.3, "Pressuposto (a validar): fracção das faltas evitadas com lembrete + chamada"),
 ], ["parametro", "valor", "descricao"])
 
 print("doentes", len(doentes), "vagas", len(vagas), "atos", len(atos), "pedidos", len(pedidos),

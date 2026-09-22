@@ -13,6 +13,7 @@ import { criarRotasDoente } from "./routes/doente.ts";
 import { criarRotasGestao } from "./routes/gestao.ts";
 import { criarRotasNotificacoes } from "./routes/notificacoes.ts";
 import { criarRotasTecnico } from "./routes/tecnico.ts";
+import { criarRotasPrioridades } from "./routes/prioridades.ts";
 import { recalcularAlertas } from "./motor/alertas.ts";
 import { agora } from "./clock.ts";
 
@@ -41,6 +42,7 @@ export function criarApp() {
   app.use("/api/gestao", criarRotasGestao(store));
   app.use("/api/notificacoes", criarRotasNotificacoes(store));
   app.use("/api/tecnico", criarRotasTecnico(store));
+  app.use("/api/prioridades", criarRotasPrioridades(store));
 
   if (process.env.NODE_ENV === "production") {
     const distDir = path.join(__dirname, "..", "dist");

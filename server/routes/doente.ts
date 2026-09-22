@@ -4,6 +4,7 @@ import { agora } from "../clock.ts";
 import { apenasData, parseIso } from "../util.ts";
 import { adiarConsulta, remarcarPedido } from "../motor/fluxo.ts";
 import { avaliarDependenciasDetalhado, calcularSemaforo } from "../motor/semaforo.ts";
+import { idadeDoente, remarcacoesHospital } from "../motor/remarcacao.ts";
 import {
   descreverEspecialidade,
   descreverEstado,
@@ -95,6 +96,11 @@ export function criarRotasDoente(store: typeof StoreType) {
       contacto,
       notas_clinicas,
       estadio_cuidado,
+      concelho,
+      distancia_km,
+      contacto_digital,
+      aceita_antecipacao,
+      transporte_nao_urgente,
     } = req.body ?? {};
 
     if (nome) doente.nome = String(nome).trim();
@@ -113,6 +119,11 @@ export function criarRotasDoente(store: typeof StoreType) {
     if (contacto !== undefined) doente.contacto = String(contacto).trim();
     if (notas_clinicas !== undefined) doente.notas_clinicas = notas_clinicas;
     if (estadio_cuidado !== undefined) doente.estadio_cuidado = estadio_cuidado;
+    if (concelho !== undefined) doente.concelho = String(concelho).trim();
+    if (distancia_km !== undefined && !Number.isNaN(Number(distancia_km))) doente.distancia_km = Number(distancia_km);
+    if (["SMS", "EMAIL", "NENHUM"].includes(contacto_digital)) doente.contacto_digital = contacto_digital;
+    if (aceita_antecipacao !== undefined) doente.aceita_antecipacao = !!aceita_antecipacao;
+    if (transporte_nao_urgente !== undefined) doente.transporte_nao_urgente = !!transporte_nao_urgente;
 
     res.json({ ok: true, doente });
   });
@@ -243,7 +254,36 @@ export function criarRotasDoente(store: typeof StoreType) {
       });
     }
 
-    res.json({ doente, timeline, marcacoesFuturas, todosPedidos, alertas, oQueFalta });
+    // Todas as marcações futuras do doente (a "agenda do doente"): o que foi marcado, onde e quando.
+    const agenda = store.atosMedicos
+      .filter((a) => a.doente_id === doente.doente_id && a.estado === "MARCADA" && parseIso(a.data_hora).getTime() >= hoje.getTime())
+      .sort((a, b) => a.data_hora.localeCompare(b.data_hora))
+      .map((a) => {
+        const pedido = store.pedidos.find((p) => p.pedido_id === a.mvp_pedido_id);
+        const marcacao = pedido ? [...store.eventos].reverse().find((e) => e.pedido_id === pedido.pedido_id && e.tipo === "MARCACAO") : undefined;
+        return {
+          ato_id: a.mvp_ato_id,
+          pedido_id: a.mvp_pedido_id,
+          data_hora: a.data_hora,
+          especialidade_legivel: descreverEspecialidade(a.especialidade_codigo),
+          descricao: pedido ? descreverPedido(pedido) : a.ato_descricao,
+          local: a.gabinete_descricao,
+          medico: descreverUtilizador(a.mvp_medico_id) || "",
+          prazo_limite: pedido?.prazo_limite ?? "",
+          dentro_do_prazo: pedido ? apenasData(parseIso(a.data_hora)).getTime() <= parseIso(pedido.prazo_limite).getTime() : null,
+          motivo_marcacao: marcacao?.motivo ?? "",
+        };
+      });
+    const comunicacoes = store.comunicacoesDoente
+      .filter((c) => c.doente_id === doente.doente_id)
+      .sort((a, b) => b.enviar_em.localeCompare(a.enviar_em));
+    const ofertas = store.ofertasAntecipacao.filter((o) => o.doente_id === doente.doente_id);
+    const logistica = {
+      idade: idadeDoente(doente, hoje),
+      remarcacoes_hospital_90d: remarcacoesHospital(doente.doente_id, agora()),
+    };
+
+    res.json({ doente, timeline, marcacoesFuturas, todosPedidos, alertas, oQueFalta, agenda, comunicacoes, ofertas, logistica });
   });
 
   router.post("/:id/pedidos/:pedidoId/remarcar-exame", (req, res) => {

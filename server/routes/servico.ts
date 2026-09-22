@@ -7,6 +7,8 @@ import { resolverAlerta } from "../motor/alertas.ts";
 import { calcularSemaforo } from "../motor/semaforo.ts";
 import { resolverAvaria } from "../motor/avarias.ts";
 import { remarcarPedido, adiarConsulta, marcarOutsourcing, pedirDecisaoMedico } from "../motor/fluxo.ts";
+import { desmarcarAPedidoDoDoente, expirarOfertas, responderOferta } from "../motor/antecipacao.ts";
+import { listaChamadas, registarChamada } from "../motor/chamadas.ts";
 import { PESOS_PRIORIDADE_OMISSAO, pesosPrioridadeDoServico } from "../motor/prioridade.ts";
 import {
   descreverDoente,
@@ -110,9 +112,100 @@ export function criarRotasServico(store: typeof StoreType) {
         proposta_id: p.proposta_id,
         justificacao: p.justificacao,
         criado_em: p.criado_em,
+        pedido_urgente: p.pedido_urgente,
         pedido_urgente_doente: descreverDoente(store.pedidos.find((x) => x.pedido_id === p.pedido_urgente)?.doente_id ?? ""),
+        avaliacao: p.avaliacao ?? [],
+        escolhido_regra_antiga: p.escolhido_regra_antiga ?? "",
       }));
     res.json(propostas);
+  });
+
+  // ------------------------------------------------ marcações do serviço (para desmarcar a pedido do doente)
+  router.get("/marcacoes", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    const hoje = apenasData(agora());
+    const marcacoes = store.pedidos
+      .filter((p) => p.especialidade_destino === especialidade && p.estado === "MARCADO")
+      .map((p) => ({ p, ato: store.atosMedicos.find((a) => a.mvp_ato_id === p.ato_id) }))
+      .filter((x) => x.ato && diferencaDias(apenasData(parseIso(x.ato.data_hora)), hoje) >= 1)
+      .map(({ p, ato }) => ({ ...pedidoResumo(p), data_hora: ato!.data_hora, ato_id: ato!.mvp_ato_id }))
+      .sort((a, b) => a.data_hora.localeCompare(b.data_hora));
+    res.json(marcacoes);
+  });
+
+  router.post("/pedidos/:id/desmarcar", (req, res) => {
+    const pedido = store.pedidos.find((p) => p.pedido_id === req.params.id);
+    if (!pedido || pedido.estado !== "MARCADO") {
+      res.status(404).json({ erro: "Pedido não encontrado ou não está marcado." });
+      return;
+    }
+    const disponivel: string | null = req.body?.disponivelAPartirDe || null;
+    if (disponivel && !/^\d{4}-\d{2}-\d{2}$/.test(disponivel)) {
+      res.status(400).json({ erro: "Data 'disponível a partir de' inválida (aaaa-mm-dd)." });
+      return;
+    }
+    const r = desmarcarAPedidoDoDoente(pedido, req.utilizadorId, disponivel, agora());
+    const novoAto = store.atosMedicos.find((a) => a.mvp_ato_id === pedido.ato_id);
+    res.json({
+      ok: true,
+      oferta: r?.oferta ?? null,
+      reagendado_para: pedido.estado === "MARCADO" ? novoAto?.data_hora ?? null : null,
+    });
+  });
+
+  // ------------------------------------------------ vagas libertadas / ofertas de antecipação (secção 8A, R-E)
+  function ofertaJson(o: (typeof store.ofertasAntecipacao)[number]) {
+    return {
+      ...o,
+      doente_nome: descreverDoente(o.doente_id),
+      pedido_descricao: descreverPedido(store.pedidos.find((p) => p.pedido_id === o.pedido_id)!),
+    };
+  }
+
+  router.get("/vagas-libertadas", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    expirarOfertas(agora());
+    const ofertas = store.ofertasAntecipacao.filter((o) => o.especialidade === especialidade);
+    res.json({
+      pendentes: ofertas.filter((o) => o.estado === "PENDENTE").map(ofertaJson),
+      historico: ofertas.filter((o) => o.estado !== "PENDENTE").reverse().map(ofertaJson),
+      libertadas: store.vagasLibertadas.filter((v) => v.especialidade === especialidade),
+    });
+  });
+
+  router.post("/ofertas/:id/responder", (req, res) => {
+    const r = responderOferta(req.params.id, !!req.body?.aceita, req.utilizadorId, agora());
+    if (!r) {
+      res.status(404).json({ erro: "Oferta não encontrada ou já respondida." });
+      return;
+    }
+    res.json({ ok: true, oferta: ofertaJson(r.oferta), seguinte: r.seguinte ? ofertaJson(r.seguinte) : null });
+  });
+
+  // ------------------------------------------------ lista de chamadas (secção 8A, R-G)
+  router.get("/chamadas", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId) ?? undefined;
+    res.json(listaChamadas(especialidade, agora()));
+  });
+
+  router.post("/chamadas/:atoId", (req, res) => {
+    const resultado = req.body?.resultado;
+    if (!["CONFIRMADO", "NAO_ATENDEU", "VAI_DESMARCAR"].includes(resultado)) {
+      res.status(400).json({ erro: "Resultado inválido." });
+      return;
+    }
+    const chamada = registarChamada(
+      req.params.atoId,
+      resultado,
+      req.utilizadorId,
+      { nota: req.body?.nota ?? "", disponivelAPartirDe: req.body?.disponivelAPartirDe || null },
+      agora(),
+    );
+    if (!chamada) {
+      res.status(404).json({ erro: "Marcação não encontrada." });
+      return;
+    }
+    res.json({ ok: true, chamada });
   });
 
   router.post("/propostas/:id/aprovar", (req, res) => {
