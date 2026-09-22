@@ -135,6 +135,11 @@ APELIDOS = ["Silva", "Santos", "Ferreira", "Pereira", "Oliveira", "Costa", "Rodr
             "Fernandes", "Gonçalves", "Gomes", "Lopes", "Marques", "Alves", "Almeida", "Ribeiro", "Pinto",
             "Carvalho", "Teixeira", "Moreira", "Correia", "Mendes", "Nunes", "Soares", "Vieira", "Monteiro"]
 
+# Estádio do doente no percurso oncológico (não confundir com "estadiamento" TNM): as 4 fases
+# grandes do percurso hospitalar, usadas para agrupar/filtrar "Os Meus Pedidos" do médico.
+ESTADIOS_CUIDADO = ["NOVO", "PRE_TRATAMENTO", "EM_TRATAMENTO", "FOLLOW_UP"]
+PESOS_ESTADIO_CUIDADO = [0.15, 0.15, 0.25, 0.45]  # maioria em vigilância, coerente com um serviço oncológico maduro
+
 doentes = {}
 def novo_doente(pid=None, nome=None, sexo=None, idade=None):
     while pid is None or pid in doentes:
@@ -148,7 +153,8 @@ def novo_doente(pid=None, nome=None, sexo=None, idade=None):
                         sexo=sexo, data_nascimento=nasc.isoformat(), demo_cenario="",
                         # Perfil clínico usado no factor 3 da equação de prioridade (server/motor/prioridade.ts);
                         # vazio por omissão — só os doentes-cenário da demo têm isto preenchido abaixo.
-                        diagnostico_principal="", estadiamento="", alergias=[], contacto="", notas_clinicas="")
+                        diagnostico_principal="", estadiamento="", alergias=[], contacto="", notas_clinicas="",
+                        estadio_cuidado=random.choices(ESTADIOS_CUIDADO, weights=PESOS_ESTADIO_CUIDADO)[0])
     return pid
 
 for _ in range(450):
@@ -300,25 +306,30 @@ D8 = demo_doente("100108", "Fernando Lopes Gomes", "M", 55, "6 - pedido Hospital
 PERFIL_CLINICO = {
     D1: dict(diagnostico_principal="Adenocarcinoma do cólon, sob vigilância pós-adjuvante",
              estadiamento="Estádio III", alergias=[], contacto="912 345 001",
-             notas_clinicas="Consulta de vigilância; sem queixas de novo até à última avaliação."),
+             notas_clinicas="Consulta de vigilância; sem queixas de novo até à última avaliação.",
+             estadio_cuidado="FOLLOW_UP"),
     D2: dict(diagnostico_principal="Neoplasia esófago-gástrica, pós-tratamento",
              estadiamento="Estádio II", alergias=["Penicilina"], contacto="912 345 002",
-             notas_clinicas="Reestadiamento periódico com TC TAP e marcadores tumorais."),
+             notas_clinicas="Reestadiamento periódico com TC TAP e marcadores tumorais.",
+             estadio_cuidado="FOLLOW_UP"),
     D3: dict(diagnostico_principal="Adenocarcinoma do recto médio, cT3N1",
              estadiamento="Estádio III", alergias=[], contacto="912 345 003",
-             notas_clinicas="Referenciado para avaliação de radioterapia neoadjuvante."),
+             notas_clinicas="Referenciado para avaliação de radioterapia neoadjuvante.",
+             estadio_cuidado="PRE_TRATAMENTO"),
     D4: dict(diagnostico_principal="Neoplasia cólon-recto, suspeita de recidiva",
              estadiamento="Estádio III (suspeita de recidiva)", alergias=["Contraste iodado — pré-medicar"],
-             contacto="912 345 004", notas_clinicas="TC TAP urgente para reestadiamento."),
+             contacto="912 345 004", notas_clinicas="TC TAP urgente para reestadiamento.",
+             estadio_cuidado="PRE_TRATAMENTO"),
     D5: dict(diagnostico_principal="Neoplasia cólon-recto, sob vigilância", estadiamento="Estádio II",
-             alergias=[], contacto="912 345 005", notas_clinicas=""),
+             alergias=[], contacto="912 345 005", notas_clinicas="", estadio_cuidado="FOLLOW_UP"),
     D6: dict(diagnostico_principal="Neoplasia esófago-gástrica, em remissão", estadiamento="Estádio I",
-             alergias=[], contacto="912 345 006", notas_clinicas="Controlo anual de rotina."),
+             alergias=[], contacto="912 345 006", notas_clinicas="Controlo anual de rotina.",
+             estadio_cuidado="FOLLOW_UP"),
     D7: dict(diagnostico_principal="Neoplasia cólon-recto, sob vigilância", estadiamento="Estádio II",
-             alergias=[], contacto="912 345 007", notas_clinicas=""),
+             alergias=[], contacto="912 345 007", notas_clinicas="", estadio_cuidado="FOLLOW_UP"),
     D8: dict(diagnostico_principal="Neoplasia cólon-recto, quimioterapia adjuvante em curso (FOLFOX)",
              estadiamento="Estádio III", alergias=["Oxaliplatina — vigiar neuropatia"], contacto="912 345 008",
-             notas_clinicas="Ciclo 1 de QT adjuvante FOLFOX em Hospital de Dia."),
+             notas_clinicas="Ciclo 1 de QT adjuvante FOLFOX em Hospital de Dia.", estadio_cuidado="EM_TRATAMENTO"),
 }
 for _pid, _perfil in PERFIL_CLINICO.items():
     doentes[_pid].update(_perfil)
@@ -663,10 +674,10 @@ wcsv("gabinetes.csv", GABINETES, ["codigo", "descricao", "especialidade_codigo",
 wcsv("utilizadores.csv", UTILIZADORES, ["utilizador_id", "nome", "perfil", "especialidade_codigo", "e_medico"])
 wcsv("doentes.csv", [(x["doente_id"], x["n_utente"], x["nome"], x["sexo"], x["data_nascimento"], x["demo_cenario"],
                       x["diagnostico_principal"], x["estadiamento"], "|".join(x["alergias"]), x["contacto"],
-                      x["notas_clinicas"])
+                      x["notas_clinicas"], x["estadio_cuidado"])
                      for x in doentes.values()],
      ["doente_id", "n_utente", "nome", "sexo", "data_nascimento", "demo_cenario",
-      "diagnostico_principal", "estadiamento", "alergias", "contacto", "notas_clinicas"])
+      "diagnostico_principal", "estadiamento", "alergias", "contacto", "notas_clinicas", "estadio_cuidado"])
 wcsv("vagas.csv", [(v["vaga_id"], v["especialidade_codigo"], v["gabinete_codigo"], v["medico_id"], iso(v["data_hora"]),
                     v["duracao_min"], v["atos_permitidos"], v["ato_id"] or "") for v in vagas],
      ["vaga_id", "especialidade_codigo", "gabinete_codigo", "medico_id", "data_hora", "duracao_min", "atos_permitidos", "ato_id"])

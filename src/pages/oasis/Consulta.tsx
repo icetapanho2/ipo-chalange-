@@ -45,7 +45,15 @@ interface Doente {
   alergias?: string[];
   contacto?: string;
   notas_clinicas?: string;
+  estadio_cuidado?: string;
 }
+
+const OPCOES_ESTADIO_CUIDADO = [
+  { valor: "NOVO", legivel: "Novo" },
+  { valor: "PRE_TRATAMENTO", legivel: "Pré-tratamento" },
+  { valor: "EM_TRATAMENTO", legivel: "Em tratamento" },
+  { valor: "FOLLOW_UP", legivel: "Follow-up" },
+];
 
 interface ResumoPedidos {
   total: number;
@@ -142,6 +150,7 @@ export function OasisConsulta() {
     alergias: "",
     contacto: "",
     notas_clinicas: "",
+    estadio_cuidado: "",
   });
   const [aGuardarClinico, setAGuardarClinico] = useState(false);
 
@@ -168,6 +177,7 @@ export function OasisConsulta() {
           alergias: (r.doente?.alergias ?? []).join(", "),
           contacto: r.doente?.contacto ?? "",
           notas_clinicas: r.doente?.notas_clinicas ?? "",
+          estadio_cuidado: r.doente?.estadio_cuidado ?? "",
         });
       })
       .catch((e) => setErro(e instanceof Error ? e.message : String(e)));
@@ -388,6 +398,11 @@ export function OasisConsulta() {
 
               {!aEditarClinico ? (
                 <div className="space-y-2 text-xs">
+                  {dados.doente?.estadio_cuidado && (
+                    <span className="inline-block rounded-full bg-oasis-header px-2.5 py-0.5 text-[10px] font-bold text-white">
+                      {OPCOES_ESTADIO_CUIDADO.find((o) => o.valor === dados.doente?.estadio_cuidado)?.legivel ?? dados.doente.estadio_cuidado}
+                    </span>
+                  )}
                   <div className="flex items-start gap-1.5">
                     <Stethoscope className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
                     <div>
@@ -426,6 +441,21 @@ export function OasisConsulta() {
                 </div>
               ) : (
                 <div className="space-y-2">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Estádio do percurso</label>
+                    <select
+                      value={formClinico.estadio_cuidado}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, estadio_cuidado: e.target.value }))}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                    >
+                      <option value="">— Não classificado</option>
+                      {OPCOES_ESTADIO_CUIDADO.map((op) => (
+                        <option key={op.valor} value={op.valor}>
+                          {op.legivel}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div>
                     <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Diagnóstico principal</label>
                     <input

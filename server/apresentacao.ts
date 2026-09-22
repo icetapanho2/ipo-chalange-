@@ -33,6 +33,17 @@ export function descreverDoente(id: string): string {
   return store.doentes.find((d) => d.doente_id === id)?.nome ?? id;
 }
 
+const NOME_ESTADIO_CUIDADO: Record<string, string> = {
+  NOVO: "Novo",
+  PRE_TRATAMENTO: "Pré-tratamento",
+  EM_TRATAMENTO: "Em tratamento",
+  FOLLOW_UP: "Follow-up",
+};
+
+export function descreverEstadioCuidado(estadio?: string): string {
+  return (estadio && NOME_ESTADIO_CUIDADO[estadio]) || "Não classificado";
+}
+
 /** Frase legível de um pedido, sem códigos: acto + exames/análises + especificação. */
 export function descreverPedido(pedido: Pick<Pedido, "especialidade_destino" | "ato_codigo" | "exames" | "analises" | "especificacao">): string {
   const base = descreverAto(pedido.especialidade_destino, pedido.ato_codigo);

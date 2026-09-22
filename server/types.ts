@@ -52,6 +52,13 @@ export interface Utilizador {
   e_medico: boolean;
 }
 
+/**
+ * As 4 fases grandes do percurso oncológico do doente no hospital (não confundir com o
+ * "estadiamento" TNM/clínico). Usadas para agrupar e filtrar "Os Meus Pedidos" do médico e,
+ * mais tarde, as estatísticas por serviço.
+ */
+export type EstadioCuidado = "NOVO" | "PRE_TRATAMENTO" | "EM_TRATAMENTO" | "FOLLOW_UP" | "";
+
 export interface Doente {
   doente_id: string;
   n_utente: string;
@@ -64,6 +71,7 @@ export interface Doente {
   alergias?: string[];
   contacto?: string;
   notas_clinicas?: string;
+  estadio_cuidado?: EstadioCuidado;
 }
 
 export interface Vaga {

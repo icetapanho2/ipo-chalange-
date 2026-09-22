@@ -189,9 +189,9 @@ describe("Guião da demo pela API (Fase 9)", () => {
     expect(primeiraPassagem.jose_tc).toBe("02/10/2026 10:00");
     expect(primeiraPassagem.rosa_cvc).toBe("24/09/2026 09:00");
     expect(primeiraPassagem.rosa_analises).toBe("24/09/2026 07:30");
-    expect(primeiraPassagem.rosa_consulta).toBe("14/10/2026 08:50");
+    expect(primeiraPassagem.rosa_consulta).toBe("14/10/2026 09:30");
     expect(primeiraPassagem.carlos_tratamento).toBe("24/09/2026 09:30");
-    expect(primeiraPassagem.carlos_consulta).toBe("14/10/2026 09:30");
+    expect(primeiraPassagem.carlos_consulta).toBe("14/10/2026 09:50");
     expect(primeiraPassagem.luisa_rt).toBe("30/09/2026 09:00");
     expect(primeiraPassagem.fernando_hd).toBe("25/09/2026 08:30");
     expect(primeiraPassagem.fernando_colheita).toBe("24/09/2026 07:40");

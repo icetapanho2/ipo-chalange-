@@ -145,6 +145,7 @@ class Store {
       alergias: list(r.alergias),
       contacto: r.contacto || "",
       notas_clinicas: r.notas_clinicas || "",
+      estadio_cuidado: (r.estadio_cuidado || "") as Doente["estadio_cuidado"],
     }));
 
     this.vagas = readCsv<Record<string, string>>(p("vagas.csv")).map((r) => ({

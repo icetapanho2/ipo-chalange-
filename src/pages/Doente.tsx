@@ -28,9 +28,17 @@ interface DoenteInfo {
   alergias?: string[];
   contacto?: string;
   notas_clinicas?: string;
+  estadio_cuidado?: string;
 }
 
 const OPCOES_ESTADIAMENTO = ["", "Estádio I", "Estádio II", "Estádio III", "Estádio IV", "Metastático"];
+
+const OPCOES_ESTADIO_CUIDADO = [
+  { valor: "NOVO", legivel: "Novo" },
+  { valor: "PRE_TRATAMENTO", legivel: "Pré-tratamento" },
+  { valor: "EM_TRATAMENTO", legivel: "Em tratamento" },
+  { valor: "FOLLOW_UP", legivel: "Follow-up" },
+];
 
 /** Espelha (só para pré-visualização) o factor clínico de calcularPrioridadeSistema em server/motor/prioridade.ts. */
 function pontosClinicosPreview(estadiamento: string, diagnostico: string): { pontos: number; motivo: string } {
@@ -126,6 +134,7 @@ export function Doente() {
     alergias: "",
     contacto: "",
     notas_clinicas: "",
+    estadio_cuidado: "",
   });
   const [aGuardarClinico, setAGuardarClinico] = useState(false);
 
@@ -140,6 +149,7 @@ export function Doente() {
           alergias: (r.doente.alergias ?? []).join(", "),
           contacto: r.doente.contacto ?? "",
           notas_clinicas: r.doente.notas_clinicas ?? "",
+          estadio_cuidado: r.doente.estadio_cuidado ?? "",
         });
       })
       .catch((e) => setErro(String(e)));
@@ -158,6 +168,7 @@ export function Doente() {
         alergias: formClinico.alergias,
         contacto: formClinico.contacto,
         notas_clinicas: formClinico.notas_clinicas,
+        estadio_cuidado: formClinico.estadio_cuidado,
       });
       setSucesso("Perfil clínico actualizado — já é usado nos próximos cálculos de prioridade.");
       setAEditarClinico(false);
@@ -563,6 +574,12 @@ export function Doente() {
                   <p className="text-slate-800 mt-0.5">{dados.doente.estadiamento || "— Não registado"}</p>
                 </div>
                 <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Estádio do percurso</span>
+                  <p className="text-slate-800 mt-0.5">
+                    {OPCOES_ESTADIO_CUIDADO.find((o) => o.valor === dados.doente.estadio_cuidado)?.legivel || "— Não classificado"}
+                  </p>
+                </div>
+                <div>
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Alergias</span>
                   <p className="text-slate-800 mt-0.5">
                     {dados.doente.alergias && dados.doente.alergias.length > 0 ? dados.doente.alergias.join(", ") : "— Nenhuma registada"}
@@ -600,6 +617,21 @@ export function Doente() {
                       {OPCOES_ESTADIAMENTO.map((op) => (
                         <option key={op} value={op}>
                           {op || "— Não registado"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Estádio do percurso</label>
+                    <select
+                      value={formClinico.estadio_cuidado}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, estadio_cuidado: e.target.value }))}
+                      className="w-full rounded border border-slate-300 px-2.5 py-2 text-sm text-slate-800"
+                    >
+                      <option value="">— Não classificado</option>
+                      {OPCOES_ESTADIO_CUIDADO.map((op) => (
+                        <option key={op.valor} value={op.valor}>
+                          {op.legivel}
                         </option>
                       ))}
                     </select>
