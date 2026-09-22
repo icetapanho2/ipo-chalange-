@@ -197,3 +197,32 @@ cada fluxo (perfil clínico a alimentar o score, limiares a mudar a classificaç
 utilizador a mostrar badges por perfil, modal de confirmação, regresso à agenda actualizada).
 36/36 testes, `tsc`/`build` limpos.
 
+## 2026-09-22 — Regras de prioridade, remarcação e vagas libertadas (secção 8A)
+
+Pedido explícito do dono do produto (alarga o âmbito da secção 16). Decisões tomadas:
+1. **Dados sem mexer na sequência aleatória.** `gerar_dados.py` usa `random.seed(7)`; qualquer chamada
+   aleatória nova a meio mudaria toda a agenda e as datas exactas dos cenários 1-8. O perfil logístico e
+   os doentes 100109-100113 são gerados no fim, com um `random.Random(2026)` próprio, e os doentes novos
+   ocupam marcações de fundo que já existiam no TAC (muda só quem lá está). Resultado: as 8 datas
+   esperadas não mudaram.
+2. **Prova "antes/depois".** Com os dados novos e a regra antiga, a troca do José escolhia o Sr. Joaquim
+   (mais folga). Isto fica de propósito: o painel "Porquê esta escolha?" mostra quem a regra antiga teria
+   escolhido.
+3. **"Dia agrupado" é custo, não exclusão** (a proposta inicial punha-o também nas regras duras) — mais
+   simples de explicar e o efeito na demo é o mesmo.
+4. **Lista de antecipáveis por estádio antes de atraso.** Os dados de fundo têm doentes em diagnóstico
+   marcados depois do prazo (realista). A Helena ganha pela regra (em diagnóstico + maior atraso previsto),
+   não por excepção nos dados; o segundo, Luís Martins Alves, recebe a vaga dela em cascata.
+5. **Lista de chamadas com limiar de risco 2.** Com "qualquer motivo" entravam 51 % das marcações do TAC
+   (uma falta antiga ou só a idade bastavam); com o limiar entram ~21-23 %.
+6. **Impacto sem inflacionar.** O histórico simulado tem 0 doentes remarcados 2 vezes; não se mostra essa
+   linha de base nem uma projecção sobre ela. A projecção usa faltas reais do histórico × pressupostos
+   explícitos (`reducao_faltas_lembrete` 30 %, `custo_medio_vaga_tac` 120 €), marcados "a validar".
+7. **Comunicações ao doente simuladas** (nada é enviado); a resposta ao SMS é registada pela
+   administrativa ("Doente aceitou"/"Recusou").
+8. **Guião reorganizado por casos** (normal + problemas em que a prioridade decide), com teste próprio
+   `tests/guiaoCasos.test.ts` pela ordem da apresentação; o guião antigo (`tests/guiao.test.ts`) continua
+   a passar sem alterações.
+9. **Fica por fazer:** ausência de médico como bloqueio de agenda (R-I); validação dos pesos com a
+   direcção clínica.
+

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AgendaDoente, type Comunicacao, type MarcacaoAgenda, type PerfilLogistico } from "../components/AgendaDoente";
 import { useParams, Link } from "react-router-dom";
 import { apiGet, apiPost, apiPut } from "../lib/api";
 import {
@@ -105,7 +106,10 @@ interface PedidoJson {
 }
 
 interface RespostaDoente {
-  doente: DoenteInfo;
+  doente: DoenteInfo & PerfilLogistico;
+  agenda?: MarcacaoAgenda[];
+  comunicacoes?: Comunicacao[];
+  logistica?: { idade: number; remarcacoes_hospital_90d: number };
   timeline: ItemTimeline[];
   marcacoesFuturas: MarcacaoFutura[];
   todosPedidos?: PedidoJson[];
@@ -362,6 +366,13 @@ export function Doente() {
       {/* CONTEÚDO DA ABA 1: O QUE FALTA & SEMÁFORO DE PRONTIDÃO */}
       {abaAtiva === "prontidao" && (
         <div className="mt-4 space-y-5">
+          <AgendaDoente
+            agenda={dados.agenda ?? []}
+            comunicacoes={dados.comunicacoes ?? []}
+            perfil={dados.doente}
+            idade={dados.logistica?.idade}
+            remarcacoes={dados.logistica?.remarcacoes_hospital_90d}
+          />
           {/* SECÇÃO O QUE FALTA */}
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">

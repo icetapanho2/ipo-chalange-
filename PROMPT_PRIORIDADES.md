@@ -1,5 +1,10 @@
 # Prompt — Prioridades, remarcações, vagas libertadas e preparação
 
+> **Estado (22/09/2026): implementado** — ver ESPECIFICACAO.md secção 8A, DECISOES.md e o Guião por
+> casos (`/guiao`, `tests/guiaoCasos.test.ts`). As datas finais dos cenários estão na tabela no fim de
+> PROMPTS.md. Diferenças face a este texto: "dia agrupado" é custo e não exclusão; a Helena não fica
+> dentro do prazo (o prazo dela já passou), ganha 13 dias; R-I (ausência de médico) ficou por fazer.
+
 Como usar: abrir o Claude Code na raiz do projecto e colar **o bloco abaixo inteiro**. Está
 dividido em fases; o agente deve fazer commit no fim de cada fase e só avançar com `npm test`
 a passar. As regras vêm primeiro, porque tudo o resto depende delas.

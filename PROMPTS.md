@@ -112,3 +112,18 @@ Não alteres a lógica do motor nesta fase.
 | 8 | Gestão | Métricas preenchidas com 60 dias de histórico |
 
 Nota: as horas exactas pressupõem esta ordem. Os testes devem seguir a mesma ordem.
+
+## Resultados esperados — Guião por casos (`tests/guiaoCasos.test.ts`, base acabada de repor, por esta ordem)
+
+| Caso | Passo | Resultado esperado |
+|---|---|---|
+| 1 | Maria: Dr. Pedro declara colheita c/ jejum + TC TAP c/ contraste + revisão dependente | Colheita **24/09 07:30**; TC **14/10 08:00**; revisão **21/10 08:30** (Dr. Pedro) |
+| 1 | Luísa: reencaminhar para RT; RT aceita | RT **30/09 09:00** |
+| 1 | Fernando: HD aceite | HD **25/09 08:30**; colheita pré-QT **24/09 07:30** |
+| 2 | José: aprovar TC → proposta | Escolhido Manuel (custo −30): **02/10 10:00 → 14/10 08:20**; regra antiga escolheria Joaquim (70); Beatriz e Tiago excluídos; Graça 49 |
+| 2 | Laboratório: Manuel com 1 remarcação | Passa a ser Graça Pereira Santos |
+| 3 | Rui desmarca (a partir de 19/10); Helena aceita | Rui **19/10 08:40**; Helena **30/09 09:00** (+13 dias); cascata para Luís Martins Alves **13/10 09:00** |
+| 4 | Dr. Pedro pede colheita s/ jejum ao Joaquim | **01/10 10:00** (dia único); lista de chamadas: Joaquim (sem contacto, 81 anos), Maria (preparação) |
+| 5 | António: remarcar colheita | **24/09 07:40**, vermelho → amarelo |
+| 6 | Gestão → Impacto | 0 remarcados 2.ª vez; 3 doentes protegidos; 1/1 vaga reaproveitada; 1 deslocação evitada |
+

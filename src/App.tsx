@@ -15,6 +15,7 @@ import { Doente } from "./pages/Doente";
 import { Guiao } from "./pages/Guiao";
 import { Tecnico } from "./pages/Tecnico";
 import { GestaoPrioridade } from "./pages/GestaoPrioridade";
+import { LaboratorioPrioridades } from "./pages/LaboratorioPrioridades";
 
 // Carregado à parte: é a única página que usa a biblioteca de gráficos (recharts),
 // de longe a maior dependência do bundle — não vale a pena pagar esse custo em todas
@@ -39,6 +40,7 @@ export function App() {
         <Route path="/doente/:id" element={<Doente />} />
         <Route path="/tecnico" element={<Tecnico />} />
         <Route path="/gestao/prioridade" element={<GestaoPrioridade />} />
+        <Route path="/gestao/laboratorio" element={<LaboratorioPrioridades />} />
         <Route
           path="/gestao"
           element={

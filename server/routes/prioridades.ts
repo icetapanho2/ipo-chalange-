@@ -139,7 +139,7 @@ export function criarRotasPrioridades(store: typeof StoreType) {
     const faltasTacMes = Math.round(faltasTacHist.length / 2);
     const faltasTacEvitadasMes = Math.round(faltasTacMes * p.reducao_faltas_lembrete);
     const faltasMes = Math.round(faltasHist.length / 2);
-    const segundasRemarcacoesMes = Math.round([...remPorDoente.values()].filter((n) => n >= 2).length / 2);
+    const faltasEvitadasMes = Math.round(faltasMes * p.reducao_faltas_lembrete);
 
     res.json({
       etiqueta: "Dados simulados",
@@ -177,14 +177,14 @@ export function criarRotasPrioridades(store: typeof StoreType) {
         faltas_tac_mes: faltasTacMes,
         faltas_tac_evitadas_mes: faltasTacEvitadasMes,
         valor_recuperado_mes_eur: faltasTacEvitadasMes * p.custo_medio_vaga_tac,
-        segundas_remarcacoes_evitadas_mes: segundasRemarcacoesMes,
+        faltas_evitadas_mes: faltasEvitadasMes,
         percentagem_marcacoes_a_ligar: chamadas.marcacoesNoHorizonte
           ? Math.round((chamadasNoHorizonte / chamadas.marcacoesNoHorizonte) * 100)
           : 0,
         pressupostos: [
           `Lembrete a D-3 + chamada dirigida evitam ${Math.round(p.reducao_faltas_lembrete * 100)}% das faltas (parâmetro reducao_faltas_lembrete, a validar)`,
           `Valor de uma vaga de TAC: ${p.custo_medio_vaga_tac} € (parâmetro custo_medio_vaga_tac, a validar)`,
-          "Faltas e remarcações por mês = histórico de 60 dias ÷ 2",
+          "Faltas por mês = histórico de 60 dias ÷ 2",
         ],
       },
       servicoTac: descreverEspecialidade("7000_2"),

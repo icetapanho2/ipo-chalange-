@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Gauge } from "lucide-react";
+import { FlaskConical, Gauge } from "lucide-react";
+import { PainelImpacto } from "../components/PainelImpacto";
 import { apiGet } from "../lib/api";
 import { CATEGORIAS, ESTADO, SEQUENCIAL } from "../lib/paleta";
 
@@ -89,6 +90,13 @@ export function Gestao() {
             <Gauge className="h-3.5 w-3.5 text-oasis-accent" />
             <span>Definições da Prioridade</span>
           </Link>
+          <Link
+            to="/gestao/laboratorio"
+            className="inline-flex items-center gap-1.5 rounded border border-indigo-300 bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-800 hover:bg-indigo-100 shadow-2xs"
+          >
+            <FlaskConical className="h-3.5 w-3.5" />
+            <span>Laboratório de prioridades</span>
+          </Link>
           <select
             className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
             value={filtro}
@@ -105,6 +113,11 @@ export function Gestao() {
       </div>
       {erro && <p className="mt-3 text-red-600">{erro}</p>}
       {!metricas && !erro && <p className="mt-4 text-slate-500">A carregar métricas…</p>}
+
+      <div className="mt-4">
+        <h2 className="mb-2 text-sm font-semibold text-slate-600">Impacto das regras de prioridade e agendamento</h2>
+        <PainelImpacto />
+      </div>
 
       {metricas && (
         <>

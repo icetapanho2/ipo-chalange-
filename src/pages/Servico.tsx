@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../lib/api";
 import { DoenteModal } from "../components/DoenteModal";
+import { PorqueEstaEscolha, type CandidatoTroca } from "../components/PorqueEstaEscolha";
+import { VagasLibertadas } from "../components/VagasLibertadas";
+import { ListaChamadas } from "../components/ListaChamadas";
 import {
   AlertTriangle,
   ArrowRight,
@@ -20,6 +23,8 @@ import {
   Settings2,
   RotateCcw,
   BarChart3,
+  CalendarX2,
+  Phone,
 } from "lucide-react";
 
 interface ResumoPedido {
@@ -57,6 +62,17 @@ interface PropostaServico {
   justificacao: string;
   criado_em: string;
   pedido_urgente_doente: string;
+  avaliacao: CandidatoTroca[];
+  escolhido_regra_antiga: string;
+}
+
+type AbaServico = "risco" | "pendencias" | "carteira" | "vagas" | "chamadas" | "estatisticas" | "definicoes";
+const ABAS_VALIDAS: AbaServico[] = ["risco", "pendencias", "carteira", "vagas", "chamadas", "estatisticas", "definicoes"];
+
+/** Separador inicial: ?aba=... (usado pelo Guião) ou, se houver propostas de troca, "pendencias". */
+function abaInicial(): AbaServico {
+  const pedida = new URLSearchParams(window.location.search).get("aba") as AbaServico | null;
+  return pedida && ABAS_VALIDAS.includes(pedida) ? pedida : "risco";
 }
 
 interface ConsultaEmRisco {
@@ -171,7 +187,7 @@ export function Servico() {
   const [doenteModalId, setDoenteModalId] = useState<string | null>(null);
   const [estadoAtivo, setEstadoAtivo] = useState<string>("SEM_VAGA");
   const [aResolverAvaria, setAResolverAvaria] = useState<string | null>(null);
-  const [abaAtiva, setAbaAtiva] = useState<"risco" | "pendencias" | "carteira" | "estatisticas" | "definicoes">("risco");
+  const [abaAtiva, setAbaAtiva] = useState<AbaServico>(abaInicial);
   const [notasOutsourcing, setNotasOutsourcing] = useState<Record<string, string>>({});
   const [motivosDecisao, setMotivosDecisao] = useState<Record<string, string>>({});
   const [aProcessarPedido, setAProcessarPedido] = useState<string | null>(null);
@@ -403,6 +419,18 @@ export function Servico() {
             contagem: pedidos ? Object.values(pedidos.porEstado).reduce((soma, l) => soma + l.length, 0) : 0,
           },
           {
+            chave: "vagas" as const,
+            titulo: "Vagas libertadas",
+            icone: CalendarX2,
+            contagem: 0,
+          },
+          {
+            chave: "chamadas" as const,
+            titulo: "Lista de chamadas",
+            icone: Phone,
+            contagem: 0,
+          },
+          {
             chave: "estatisticas" as const,
             titulo: "Estatísticas",
             icone: BarChart3,
@@ -439,6 +467,55 @@ export function Servico() {
           </button>
         ))}
       </div>
+
+      {/* SECÇÃO 2: PROPOSTAS DE TROCA INTELIGENTE DE VAGAS */}
+      {abaAtiva === "pendencias" && propostas && propostas.length > 0 && (
+        <div className="mt-5 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-indigo-200 pb-2 mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+              <TrendingUp className="h-4 w-4 text-indigo-600" />
+              <span>Propostas de Troca Inteligente de Agenda</span>
+            </h2>
+            <span className="text-[11px] text-indigo-700">Otimização automática de vagas</span>
+          </div>
+
+          <div className="space-y-2.5">
+            {propostas.map((p) => (
+              <div
+                key={p.proposta_id}
+                className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-indigo-200 bg-white p-3.5 shadow-2xs"
+              >
+                <div className="min-w-0 flex-1 basis-[28rem]">
+                  <h4 className="text-sm font-bold text-slate-800">
+                    Proposta para Doente Urgente: {p.pedido_urgente_doente}
+                  </h4>
+                  <p className="mt-0.5 text-xs text-slate-600">{p.justificacao}</p>
+                  <PorqueEstaEscolha candidatos={p.avaliacao} />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => decidirProposta(p.proposta_id, "aprovar")}
+                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 flex items-center gap-1"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    <span>Aprovar Troca</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => decidirProposta(p.proposta_id, "rejeitar")}
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 flex items-center gap-1"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    <span>Rejeitar</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* SECÇÃO 0A: SOBRELOTAÇÃO — MESMA PRIORIDADE/PRAZO, SEM VAGAS SUFICIENTES */}
       {abaAtiva === "risco" && overbooking && overbooking.length > 0 && (
@@ -614,52 +691,24 @@ export function Servico() {
         </div>
       )}
 
-      {/* SECÇÃO 2: PROPOSTAS DE TROCA INTELIGENTE DE VAGAS */}
-      {abaAtiva === "pendencias" && propostas && propostas.length > 0 && (
-        <div className="mt-5 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm">
-          <div className="flex items-center justify-between border-b border-indigo-200 pb-2 mb-3">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
-              <TrendingUp className="h-4 w-4 text-indigo-600" />
-              <span>Propostas de Troca Inteligente de Agenda</span>
-            </h2>
-            <span className="text-[11px] text-indigo-700">Otimização automática de vagas</span>
-          </div>
+      {abaAtiva === "vagas" && (
+        <VagasLibertadas
+          aoMudar={(m) => {
+            setMensagemSucesso(m);
+            recarregar();
+            setTimeout(() => setMensagemSucesso(null), 6000);
+          }}
+        />
+      )}
 
-          <div className="space-y-2.5">
-            {propostas.map((p) => (
-              <div
-                key={p.proposta_id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-indigo-200 bg-white p-3.5 shadow-2xs"
-              >
-                <div>
-                  <h4 className="text-sm font-bold text-slate-800">
-                    Proposta para Doente Urgente: {p.pedido_urgente_doente}
-                  </h4>
-                  <p className="mt-0.5 text-xs text-slate-600">{p.justificacao}</p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => decidirProposta(p.proposta_id, "aprovar")}
-                    className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 flex items-center gap-1"
-                  >
-                    <Check className="h-3.5 w-3.5" />
-                    <span>Aprovar Troca</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => decidirProposta(p.proposta_id, "rejeitar")}
-                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 flex items-center gap-1"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    <span>Rejeitar</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {abaAtiva === "chamadas" && (
+        <ListaChamadas
+          aoMudar={(m) => {
+            setMensagemSucesso(m);
+            recarregar();
+            setTimeout(() => setMensagemSucesso(null), 6000);
+          }}
+        />
       )}
 
       {/* Nada a mostrar nesta aba */}

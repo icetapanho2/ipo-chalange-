@@ -108,6 +108,24 @@ Testar contra `planos_teste.json` (resultado esperado incluído) e mostrar a tax
 - Urgência (< 72 h) fica fora do sistema → alerta para uma pessoa.
 - **Ordem da fila:** (1) menor **folga** = prazo − hoje − tempo necessário para dependências; (2) nível mais alto; (3) pedido mais antigo.
 
+## 8A. Regras de prioridade, remarcação e vagas libertadas
+
+Alargamento aprovado pelo dono do produto (22/09/2026). Tudo determinístico em `server/motor/` (`remarcacao.ts`, `antecipacao.ts`, `chamadas.ts`, `comunicacoes.ts`); pesos e limiares em `parametros.csv`, **a validar com a direcção clínica**.
+
+**Perfil logístico do doente** (`doentes.csv`): `concelho`, `distancia_km`, `contacto_digital` (SMS | EMAIL | NENHUM), `aceita_antecipacao`, `transporte_nao_urgente`. A idade vem de `data_nascimento`; as faltas vêm do histórico.
+
+- **R-A — Quem nunca cede a vaga numa troca:** marcação a `congelamento_dias` ou menos; doente já remarcado pelo hospital `max_remarcacoes_hospital` (1) vez nos últimos 90 dias (faltas e pedidos do doente não contam); doente `EM_TRATAMENTO`; sem alternativa dentro do seu próprio prazo.
+- **R-B — Custo de remarcar** (cede quem tem o menor): 75+ anos +20; sem contacto digital +25; ≥ 50 km +15 (≥ 150 km +25); transporte não urgente +10; outra marcação no mesmo dia +20; em diagnóstico (NOVO/PRE_TRATAMENTO) +30; −1 por cada 3 dias de folga (máx. −30). Empate: maior folga → menos remarcações → marcado há menos tempo. A proposta guarda todos os candidatos avaliados e quem a regra antiga (só folga) teria escolhido; a justificação diz porque não foram os outros.
+- **R-C — Estádio na equação de prioridade:** NOVO/PRE_TRATAMENTO +8, EM_TRATAMENTO +5 no factor paciente (máx. 25).
+- **R-D — Vagas protegidas** (`regras_capacidade.csv`, só TAC, 10 dias): uma vaga livre nos próximos 10 dias fica para MP/P, para quem já está fora do prazo ou tem o prazo dentro do horizonte; a partir de D-3 fica aberta a todos.
+- **R-E — Vaga libertada com aviso** (desmarcação a pedido do doente, chamada "não vem", cascata): > 72 h → oferta por SMS (simulado) ao 1.º da lista de antecipáveis, resposta em 24 h; 24–72 h → só quem aceita antecipação e mora a < 50 km; < 24 h → ninguém de fora. Ordem: (1) sem vaga ou marcado depois do prazo, ganho ≥ 3 dias; (2) em diagnóstico, ganho ≥ 7 dias, aceita antecipação; dentro de cada grupo, em diagnóstico primeiro, depois maior atraso previsto. Aceite → a marcação muda, **não conta como remarcação**, e a vaga antiga corre a lista (cascata até 3 níveis). Recusa/expiração → seguinte. A desmarcação pedida pelo doente também não conta; é reagendado a partir da data que indicar.
+- **R-F — Remarcação inevitável** (avaria): continua automática; quem já tinha sido remarcado escolhe primeiro e gera alerta `SEGUNDA_REMARCACAO` (alta).
+- **R-G — Aviso, preparação e lista de chamadas:** cada marcação gera aviso ao doente com a preparação (`preparacoes.csv`, texto provisório) e lembrete a D-3 (simulados). A lista de chamadas do serviço inclui só marcações dos próximos 10 dias com risco ≥ 2: sem contacto digital (2), preparação crítica — TC com contraste e diabetes/metformina (2, em qualquer data), faltas no último ano (1 falta = 1, 2+ = 2), 80+ anos (1), 2.ª remarcação (3). Nunca baixa a prioridade clínica.
+- **R-H — Dia único:** doente a ≥ 50 km com outra marcação na janela → primeira vaga compatível nesse dia, com ≥ 30 min de intervalo, de preferência a partir das 10:00; nunca para lá do prazo.
+- Ausência de médico como bloqueio de agenda (reutilizando as avarias) fica para depois.
+
+**Métricas de impacto** (`/api/prioridades/impacto`): linha de base dos 60 dias (remarcações pelo hospital, faltas), o que as regras fizeram (doentes protegidos, vagas reaproveitadas, dias ganhos, deslocações evitadas, % a ligar) e projecção mensal com pressupostos explícitos (`reducao_faltas_lembrete`, `custo_medio_vaga_tac`). **Laboratório de prioridades** (`/gestao/laboratorio`): simula a escolha com atributos e pesos alterados, sem alterar o estado.
+
 ## 9. Dependências
 
 "B só pode acontecer depois de A estar feito e com resultado."
@@ -193,6 +211,10 @@ Selector de perfil no topo (sem autenticação) + botão **"Repor demo"** (recar
 | **Fernando Lopes** (100108) | pedido HD em triagem | triadora aceita | sessão de HD + análises pré-QT criadas pela regra R2 |
 | **António Ribeiro** (100102) | TC realizado; faltou à colheita ontem; revisão a 28/09 | abrir "consultas em risco" | 🔴 + alerta; remarcar colheita para 24–25/09 → 🟡 |
 | — | 60 dias de histórico | abrir Gestão | métricas |
+| **Joaquim Pereira** (100109) | 81 anos, Castelo Branco (230 km), sem telemóvel, ambulância; TC 01/10 09:00 e consulta 01/10 11:10; consulta hoje 11:50 | (troca do José) · Dr. Pedro pede colheita s/ jejum | na troca do José é o escolhido pela regra antiga, mas tem custo 70 e fica; colheita marcada a **01/10 10:00** (dia único); aparece na lista de chamadas |
+| **Beatriz Rocha** (100110) | TC 01/10 10:00, já remarcada 1× pelo hospital | (troca do José) | excluída da troca |
+| **Tiago Silva** (100111) | em QT, TC 02/10 08:00 | (troca do José) | excluído da troca |
+| **Rui Lima** (100113) / **Helena Matos** (100112) | Rui: TC 30/09 09:00; Helena: em diagnóstico, TC 13/10 09:00 com prazo 08/09 | Radiologia desmarca o Rui a pedido (disponível a partir de 19/10); Helena aceita | Rui → **19/10 08:40**; Helena → **30/09 09:00** (ganha 13 dias, não conta como remarcação); vaga de 13/10 oferecida a Luís Martins Alves (cascata) |
 
 **Pré-condições garantidas pelo gerador** (e verificadas por `verificar_dados.py`): TAC sem vagas de 24/09 a 13/10 e 4 vagas livres a 14/10; Manuel no TAC de 02/10 10:00 e é o melhor candidato à troca; colheitas livres 24–25/09; enfermagem livre 24–25/09; RT livre 30/09; HD livre 25/09; Dr. Pedro com vagas a 21 e 23/10. **Ordem recomendada da demo:** Maria → José → Rosa → Carlos → Luísa → Fernando → António → Gestão. A extracção dos textos ao vivo tem fallback em `demo_extracoes_cache.json`.
 
@@ -215,7 +237,7 @@ Selector de perfil no topo (sem autenticação) + botão **"Repor demo"** (recar
 - Enquadramento MDR / AI Act e parecer do DPO.
 - Servidor e modelo local para produção.
 - Capacidade detalhada (salas, preparação, equipamentos partilhados).
-- Lista de espera dinâmica para cancelamentos; regras de no-show.
+- ~~Lista de espera dinâmica para cancelamentos; regras de no-show~~ → feito na secção 8A (validar pesos com a direcção clínica).
 - Recorrências completas (todas as sessões).
 - Vagas extraordinárias e outsourcing.
 - Linha de base real (validar 300 cromos/dia, cópias e tempo por cromo).

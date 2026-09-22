@@ -80,10 +80,53 @@ man = [a for a in atos_doente("100106") if a["Especialidade_Código"] == "7000_2
 check(man and man[0]["Ato Médico_Data e hora"] == "02/10/2026 10:00", "Manuel não está no TAC de 02/10 10:00")
 jose = [p for p in ped_doente("100104") if p["tipo_pedido"] == "exame"]
 check(jose and jose[0]["estado"] == "EXTRAIDO" and jose[0]["prazo_limite"] == "2026-10-05", "José: pedido TC não está EXTRAIDO até 05/10")
-cands = [a for a in atos.values() if a["Especialidade_Código"] == "7000_2" and a["mvp_prazo_limite"]
-         and date(2026, 9, 30) <= dt_pt(a["Ato Médico_Data e hora"]).date() <= date(2026, 10, 5)]
-best = max(cands, key=lambda a: (date.fromisoformat(a["mvp_prazo_limite"]) - dt_pt(a["Ato Médico_Data e hora"]).date()).days)
-check(best["ID"] == "100106", f"o melhor candidato à troca não é o Manuel ({best['ID']})")
+# Troca do José (ESPECIFICACAO.md secção 8A): candidatos = marcações de TAC com pedido na janela
+# 24/09–05/10, a mais de 7 dias (congelamento) e com vaga alternativa a 14/10 dentro do prazo.
+doentes = {d["doente_id"]: d for d in load("doentes.csv")}
+params = {r["parametro"]: float(r["valor"]) for r in load("parametros.csv") if r["parametro"] != "DEMO_DATE"}
+def idade(pid):
+    n = date.fromisoformat(doentes[pid]["data_nascimento"])
+    return DEMO.year - n.year - ((DEMO.month, DEMO.day) < (n.month, n.day))
+def rem_hospital(pid):
+    ids = {p["pedido_id"] for p in pedidos.values() if p["doente_id"] == pid}
+    return sum(1 for e in evs if e["tipo"] == "REMARCACAO" and e["pedido_id"] in ids
+               and not any(k in e["motivo"].lower() for k in ("doente", "falta"))
+               and dt_iso(e["data_hora"]).date() >= DEMO - timedelta(days=90))
+def dia_agrupado(a):
+    dia = a["Ato Médico_Data e hora"][:10]
+    return any(x["ID"] == a["ID"] and x["mvp_ato_id"] != a["mvp_ato_id"] and x["Ato Médico_Estado"] == "MARCADA"
+               and x["Ato Médico_Data e hora"][:10] == dia for x in atos.values())
+def custo(a):
+    d = doentes[a["ID"]]; folga = (date.fromisoformat(a["mvp_prazo_limite"]) - DEMO).days
+    c = (params["custo_idade_75"] if idade(a["ID"]) >= 75 else 0)
+    c += params["custo_sem_contacto_digital"] if d["contacto_digital"] == "NENHUM" else 0
+    km = float(d["distancia_km"] or 0)
+    c += params["custo_distancia_150km"] if km >= 150 else params["custo_distancia_50km"] if km >= 50 else 0
+    c += params["custo_transporte"] if d["transporte_nao_urgente"] == "1" else 0
+    c += params["custo_dia_agrupado"] if dia_agrupado(a) else 0
+    c += params["custo_estadio_novo"] if d["estadio_cuidado"] in ("NOVO", "PRE_TRATAMENTO") else 0
+    return c - min(params["bonus_folga_max"], max(0, folga // 3)), -folga
+cands = [a for a in atos.values() if a["Especialidade_Código"] == "7000_2" and a["mvp_pedido_id"]
+         and a["Ato Médico_Estado"] == "MARCADA" and a["ID"] != "100104"
+         and date(2026, 10, 1) <= dt_pt(a["Ato Médico_Data e hora"]).date() <= date(2026, 10, 5)
+         and date.fromisoformat(a["mvp_prazo_limite"]) >= date(2026, 10, 14)]
+antiga = max(cands, key=lambda a: (date.fromisoformat(a["mvp_prazo_limite"]) - DEMO).days)
+check(antiga["ID"] == "100109", f"pela regra antiga (só folga) o escolhido devia ser o Joaquim ({antiga['ID']})")
+elegiveis = [a for a in cands if rem_hospital(a["ID"]) < params["max_remarcacoes_hospital"]
+             and doentes[a["ID"]]["estadio_cuidado"] != "EM_TRATAMENTO"]
+best = min(elegiveis, key=custo)
+check(best["ID"] == "100106", f"com as regras novas o melhor candidato à troca não é o Manuel ({best['ID']})")
+check(rem_hospital("100110") >= 1, "Beatriz devia ter uma remarcação pelo hospital")
+check(doentes["100111"]["estadio_cuidado"] == "EM_TRATAMENTO", "Tiago devia estar em tratamento")
+for pid in ("100109", "100110", "100111", "100112", "100113"):
+    check(pid in doentes and doentes[pid]["demo_cenario"], f"doente-cenário {pid} em falta")
+hel = [a for a in atos_doente("100112") if a["Especialidade_Código"] == "7000_2"]
+check(hel and hel[0]["Ato Médico_Data e hora"] == "13/10/2026 09:00" and hel[0]["mvp_prazo_limite"] == "2026-09-08",
+      "Helena devia estar no TAC de 13/10 09:00 com prazo 08/09")
+rui = [a for a in atos_doente("100113") if a["Especialidade_Código"] == "7000_2"]
+check(rui and rui[0]["Ato Médico_Data e hora"] == "30/09/2026 09:00", "Rui devia estar no TAC de 30/09 09:00")
+check(any(a["Ato Médico_Data e hora"] == "23/09/2026 11:50" for a in atos_doente("100109")), "Joaquim sem consulta hoje às 11:50")
+check(livres("6100", date(2026, 10, 1), date(2026, 10, 1)), "sem colheitas livres a 01/10 (dia único do Joaquim)")
 ant = {p["tipo_pedido"] + p["estado"] for p in ped_doente("100102")}
 check({"analisesFALTOU", "exameREALIZADO", "consultaMARCADO"} <= ant, "António: estados do cenário incorrectos")
 check(livres("6100", date(2026, 9, 24), date(2026, 9, 25)), "sem colheitas livres 24–25/09 (António)")

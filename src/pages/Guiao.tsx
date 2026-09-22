@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { usePerfil } from "../lib/PerfilContext";
 import { apiGet, apiPost, apiPut } from "../lib/api";
+import { PainelImpacto } from "../components/PainelImpacto";
 import {
   Sparkles,
   UserCheck,
@@ -16,8 +17,6 @@ import {
   ShieldAlert,
   Search,
   BookOpen,
-  Copy,
-  ClipboardCheck,
 } from "lucide-react";
 
 interface AcaoPasso {
@@ -27,102 +26,201 @@ interface AcaoPasso {
 }
 
 interface Passo {
-  numero: number;
   titulo: string;
-  doente: string;
   descricao: string;
   resultado: string;
   acoes: AcaoPasso[];
-  textoPlano?: string;
+  /** O que dizer ao júri neste passo. */
+  fala?: string;
 }
 
-const PASSOS: Passo[] = [
+interface Caso {
+  id: string;
+  titulo: string;
+  tipo: "normal" | "problema" | "impacto";
+  problema: string;
+  regras?: string[];
+  passos: Passo[];
+}
+
+/**
+ * Guião da demo por CASOS: o caso normal (tudo corre bem) e os casos com problemas em que as
+ * regras de prioridade decidem (ESPECIFICACAO.md secção 8A). Os resultados esperados são os de
+ * tests/guiaoCasos.test.ts — correr os casos por esta ordem, depois de "Repor demo".
+ */
+const CASOS: Caso[] = [
   {
-    numero: 1,
-    titulo: "Maria Fernandes — circuito completo",
-    doente: "100101",
-    descricao:
-      "Abrir a consulta de hoje (09:30) e colar o texto abaixo no campo P — Plano. Guardar: o Agente Oasis " +
-      "extrai os pedidos e aparece o ecrã de confirmação (fundo escurecido, só o modal em foco). Ao confirmar " +
-      "\"Avançar, sim\", volta à agenda já com a consulta marcada como \"Guardada\" — e a administrativa (Joana " +
-      "Moreira) recebe de imediato uma notificação de fim de consulta. Trocar para o perfil dela (sino no " +
-      "cabeçalho → \"Trocar utilizador\") mostra a notificação e o badge na fila de Validação; ela revê e aprova.",
-    resultado: "Colheita 24/09 07:30 → TC 14/10 08:00 (depende da colheita) → Revisão 21/10 08:30 (Dr. Pedro).",
-    acoes: [
-      { etiqueta: "1a. Escrever o plano", utilizadorId: "U01", caminho: "/oasis/medico" },
-      { etiqueta: "1b. Validar", utilizadorId: "U03", caminho: "/validacao" },
-    ],
-    textoPlano: "TC TAP c/ contraste + colheita c/ jejum (hemog, bioq c/ creat, CEA, CA 19.9). Rev c/ exames 1/12 comigo.",
-  },
-  {
-    numero: 2,
-    titulo: "José Carvalho — TAC cheio, troca segura",
-    doente: "100104",
-    descricao: "A administrativa aprova o TC já extraído (prazo 05/10); a Radiologia aprova a troca com o Manuel.",
-    resultado: "José fica com 02/10 10:00; Manuel passa para 14/10 08:20 (dentro do seu prazo, 31/12).",
-    acoes: [
-      { etiqueta: "2a. Validar", utilizadorId: "U03", caminho: "/validacao" },
-      { etiqueta: "2b. Aprovar a troca", utilizadorId: "U07", caminho: "/servico" },
-    ],
-  },
-  {
-    numero: 3,
-    titulo: "Rosa Teixeira — abreviatura desconhecida",
-    doente: "100105",
-    descricao: "O médico escreve o plano B (09:50); a administrativa vê o alerta \"HPC\" e corrige para Manutenção CVC.",
-    resultado: "Entrada \"HPC\" no dicionário do Dr. Pedro; CVC 24/09 09:00; colheita 24/09 07:30; revisão 14/10 08:50.",
-    acoes: [
-      { etiqueta: "3a. Escrever o plano", utilizadorId: "U01", caminho: "/oasis/medico" },
-      { etiqueta: "3b. Corrigir e validar", utilizadorId: "U03", caminho: "/validacao" },
-    ],
-    textoPlano: "HPC 4/4s. Colheita s/ jejum (hemog, CEA). Rev c/ resultados 1/12.",
-  },
-  {
-    numero: 4,
-    titulo: "Carlos Mendes — abreviatura aprendida",
-    doente: "100107",
-    descricao: "O médico escreve o plano C (10:10): \"HPC\" já é reconhecida automaticamente, com selo \"aprendido\".",
-    resultado: "CVC 24/09 09:30; revisão 14/10 09:30 (Dr. Pedro).",
-    acoes: [
-      { etiqueta: "4a. Escrever o plano", utilizadorId: "U01", caminho: "/oasis/medico" },
-      { etiqueta: "4b. Validar", utilizadorId: "U03", caminho: "/validacao" },
-    ],
-    textoPlano: "Mantém vigilância. HPC 4/4s. Rev 1/12 comigo.",
-  },
-  {
-    numero: 5,
-    titulo: "Luísa Martins — triagem reencaminha",
-    doente: "100103",
-    descricao: "O triador de Onc. Médica reencaminha para Radioterapia; a triadora de RT aceita.",
-    resultado: "1.ª consulta de Radioterapia marcada em 30/09 09:00.",
-    acoes: [
-      { etiqueta: "5a. Reencaminhar", utilizadorId: "U04", caminho: "/triagem" },
-      { etiqueta: "5b. Aceitar em RT", utilizadorId: "U06", caminho: "/triagem" },
+    id: "1",
+    titulo: "Caso 1 — Tudo corre bem",
+    tipo: "normal",
+    problema:
+      "Hoje o plano da consulta segue num papel (o \"cromo\"): a administrativa copia-o e cada serviço marca por si, sem saber das dependências. Aqui o médico declara os pedidos uma vez e o sistema faz o resto.",
+    passos: [
+      {
+        titulo: "Maria Fernandes — da consulta às marcações",
+        descricao:
+          "Dr. Pedro, consulta das 09:30: escrever no Diário Clínico e \"Guardar & Seguinte\". No assistente escolher Análises, Exames e Consulta de revisão. Colheita com jejum (hemograma, bioquímica com creatinina, CEA, CA 19.9); TC TAP com contraste; revisão que depende dos exames desta consulta, com continuidade. Submeter.",
+        resultado:
+          "Marcado automaticamente: colheita 24/09 07:30 → TC 14/10 08:00 (regra R1: creatinina antes do contraste) → revisão com o Dr. Pedro 21/10 08:30 (7 dias depois do TC, para haver resultado).",
+        acoes: [{ etiqueta: "Agenda do Dr. Pedro", utilizadorId: "U01", caminho: "/oasis/medico" }],
+        fala: "O médico declara os pedidos uma vez. O sistema percebe as dependências e marca tudo pela ordem certa, sem papel.",
+      },
+      {
+        titulo: "Luísa Martins — pedido para outro serviço",
+        descricao: "O triador de Oncologia Médica vê que o pedido é para Radioterapia e reencaminha-o; a triadora de Radioterapia aceita.",
+        resultado: "1.ª consulta de Radioterapia a 30/09 09:00, marcada no momento em que é aceite.",
+        acoes: [
+          { etiqueta: "Reencaminhar (Onc. Médica)", utilizadorId: "U04", caminho: "/triagem" },
+          { etiqueta: "Aceitar (Radioterapia)", utilizadorId: "U06", caminho: "/triagem" },
+        ],
+      },
+      {
+        titulo: "Fernando Lopes — Hospital de Dia",
+        descricao: "A triadora de Hospital de Dia aceita a sessão de quimioterapia.",
+        resultado: "Sessão a 25/09 08:30; as análises pré-quimioterapia são criadas e marcadas sozinhas para 24/09 07:30 (regra R2: 1 a 3 dias antes).",
+        acoes: [{ etiqueta: "Aceitar (Hospital de Dia)", utilizadorId: "U10", caminho: "/triagem" }],
+      },
+      {
+        titulo: "Ver tudo na ficha do doente",
+        descricao:
+          "Abrir a ficha da Maria: em \"Marcações do doente\" aparece cada marcação, com a indicação de que está dentro do prazo, e as mensagens que ela recebeu (aviso com a preparação do exame e lembrete a D-3).",
+        resultado: "Tudo o que foi pedido está marcado, dentro do prazo, e o doente já sabe o que tem de fazer.",
+        acoes: [
+          { etiqueta: "Ficha da Maria", utilizadorId: "U03", caminho: "/doente/100101" },
+          { etiqueta: "Ficha do Fernando", utilizadorId: "U03", caminho: "/doente/100108" },
+        ],
+        fala: "Fim do circuito normal: pedido, triagem, marcação e aviso ao doente, sem papel e sem telefonemas.",
+      },
     ],
   },
   {
-    numero: 6,
-    titulo: "Fernando Lopes — Hospital de Dia",
-    doente: "100108",
-    descricao: "A triadora de Hospital de Dia aceita o pedido de HD.",
-    resultado: "Sessão de HD 25/09 08:30; colheita pré-QT criada automaticamente (regra R2) para 24/09 07:40.",
-    acoes: [{ etiqueta: "6. Aceitar em HD", utilizadorId: "U10", caminho: "/triagem" }],
+    id: "2",
+    titulo: "Caso 2 — O TAC está cheio: quem cede a vaga?",
+    tipo: "problema",
+    problema:
+      "José Carvalho tem suspeita de recidiva: TC muito prioritário até 05/10. O TAC não tem vagas até 13/10. Alguém tem de ceder a vaga — mas quem? Hoje, é quem calha (ou quem tem mais folga), e às vezes é o doente de 81 anos que vem de ambulância.",
+    regras: [
+      "Nunca se mexe numa marcação a 7 dias ou menos.",
+      "Nunca se remarca pelo hospital alguém que já foi remarcado.",
+      "Nunca se mexe em quem está em tratamento.",
+      "Entre os restantes, cede quem tem menor custo de remarcar: idade, sem telemóvel, distância, transporte, outra marcação no mesmo dia, em diagnóstico (a folga até ao prazo desconta).",
+      "É sempre uma proposta: um humano aprova.",
+    ],
+    passos: [
+      {
+        titulo: "A administrativa aprova o TC do José",
+        descricao: "Na Validação, aprovar o TC do José. Sem vaga livre, o sistema prepara uma proposta de troca para a Radiologia.",
+        resultado: "Proposta de troca criada, à espera de aprovação da Radiologia.",
+        acoes: [{ etiqueta: "Validação (Joana)", utilizadorId: "U03", caminho: "/validacao" }],
+      },
+      {
+        titulo: "Radiologia: \"Porquê esta escolha?\"",
+        descricao: "Abrir a proposta e o painel \"Porquê esta escolha?\" — todos os doentes avaliados, as exclusões e o custo de cada um. Aprovar.",
+        resultado:
+          "Cede a vaga Manuel Costa (follow-up, SMS, prazo 31/12): 02/10 10:00 → 14/10 08:20. Excluídos: Beatriz (já remarcada uma vez) e Tiago (em quimioterapia). Pela regra antiga seria o Sr. Joaquim — mais folga, mas 81 anos, sem telemóvel, Castelo Branco, ambulância e consulta no mesmo dia: custo 70 contra −30.",
+        acoes: [{ etiqueta: "Propostas (Radiologia)", utilizadorId: "U07", caminho: "/servico?aba=pendencias" }],
+        fala: "O sistema não decide sozinho: propõe, explica porquê em linguagem simples, e um humano aprova.",
+      },
+      {
+        titulo: "Laboratório: e se as regras fossem outras?",
+        descricao:
+          "Na Gestão, abrir o Laboratório de prioridades. Pôr as \"Remarcações\" do Manuel a 1: ele passa a estar protegido e a escolha muda. Experimentar também os pesos das regras.",
+        resultado: "Com o Manuel já remarcado, cede a vaga a Graça Pereira Santos (custo 49); o Sr. Joaquim continua protegido.",
+        acoes: [{ etiqueta: "Laboratório de prioridades", utilizadorId: "U12", caminho: "/gestao/laboratorio" }],
+        fala: "Os critérios são da direcção clínica. Aqui vê-se o efeito de cada um, sem mexer em marcações reais.",
+      },
+    ],
   },
   {
-    numero: 7,
-    titulo: "António Ribeiro — semáforo vermelho",
-    doente: "100102",
-    descricao: "Abrir a timeline do doente: a revisão de 28/09 está a vermelho (faltou à colheita de 22/09).",
-    resultado: "\"Remarcar exame\" agenda a colheita para 24/09 07:40 → o semáforo passa a amarelo.",
-    acoes: [{ etiqueta: "7. Abrir o doente", utilizadorId: "U08", caminho: "/doente/100102" }],
+    id: "3",
+    titulo: "Caso 3 — Um doente desmarca: quem aproveita a vaga?",
+    tipo: "problema",
+    problema:
+      "Rui Fonseca liga a desmarcar o TC de 30/09 (vai estar fora; pode a partir de 19/10). Hoje a vaga fica vazia ou vai para quem ligar primeiro — enquanto há doentes em diagnóstico marcados semanas depois do prazo.",
+    regras: [
+      "Aviso de mais de 72 h: a vaga é oferecida por SMS; com menos de 24 h não se chama ninguém de fora.",
+      "Primeiro quem está sem vaga ou marcado depois do prazo — em diagnóstico à frente, depois quem ficaria mais dias fora do prazo.",
+      "Depois, doentes em diagnóstico que ganham pelo menos 7 dias e aceitam ser antecipados.",
+      "Antecipar alguém não conta como remarcação: foi o doente que aceitou.",
+    ],
+    passos: [
+      {
+        titulo: "Radiologia regista a desmarcação",
+        descricao: "Separador \"Vagas libertadas\": procurar \"Rui\" → \"Desmarcar a pedido do doente\", disponível a partir de 19/10.",
+        resultado:
+          "Rui reagendado para 19/10 08:40. A vaga de 30/09 09:00 é oferecida a Helena Duarte — em diagnóstico (suspeita de cancro do pâncreas), marcada a 13/10, 35 dias depois do prazo.",
+        acoes: [{ etiqueta: "Vagas libertadas (Radiologia)", utilizadorId: "U07", caminho: "/servico?aba=vagas" }],
+      },
+      {
+        titulo: "A Helena aceita",
+        descricao: "Clicar em \"Doente aceitou\" (a resposta ao SMS é simulada). Abrir \"Porquê esta pessoa?\" para ver a lista ordenada.",
+        resultado:
+          "Helena passa para 30/09 09:00 e ganha 13 dias, sem contar como remarcação. A vaga dela de 13/10 é oferecida automaticamente a Luís Martins Alves (cascata).",
+        acoes: [
+          { etiqueta: "Vagas libertadas (Radiologia)", utilizadorId: "U07", caminho: "/servico?aba=vagas" },
+          { etiqueta: "Ficha da Helena", utilizadorId: "U07", caminho: "/doente/100112" },
+        ],
+        fala: "Uma desmarcação com uma semana de aviso deixa de ser uma vaga perdida e passa a ser tempo ganho por quem espera um diagnóstico.",
+      },
+    ],
   },
   {
-    numero: 8,
-    titulo: "Gestão",
-    doente: "",
-    descricao: "Abrir o dashboard de gestão, com 60 dias de histórico.",
-    resultado: "Métricas preenchidas: tempos, prazos, pendentes, remarcações, aprendizagem da IA, triagem, impacto estimado.",
-    acoes: [{ etiqueta: "8. Abrir Gestão", utilizadorId: "U12", caminho: "/gestao" }],
+    id: "4",
+    titulo: "Caso 4 — Doente de longe, idoso e sem telemóvel",
+    tipo: "problema",
+    problema:
+      "O Sr. Joaquim (81 anos) mora em Castelo Branco, a 230 km, não tem telemóvel e vem de ambulância. Já tem TC e consulta a 01/10. Hoje o Dr. Pedro pede-lhe uma colheita — a primeira vaga é amanhã, o que obrigaria a mais uma viagem.",
+    regras: [
+      "Dia único: para quem mora a 50 km ou mais, o sistema prefere um dia em que o doente já vem ao hospital (nunca para lá do prazo) e evita horas antes das 10:00.",
+      "Lista de chamadas: todos recebem aviso e lembrete; a administrativa só liga a quem tem risco (sem contacto digital, preparação crítica, faltas, 2.ª remarcação).",
+    ],
+    passos: [
+      {
+        titulo: "Dr. Pedro pede a colheita",
+        descricao: "Consulta das 11:50 (Joaquim Pereira) → \"Guardar & Seguinte\" → Análises: colheita sem jejum (hemograma, CEA). Submeter.",
+        resultado:
+          "Marcada a 01/10 10:00, entre o TC (09:00) e a consulta (11:10) — não a 24/09, que era a primeira vaga. Evita uma viagem de 460 km.",
+        acoes: [
+          { etiqueta: "Agenda do Dr. Pedro", utilizadorId: "U01", caminho: "/oasis/medico" },
+          { etiqueta: "Ficha do Joaquim", utilizadorId: "U08", caminho: "/doente/100109" },
+        ],
+      },
+      {
+        titulo: "Lista de chamadas da Radiologia",
+        descricao: "Separador \"Lista de chamadas\": o Sr. Joaquim aparece (sem contacto digital, 81 anos) e a Maria aparece por causa da preparação (TC com contraste e metformina).",
+        resultado: "Cerca de 1 em cada 5 marcações precisa de chamada; as restantes ficam só com o SMS/email e o lembrete a D-3.",
+        acoes: [{ etiqueta: "Lista de chamadas (Radiologia)", utilizadorId: "U07", caminho: "/servico?aba=chamadas" }],
+        fala: "Não ligamos a toda a gente: ligamos a quem, sem chamada, provavelmente falharia o exame.",
+      },
+    ],
+  },
+  {
+    id: "5",
+    titulo: "Caso 5 — Faltou a uma análise antes da consulta",
+    tipo: "problema",
+    problema: "António Ribeiro faltou ontem à colheita de que depende a revisão de 28/09. Sem o sistema, só se descobre no dia da consulta.",
+    passos: [
+      {
+        titulo: "Semáforo vermelho na ficha do doente",
+        descricao: "Abrir a ficha do António: a revisão de 28/09 está a vermelho. Clicar em \"Remarcar exame\".",
+        resultado: "Colheita remarcada para 24/09 07:40 → o semáforo passa a amarelo, a consulta mantém-se.",
+        acoes: [{ etiqueta: "Ficha do António", utilizadorId: "U08", caminho: "/doente/100102" }],
+      },
+    ],
+  },
+  {
+    id: "6",
+    titulo: "Impacto em números",
+    tipo: "impacto",
+    problema: "O que isto vale para a gestão: o antes (60 dias de histórico), o que o sistema fez nesta demonstração e a projecção mensal, com os pressupostos à vista.",
+    passos: [
+      {
+        titulo: "Dashboard de gestão",
+        descricao: "Abrir a Gestão: o painel \"Impacto das regras\" actualiza-se com o que foi feito nos casos anteriores.",
+        resultado: "0 doentes remarcados uma 2.ª vez, 3 doentes vulneráveis protegidos, 1 vaga libertada reaproveitada (13 dias ganhos), 1 deslocação evitada (460 km), ~23% das marcações a ligar.",
+        acoes: [{ etiqueta: "Abrir Gestão", utilizadorId: "U12", caminho: "/gestao" }],
+      },
+    ],
   },
 ];
 
@@ -209,17 +307,6 @@ export function Guiao() {
 
   // Separador ativo: 'guiao' | 'tradutor' | 'perfil'
   const [separador, setSeparador] = useState<"guiao" | "tradutor" | "perfil">("guiao");
-  const [textoCopiado, setTextoCopiado] = useState<number | null>(null);
-
-  async function copiarTexto(numero: number, texto: string) {
-    try {
-      await navigator.clipboard.writeText(texto);
-    } catch {
-      // clipboard indisponível (ex.: contexto não seguro) — o texto continua seleccionável à mão
-    }
-    setTextoCopiado(numero);
-    setTimeout(() => setTextoCopiado((atual) => (atual === numero ? null : atual)), 2500);
-  }
 
   // Estado do Testador de Tradução
   const [textoTradutor, setTextoTradutor] = useState(EXEMPLOS_TRADUTOR[0].texto);
@@ -381,7 +468,7 @@ export function Guiao() {
               }`}
             >
               <Play className="h-3.5 w-3.5 text-oasis-accent" />
-              <span>Passos da Demo (1 a 8)</span>
+              <span>Casos da Demo</span>
             </button>
 
             <button
@@ -416,81 +503,96 @@ export function Guiao() {
       {/* SEPARADOR 1: GUIÃO DA DEMO */}
       {separador === "guiao" && (
         <div>
-          <div className="mb-4 flex items-center justify-between text-xs text-slate-500">
-            <span>Sequência recomendada de validação operacional do circuito Oasis 2.0</span>
-            <span className="font-semibold text-slate-700">8 passos encadeados</span>
+          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600 shadow-2xs">
+            <strong className="text-slate-800">Como apresentar:</strong> carregar em \"Repor demo\" e seguir os casos por esta ordem. O Caso 1
+            mostra o circuito normal; os Casos 2 a 5 mostram problemas reais em que as regras de prioridade decidem; o último mostra o impacto
+            em números. Cada botão já troca para o perfil certo.
           </div>
 
-          <ol className="space-y-3.5">
-            {PASSOS.map((passo) => (
-              <li
-                key={passo.numero}
-                className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs hover:border-slate-300 transition-colors"
+          <div className="space-y-6">
+            {CASOS.map((caso) => (
+              <section
+                key={caso.id}
+                className={`rounded-2xl border p-4 shadow-sm ${
+                  caso.tipo === "normal"
+                    ? "border-emerald-200 bg-emerald-50/40"
+                    : caso.tipo === "impacto"
+                      ? "border-indigo-200 bg-indigo-50/40"
+                      : "border-amber-200 bg-amber-50/40"
+                }`}
               >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-800 text-xs font-bold text-white">
-                      {passo.numero}
-                    </span>
-                    <h2 className="font-bold text-slate-900 text-sm">{passo.titulo}</h2>
-                  </div>
-                  {passo.doente && (
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-mono font-medium text-slate-600">
-                      Utente: {passo.doente}
-                    </span>
-                  )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-base font-bold text-slate-900">{caso.titulo}</h2>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                      caso.tipo === "normal"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : caso.tipo === "impacto"
+                          ? "bg-indigo-100 text-indigo-800"
+                          : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    {caso.tipo === "normal" ? "caso normal" : caso.tipo === "impacto" ? "gestão" : "a prioridade decide"}
+                  </span>
                 </div>
-
-                <p className="mt-2 text-xs text-slate-600 leading-relaxed">{passo.descricao}</p>
-
-                {passo.textoPlano && (
-                  <div className="mt-2.5 rounded-lg border border-sky-200 bg-sky-50/60 p-2.5">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-sky-800">
-                        Texto pronto a colar no campo P — Plano
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => copiarTexto(passo.numero, passo.textoPlano!)}
-                        className="inline-flex items-center gap-1 rounded border border-sky-300 bg-white px-2 py-1 text-[11px] font-semibold text-sky-800 hover:bg-sky-100 shrink-0"
-                      >
-                        {textoCopiado === passo.numero ? (
-                          <>
-                            <ClipboardCheck className="h-3 w-3 text-emerald-600" />
-                            <span className="text-emerald-700">Copiado!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="h-3 w-3" />
-                            <span>Copiar</span>
-                          </>
-                        )}
-                      </button>
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-700">
+                  <strong>{caso.tipo === "impacto" ? "Para quê:" : "Problema:"}</strong> {caso.problema}
+                </p>
+                {caso.regras && (
+                  <div className="mt-2 rounded-lg border border-slate-200 bg-white p-2.5">
+                    <div className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      <ShieldAlert className="h-3 w-3" /> Regras que decidem
                     </div>
-                    <p className="font-mono text-xs text-slate-800 select-all">{passo.textoPlano}</p>
+                    <ul className="list-disc space-y-0.5 pl-4 text-xs text-slate-700">
+                      {caso.regras.map((r) => (
+                        <li key={r}>{r}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
 
-                <div className="mt-2 rounded-lg bg-emerald-50/70 border border-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-800">
-                  <strong className="text-emerald-900">Resultado esperado:</strong> {passo.resultado}
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-                  {passo.acoes.map((acao) => (
-                    <button
-                      key={acao.etiqueta}
-                      type="button"
-                      onClick={() => ir(acao)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-colors shadow-2xs"
-                    >
-                      <span>{acao.etiqueta}</span>
-                      <ArrowRight className="h-3 w-3 text-slate-400" />
-                    </button>
+                <ol className="mt-3 space-y-2.5">
+                  {caso.passos.map((passo, i) => (
+                    <li key={passo.titulo} className="rounded-xl border border-slate-200 bg-white p-3.5">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-slate-800 text-xs font-bold text-white">
+                          {caso.id}.{i + 1}
+                        </span>
+                        <h3 className="text-sm font-bold text-slate-900">{passo.titulo}</h3>
+                      </div>
+                      <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{passo.descricao}</p>
+                      <div className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-1.5 text-xs font-medium text-emerald-800">
+                        <strong className="text-emerald-900">Resultado esperado:</strong> {passo.resultado}
+                      </div>
+                      {passo.fala && (
+                        <div className="mt-2 rounded-lg border border-sky-100 bg-sky-50/70 px-3 py-1.5 text-xs italic text-sky-900">
+                          <strong className="not-italic">Dizer ao júri:</strong> “{passo.fala}”
+                        </div>
+                      )}
+                      <div className="mt-2.5 flex flex-wrap gap-2 border-t border-slate-100 pt-2">
+                        {passo.acoes.map((acao) => (
+                          <button
+                            key={acao.etiqueta}
+                            type="button"
+                            onClick={() => ir(acao)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs transition-colors hover:border-slate-400 hover:bg-slate-50"
+                          >
+                            <span>{acao.etiqueta}</span>
+                            <ArrowRight className="h-3 w-3 text-slate-400" />
+                          </button>
+                        ))}
+                      </div>
+                    </li>
                   ))}
-                </div>
-              </li>
+                </ol>
+                {caso.tipo === "impacto" && (
+                  <div className="mt-3">
+                    <PainelImpacto recarregarCada={5000} />
+                  </div>
+                )}
+              </section>
             ))}
-          </ol>
+          </div>
         </div>
       )}
 
