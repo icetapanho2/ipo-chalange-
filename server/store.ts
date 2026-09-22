@@ -27,6 +27,7 @@ import type {
   NotaConsulta,
   Notificacao,
   Silenciamento,
+  Avaria,
 } from "./types.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -69,6 +70,8 @@ class Store {
   /** Notificações e preferências de silenciamento (Prompt N2) — geradas pela aplicação, não vêm de CSV. */
   notificacoes: Notificacao[] = [];
   silenciamentos: Silenciamento[] = [];
+  /** Avarias reportadas pelos técnicos (N2); uma avaria ABERTA bloqueia vagas do serviço/acto na janela afectada. */
+  avarias: Avaria[] = [];
 
   private contadores: Record<string, number> = {
     pedido: 0,
@@ -78,6 +81,7 @@ class Store {
     proposta: 0,
     ato: 0,
     notificacao: 0,
+    avaria: 0,
   };
 
   carregar(): void {
@@ -260,6 +264,7 @@ class Store {
     this.notasConsulta = [];
     this.notificacoes = [];
     this.silenciamentos = [];
+    this.avarias = [];
 
     this.contadores = {
       pedido: maxSufixo(this.pedidos.map((x) => x.pedido_id), "P"),
@@ -269,6 +274,7 @@ class Store {
       proposta: 0,
       ato: maxSufixo(this.atosMedicos.map((x) => x.mvp_ato_id), "AT"),
       notificacao: 0,
+      avaria: 0,
     };
   }
 
@@ -315,7 +321,7 @@ class Store {
     return [...porAto.values()];
   }
 
-  proximoId(entidade: "pedido" | "dependencia" | "evento" | "alerta" | "proposta" | "ato" | "notificacao"): string {
+  proximoId(entidade: "pedido" | "dependencia" | "evento" | "alerta" | "proposta" | "ato" | "notificacao" | "avaria"): string {
     this.contadores[entidade] += 1;
     const n = this.contadores[entidade];
     const prefixos: Record<typeof entidade, string> = {
@@ -326,6 +332,7 @@ class Store {
       proposta: "PT",
       ato: "AT",
       notificacao: "N",
+      avaria: "AV",
     };
     const casas = entidade === "ato" ? 6 : 5;
     return `${prefixos[entidade]}${String(n).padStart(casas, "0")}`;

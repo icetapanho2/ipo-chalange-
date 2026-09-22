@@ -111,6 +111,7 @@ UTILIZADORES = [
     ("U10", "Dra. Helena Pinto", "TRIADOR", "9610", 1),
     ("U11", "Tiago Neves", "ADMINISTRATIVO", "7000_3", 0),
     ("U12", "Dr. Nuno Reis", "GESTAO", "", 0),
+    ("U13", "Vítor Amaral", "TECNICO", "", 0),
 ]
 
 # ---------------------------------------------------------------- regras

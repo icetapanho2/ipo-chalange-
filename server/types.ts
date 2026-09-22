@@ -5,7 +5,8 @@ export type Perfil =
   | "MEDICO"
   | "ADMINISTRATIVO"
   | "TRIADOR"
-  | "GESTAO";
+  | "GESTAO"
+  | "TECNICO";
 
 export interface Especialidade {
   codigo: string;
@@ -224,7 +225,9 @@ export type TipoNotificacao =
   | "PEDIDO_MARCADO"
   | "PEDIDO_SEM_VAGA"
   | "PEDIDO_DEVOLVIDO"
-  | "PEDIDO_RECUSADO";
+  | "PEDIDO_RECUSADO"
+  | "AVARIA_SERVICO"
+  | "AVARIA_RESOLVIDA";
 
 /** Notificação dirigida a um utilizador, gerada pelo motor em cada transição relevante do fluxo (secção 5/N2). */
 export interface Notificacao {
@@ -244,6 +247,25 @@ export interface Notificacao {
 export interface Silenciamento {
   utilizador_id: string;
   tipo: TipoNotificacao;
+}
+
+/**
+ * Avaria reportada por um técnico (N2): um serviço, opcionalmente um acto específico, fica
+ * indisponível por X dias. A administração do serviço decide remarcação total ou parcial.
+ */
+export interface Avaria {
+  avaria_id: string;
+  especialidade_codigo: string;
+  ato_codigo: string; // "" = afecta todo o serviço; preenchido = só este acto/equipamento
+  descricao: string;
+  duracao_dias: number;
+  reportado_por: string;
+  criado_em: string;
+  estado: "ABERTA" | "RESOLVIDA";
+  decisao: "REMARCACAO_TOTAL" | "REMARCACAO_PARCIAL" | "";
+  resolvido_por: string;
+  resolvido_em: string;
+  pedidos_afetados: number;
 }
 
 export interface DicionarioEntrada {

@@ -40,6 +40,30 @@ function dentroDaJanela(dataHoraIso: string, inicio: Date, fim: Date): boolean {
   return dh.getTime() >= inicio.getTime() && apenasData(dh).getTime() <= apenasData(fim).getTime();
 }
 
+/** Uma avaria ABERTA (N2) tira temporariamente do pool as vagas do serviço (ou só de um acto) na sua janela. */
+export function vagaBloqueadaPorAvaria(vaga: Vaga, atoCodigo: string): boolean {
+  return store.avarias.some((av) => {
+    if (av.estado !== "ABERTA" || av.especialidade_codigo !== vaga.especialidade_codigo) return false;
+    if (av.ato_codigo && av.ato_codigo !== atoCodigo) return false;
+    const inicio = parseIso(av.criado_em);
+    const fim = somarDias(inicio, av.duracao_dias);
+    const dh = parseIso(vaga.data_hora);
+    return dh.getTime() >= inicio.getTime() && dh.getTime() <= fim.getTime();
+  });
+}
+
+/** Nº de vagas livres compatíveis na janela [inicio, fim] (para detectar sobrelotação antes de faltar vaga a alguém). */
+export function contarVagasLivres(especialidadeCodigo: string, atoCodigo: string, inicio: Date, fim: Date): number {
+  return store.vagas.filter(
+    (v) =>
+      v.especialidade_codigo === especialidadeCodigo &&
+      !v.ato_id &&
+      v.atos_permitidos.includes(atoCodigo) &&
+      dentroDaJanela(v.data_hora, inicio, fim) &&
+      !vagaBloqueadaPorAvaria(v, atoCodigo),
+  ).length;
+}
+
 /** Primeira vaga livre compatível (especialidade, atos_permitidos, médico se pedido) na janela [inicio, fim]. */
 export function encontrarVagaLivre(
   especialidadeCodigo: string,
@@ -54,7 +78,8 @@ export function encontrarVagaLivre(
       !v.ato_id &&
       v.atos_permitidos.includes(atoCodigo) &&
       dentroDaJanela(v.data_hora, inicio, fim) &&
-      (!medicoId || v.medico_id === medicoId),
+      (!medicoId || v.medico_id === medicoId) &&
+      !vagaBloqueadaPorAvaria(v, atoCodigo),
   );
   candidatas.sort((a, b) => a.data_hora.localeCompare(b.data_hora));
   return candidatas[0] ?? null;
