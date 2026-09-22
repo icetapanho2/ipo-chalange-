@@ -137,7 +137,7 @@ export function pedirInformacao(pedido: Pedido, utilizadorId: string, pergunta: 
   registarEvento(pedido, "DEVOLUCAO", "DEVOLVIDO", utilizadorId, { motivo: pergunta, dataHora: quando });
   notificar({
     tipo: "PEDIDO_DEVOLVIDO",
-    destinatarios: [pedido.medico_requisitante_id],
+    destinatarios: [pedido.medico_requisitante_id, ...utilizadoresPorPerfil("ADMINISTRATIVO", pedido.especialidade_origem)],
     titulo: `${descreverEspecialidade(pedido.especialidade_destino)} pediu mais informação: ${descreverPedido(pedido)}`,
     mensagem: `${descreverDoente(pedido.doente_id)} · Pergunta: ${pergunta}`,
     pedidoId: pedido.pedido_id,

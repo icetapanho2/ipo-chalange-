@@ -117,6 +117,7 @@ export function criarRotasOasis(store: typeof StoreType) {
     prioridade?: Prioridade | "" | null;
     nao_antes?: string; // "aaaa-mm-dd" ou ""
     depende_exames_consulta?: boolean; // só relevante para tipo_pedido "consulta"
+    continuidade_medico?: boolean; // "comigo": tenta agendar com o médico requisitante (só tipo "consulta")
   }
 
   // Cria pedidos directamente a partir do que o médico declarou no assistente (etapas 2-4):
@@ -180,8 +181,8 @@ export function criarRotasOasis(store: typeof StoreType) {
         prioridade,
         prazo_limite: isoData(prazo),
         nao_antes: naoAntes,
-        medico_preferido_id: "",
-        continuidade_obrigatoria: false,
+        medico_preferido_id: tipoPedido === "consulta" && item.continuidade_medico ? medicoId : "",
+        continuidade_obrigatoria: tipoPedido === "consulta" && !!item.continuidade_medico,
         recorrencia: "",
         texto_origem: especificacao,
         confianca: 1,

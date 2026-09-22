@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { OasisPainel, OasisShell } from "../../oasis/OasisShell";
 import { apiGet, apiPost } from "../../lib/api";
 import { DoenteModal } from "../../components/DoenteModal";
 import {
@@ -12,6 +11,18 @@ import {
   User,
   CalendarClock,
 } from "lucide-react";
+
+/** Cartão no estilo usado no resto do site (Triagem, Validação, Serviço): branco, cabeçalho leve. */
+function Painel({ titulo, children }: { titulo?: string; children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      {titulo && (
+        <div className="border-b border-slate-100 px-3.5 py-2 text-xs font-bold uppercase tracking-wide text-slate-600">{titulo}</div>
+      )}
+      <div className="p-3.5">{children}</div>
+    </div>
+  );
+}
 
 type TipoPedido = "consulta" | "pedido_consulta" | "pedido_hd" | "exame" | "analises" | "tratamento";
 type Prioridade = "" | "MP" | "P" | "N";
@@ -68,6 +79,7 @@ interface PedidoForm {
   prioridade: Prioridade;
   nao_antes: string;
   depende_exames_consulta: boolean;
+  continuidade_medico: boolean;
 }
 
 interface PedidoSubmetido {
@@ -144,6 +156,7 @@ export function OasisPedidosPosConsulta() {
       prioridade: "",
       nao_antes: "",
       depende_exames_consulta: false,
+      continuidade_medico: tipo === "consulta",
     };
   }
 
@@ -209,6 +222,7 @@ export function OasisPedidosPosConsulta() {
           prioridade: p.prioridade || null,
           nao_antes: p.nao_antes,
           depende_exames_consulta: p.depende_exames_consulta,
+          continuidade_medico: p.continuidade_medico,
         })),
       };
       const r = await apiPost<RespostaSubmissao>(`/oasis/consulta/${atoId}/pedidos`, corpo);
@@ -249,28 +263,32 @@ export function OasisPedidosPosConsulta() {
   const voltarAgenda = () => navigate(dia ? `/oasis/medico?data=${dia}` : "/oasis/medico");
 
   return (
-    <OasisShell
-      titulo="Pedidos Pós-Consulta"
-      acoes={
+    <div className="mx-auto max-w-5xl px-4 py-6">
+      {/* Cabeçalho da página, igual ao resto do site */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800">Pedidos Pós-Consulta</h1>
+          <p className="mt-1 text-xs text-slate-500">Declare directamente o que pretende pedir: sem Agente Oasis, sem validação prévia.</p>
+        </div>
         <div className="flex items-center gap-2">
           {dados?.doente && (
-            <span className="hidden sm:flex items-center gap-1.5 rounded border border-slate-300 px-2.5 py-1 text-xs text-white">
-              <User className="h-3.5 w-3.5" />
+            <span className="hidden sm:flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs">
+              <User className="h-3.5 w-3.5 text-oasis-accent" />
               <span>{dados.doente.nome}</span>
             </span>
           )}
           <button
             type="button"
             onClick={() => atoId && navigate(`/oasis/medico/${atoId}`)}
-            className="rounded border border-slate-300 px-2.5 py-1 text-xs text-white hover:bg-white/10 transition-colors"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
           >
             ← Voltar à consulta
           </button>
         </div>
-      }
-    >
+      </div>
+
       {/* Barra de progresso das 4 etapas */}
-      <div className="mb-4 flex items-center gap-1.5">
+      <div className="mt-4 mb-4 flex items-center gap-1.5">
         {(
           [
             { chave: "tipos" as const, titulo: "Tipo de pedidos" },
@@ -311,14 +329,14 @@ export function OasisPedidosPosConsulta() {
       )}
 
       {!dados || !catalogo ? (
-        <div className="flex h-64 items-center justify-center text-slate-500 gap-2">
+        <div className="mt-8 flex h-64 items-center justify-center text-slate-500 gap-2">
           <span>A carregar…</span>
         </div>
       ) : (
         <>
           {/* ETAPA 2: TIPO DE PEDIDOS */}
           {etapa === "tipos" && (
-            <OasisPainel titulo="Tipo de Pedidos">
+            <Painel titulo="Tipo de Pedidos">
               <p className="text-xs text-slate-500 mb-3">
                 Escolha uma ou várias opções (equivalente ao Modelo 234). Pode juntar vários tipos na mesma submissão.
               </p>
@@ -364,12 +382,12 @@ export function OasisPedidosPosConsulta() {
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
-            </OasisPainel>
+            </Painel>
           )}
 
           {/* ETAPA 3: PREENCHIMENTO DOS PEDIDOS */}
           {etapa === "preenchimento" && (
-            <OasisPainel titulo="Preenchimento dos Pedidos">
+            <Painel titulo="Preenchimento dos Pedidos">
               <div className="space-y-6">
                 {tiposSelecionados.map((tipo) => {
                   const blocos = pedidos.filter((p) => p.tipo_pedido === tipo);
@@ -515,6 +533,17 @@ export function OasisPedidosPosConsulta() {
                                 <label className="mt-2.5 flex items-center gap-2 text-[11px] text-slate-600">
                                   <input
                                     type="checkbox"
+                                    checked={p.continuidade_medico}
+                                    onChange={(e) => atualizarPedido(p.id, { continuidade_medico: e.target.checked })}
+                                  />
+                                  Continuidade — agendar comigo sempre que possível
+                                </label>
+                              )}
+
+                              {tipo === "consulta" && (
+                                <label className="mt-2 flex items-center gap-2 text-[11px] text-slate-600">
+                                  <input
+                                    type="checkbox"
                                     checked={p.depende_exames_consulta}
                                     onChange={(e) => atualizarPedido(p.id, { depende_exames_consulta: e.target.checked })}
                                   />
@@ -567,12 +596,12 @@ export function OasisPedidosPosConsulta() {
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
-            </OasisPainel>
+            </Painel>
           )}
 
           {/* ETAPA 4: RESUMO E SUBMISSÃO */}
           {etapa === "resumo" && (
-            <OasisPainel titulo="Resumo do Pedido de Marcações">
+            <Painel titulo="Resumo do Pedido de Marcações">
               <div className="mb-3 text-xs text-slate-500">
                 <strong className="text-slate-800">{dados.doente?.nome}</strong> · Médico requisitante: reveja os pedidos antes de submeter.
               </div>
@@ -649,7 +678,7 @@ export function OasisPedidosPosConsulta() {
                   {!aSubmeter && <ChevronRight className="h-3.5 w-3.5" />}
                 </button>
               </div>
-            </OasisPainel>
+            </Painel>
           )}
 
           {/* ETAPA 5: PEDIDO SUBMETIDO */}
@@ -708,6 +737,6 @@ export function OasisPedidosPosConsulta() {
       {modalDoenteAberto && dados?.doente && (
         <DoenteModal doenteId={dados.doente.doente_id} onFechar={() => setModalDoenteAberto(false)} />
       )}
-    </OasisShell>
+    </div>
   );
 }

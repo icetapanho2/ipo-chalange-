@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { OasisPainel, OasisShell } from "../../oasis/OasisShell";
 import { apiGet, apiPost, apiPut } from "../../lib/api";
 import { DoenteModal } from "../../components/DoenteModal";
 import {
@@ -99,26 +98,34 @@ interface RespostaConsulta {
   resumoPedidos?: ResumoPedidos;
 }
 
-const SECAO_CLINICA = {
-  titulo: "S/O/A — Registo Clínico",
-  subtitulo: "Subjectivo, objectivo e avaliação: sintomas, achados do exame físico e diagnóstico/evolução, em texto livre",
+const SECAO_DIARIO = {
+  titulo: "Diário Clínico",
+  subtitulo: "Registo livre da consulta: sintomas, achados, avaliação e orientação. É só documentação — não gera pedidos automaticamente.",
   ajuda:
     "Ex: Doente refere cansaço ligeiro, nega dor abdominal. ECOG 0, abdómen mole e indolor. Adenocarcinoma do " +
-    "cólon estádio III sob vigilância, boa evolução.",
+    "cólon estádio III sob vigilância, boa evolução. Vigilância pós-adjuvante; rever com TC de reestadiamento e analítica.",
 };
 
-const SECAO_PLANO = {
-  chave: "p" as const,
-  titulo: "P — Plano Terapêutico",
-  subtitulo: "Orientação clínica para os exames, análises, consultas ou tratamentos a pedir a seguir",
-  ajuda: "Ex: Vigilância pós-adjuvante. Rever com TC de reestadiamento e analítica.",
-};
+/** Cartão no estilo usado no resto do site (Triagem, Validação, Serviço): branco, cabeçalho leve. */
+function Painel({ titulo, acoes, children }: { titulo?: string; acoes?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      {titulo && (
+        <div className="flex items-center justify-between border-b border-slate-100 px-3.5 py-2">
+          <span className="text-xs font-bold uppercase tracking-wide text-slate-600">{titulo}</span>
+          {acoes}
+        </div>
+      )}
+      <div className="p-3.5">{children}</div>
+    </div>
+  );
+}
 
 export function OasisConsulta() {
   const { atoId } = useParams<{ atoId: string }>();
   const navigate = useNavigate();
   const [dados, setDados] = useState<RespostaConsulta | null>(null);
-  const [campos, setCampos] = useState({ soa: "", p: "" });
+  const [diario, setDiario] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [aGuardar, setAGuardar] = useState(false);
   const [modalDoenteAberto, setModalDoenteAberto] = useState(false);
@@ -139,8 +146,7 @@ export function OasisConsulta() {
       .then((r) => {
         setDados(r);
         if (r.nota) {
-          const soa = [r.nota.s, r.nota.o, r.nota.a].filter((texto) => texto.trim()).join("\n\n");
-          setCampos({ soa, p: r.nota.p });
+          setDiario([r.nota.s, r.nota.o, r.nota.a, r.nota.p].filter((texto) => texto.trim()).join("\n\n"));
         }
         setFormClinico({
           diagnostico_principal: r.doente?.diagnostico_principal ?? "",
@@ -171,19 +177,14 @@ export function OasisConsulta() {
     }
   }
 
-  // Grava a nota SOAP (sem Agente Oasis — o P é só texto clínico) e segue directamente para o
+  // Grava o diário (documentação livre, sem Agente Oasis) e segue directamente para o
   // assistente de pedidos: o médico declara o que pretende, sem etapa intermédia.
   async function guardarESeguir() {
     if (!atoId) return;
     setAGuardar(true);
     setErro(null);
     try {
-      await apiPost(`/oasis/consulta/${atoId}/guardar`, {
-        s: campos.soa,
-        o: "",
-        a: "",
-        p: campos.p,
-      });
+      await apiPost(`/oasis/consulta/${atoId}/guardar`, { s: diario, o: "", a: "", p: "" });
       navigate(`/oasis/medico/${atoId}/pedidos`);
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
@@ -192,60 +193,62 @@ export function OasisConsulta() {
   }
 
   return (
-    <OasisShell
-      titulo="Registo Clínico da Consulta"
-      acoes={
-        <div className="flex items-center gap-2">
-          <div className="group relative">
-            <button
-              type="button"
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-white hover:bg-white/10 transition-colors"
-              title="Como funciona este registo"
-            >
-              <Info className="h-3.5 w-3.5" />
-            </button>
-            <div className="invisible absolute right-0 top-full z-20 mt-2 w-72 rounded-lg border border-slate-200 bg-white p-3 text-left text-slate-700 opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
-              <h4 className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                <Sparkles className="h-3.5 w-3.5 text-oasis-accent" />
-                <span>Como funciona</span>
-              </h4>
-              <p className="text-[11px] leading-relaxed text-slate-600">
-                1. Registe o S/O/A e o P (plano) em texto livre.
-              </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
-                2. Em <strong>Guardar & Seguinte</strong>, escolhe os tipos de pedido (consulta, exame, análises…) e preenche cada um.
-              </p>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
-                3. Reveja o resumo e submeta: os pedidos seguem de imediato para agendamento ou triagem do serviço.
-              </p>
+    <div className="mx-auto max-w-5xl px-4 py-6">
+      {/* Cabeçalho da página, igual ao resto do site */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-slate-800">Diário Clínico</h1>
+            <div className="group relative">
+              <button
+                type="button"
+                className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100 transition-colors"
+                title="Como funciona este registo"
+              >
+                <Info className="h-3 w-3" />
+              </button>
+              <div className="invisible absolute left-0 top-full z-20 mt-2 w-72 rounded-lg border border-slate-200 bg-white p-3 text-left text-slate-700 opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+                <h4 className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <Sparkles className="h-3.5 w-3.5 text-oasis-accent" />
+                  <span>Como funciona</span>
+                </h4>
+                <p className="text-[11px] leading-relaxed text-slate-600">1. Registe o diário da consulta em texto livre.</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                  2. Em <strong>Guardar & Seguinte</strong>, escolhe os tipos de pedido (consulta, exame, análises…) e preenche cada um.
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                  3. Reveja o resumo e submeta: os pedidos seguem de imediato para agendamento ou triagem do serviço.
+                </p>
+              </div>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate("/oasis/medico")}
-            className="rounded border border-slate-300 px-2.5 py-1 text-xs text-white hover:bg-white/10 transition-colors"
-          >
-            ← Voltar à agenda
-          </button>
+          <p className="mt-1 text-xs text-slate-500">{dados?.doente?.nome ?? "A carregar…"} · {dados?.ato.especialidade_descricao}</p>
         </div>
-      }
-    >
+        <button
+          type="button"
+          onClick={() => navigate("/oasis/medico")}
+          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
+        >
+          ← Voltar à agenda
+        </button>
+      </div>
+
       {erro && (
-        <div className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <div className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           <strong>Erro:</strong> {erro}
         </div>
       )}
 
       {!dados ? (
-        <div className="flex h-64 items-center justify-center text-slate-500 gap-2">
-          <Clock className="h-5 w-5 animate-spin text-oasis-header" />
+        <div className="mt-8 flex h-64 items-center justify-center text-slate-500 gap-2">
+          <Clock className="h-5 w-5 animate-spin text-oasis-accent" />
           <span>A carregar consulta e prontuário do utente…</span>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
           {/* PAINEL ESQUERDO: DOENTE E DADOS DO ATO */}
           <div className="space-y-3">
-            <OasisPainel titulo="Identificação do Utente">
+            <Painel titulo="Identificação do Utente">
               <div className="space-y-3">
                 <div
                   onClick={() => setModalDoenteAberto(true)}
@@ -278,13 +281,13 @@ export function OasisConsulta() {
                     </div>
                     <ExternalLink className="h-3.5 w-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-slate-600 bg-white p-1.5 rounded border border-slate-200">
+                  <div className="mt-2 flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-1.5 rounded border border-slate-200">
                     <span>Nasc: {dados.doente?.data_nascimento}</span>
                     <span>Sexo: {dados.doente?.sexo === "M" ? "Masc" : "Fem"}</span>
                   </div>
                 </div>
 
-                <div className="border-t border-oasis-border pt-2 text-xs space-y-1 text-slate-700">
+                <div className="border-t border-slate-200 pt-2 text-xs space-y-1 text-slate-700">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Especialidade:</span>
                     <span className="font-semibold text-slate-800">{dados.ato.especialidade_descricao}</span>
@@ -304,7 +307,7 @@ export function OasisConsulta() {
                 </div>
 
                 {dados.nota && (
-                  <div className="rounded bg-slate-100 p-2 text-[11px] text-slate-500 border border-slate-200">
+                  <div className="rounded bg-slate-50 p-2 text-[11px] text-slate-500 border border-slate-200">
                     Última gravação: {dados.nota.guardado_em.replace("T", " às ")}
                   </div>
                 )}
@@ -335,12 +338,10 @@ export function OasisConsulta() {
                   </button>
                 )}
               </div>
-            </OasisPainel>
+            </Painel>
 
             {/* Perfil Clínico: mais detalhe + edição directa, sem sair da consulta */}
-            <OasisPainel
-              titulo="Perfil Clínico"
-            >
+            <Painel titulo="Perfil Clínico">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] text-slate-500">Usado no factor clínico da equação de prioridade</span>
                 {!aEditarClinico && (
@@ -488,51 +489,29 @@ export function OasisConsulta() {
                   </div>
                 </div>
               )}
-            </OasisPainel>
-
+            </Painel>
           </div>
 
-          {/* PAINEL DIREITO: REGISTO CLÍNICO */}
+          {/* PAINEL DIREITO: DIÁRIO CLÍNICO */}
           <div className="space-y-4">
-            <OasisPainel titulo="Folha Clínica de Registo Médico (SOAP)">
-              <div className="space-y-4">
-                {/* S/O/A num único campo de escrita livre */}
-                <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-2xs">
-                  <div className="mb-1.5">
-                    <label className="text-xs font-bold text-slate-800">{SECAO_CLINICA.titulo}</label>
-                    <span className="text-[11px] text-slate-400 block">{SECAO_CLINICA.subtitulo}</span>
-                  </div>
-                  <textarea
-                    id="campo-soap-soa"
-                    className="w-full rounded border border-slate-300 bg-white p-2.5 text-xs text-slate-800 transition-colors focus:outline-none focus:border-oasis-accent"
-                    rows={5}
-                    value={campos.soa}
-                    onChange={(e) => setCampos((c) => ({ ...c, soa: e.target.value }))}
-                    placeholder={SECAO_CLINICA.ajuda}
-                  />
+            <Painel titulo="Diário da Consulta">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="mb-1.5">
+                  <label className="text-xs font-bold text-slate-800">{SECAO_DIARIO.titulo}</label>
+                  <span className="text-[11px] text-slate-500 block">{SECAO_DIARIO.subtitulo}</span>
                 </div>
-
-                {/* P — Plano, à parte e por último */}
-                <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-2xs">
-                  <div className="mb-1.5">
-                    <label className="text-xs font-bold text-slate-800">{SECAO_PLANO.titulo}</label>
-                    <span className="text-[11px] text-slate-400 block">{SECAO_PLANO.subtitulo}</span>
-                  </div>
-                  <textarea
-                    id="campo-soap-p"
-                    className="w-full rounded border border-slate-300 bg-white p-2.5 text-xs text-slate-800 leading-relaxed transition-colors focus:outline-none focus:border-oasis-accent"
-                    rows={5}
-                    value={campos.p}
-                    onChange={(e) => setCampos((c) => ({ ...c, p: e.target.value }))}
-                    placeholder={SECAO_PLANO.ajuda}
-                  />
-                </div>
+                <textarea
+                  id="campo-diario"
+                  className="w-full rounded border border-slate-300 bg-white p-2.5 text-xs text-slate-800 leading-relaxed transition-colors focus:outline-none focus:border-oasis-accent"
+                  rows={10}
+                  value={diario}
+                  onChange={(e) => setDiario(e.target.value)}
+                  placeholder={SECAO_DIARIO.ajuda}
+                />
               </div>
 
-              <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-200">
-                <div className="text-xs text-slate-500">
-                  O formulário cumpre as normas de documentação clínica hospitalar do SNS.
-                </div>
+              <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-100">
+                <div className="text-xs text-slate-500">O que pretende pedir a seguir escolhe-se no ecrã seguinte.</div>
                 <button
                   id="btn-guardar-consulta"
                   type="button"
@@ -553,7 +532,7 @@ export function OasisConsulta() {
                   )}
                 </button>
               </div>
-            </OasisPainel>
+            </Painel>
 
             {/* Pedidos já submetidos nesta consulta (se o médico voltar a abrir o ecrã) */}
             {dados.pedidosExistentes && dados.pedidosExistentes.length > 0 && (
@@ -592,11 +571,8 @@ export function OasisConsulta() {
 
       {/* Modal Universal de Feedback do Doente */}
       {modalDoenteAberto && dados?.doente && (
-        <DoenteModal
-          doenteId={dados.doente.doente_id}
-          onFechar={() => setModalDoenteAberto(false)}
-        />
+        <DoenteModal doenteId={dados.doente.doente_id} onFechar={() => setModalDoenteAberto(false)} />
       )}
-    </OasisShell>
+    </div>
   );
 }

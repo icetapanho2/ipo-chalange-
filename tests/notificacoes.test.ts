@@ -64,7 +64,7 @@ describe("Notificações (Prompt N2)", () => {
     expect(notificacoesDe("U03").some((n) => n.tipo === "PEDIDO_RECUSADO")).toBe(true);
   });
 
-  it("triagem pede informação: notifica só o médico requisitante, com a pergunta", () => {
+  it("triagem pede informação: notifica o médico requisitante e a admin de origem, com a pergunta", () => {
     const p5 = pedido("P00005");
     pedirInformacao(p5, "U04", "Tem RM pélvica recente?", agora());
     expect(p5.estado).toBe("DEVOLVIDO");
@@ -73,7 +73,9 @@ describe("Notificações (Prompt N2)", () => {
     expect(doMedico).toHaveLength(1);
     expect(doMedico[0].tipo).toBe("PEDIDO_DEVOLVIDO");
     expect(doMedico[0].mensagem).toContain("Tem RM pélvica recente?");
-    expect(notificacoesDe("U03")).toHaveLength(0);
+
+    const daAdminOrigem = notificacoesDe("U03"); // ADMINISTRATIVO de 2102
+    expect(daAdminOrigem.some((n) => n.tipo === "PEDIDO_DEVOLVIDO" && n.pedido_id === "P00005")).toBe(true);
   });
 
   it("aprovação de um pedido TRIAGEM notifica o triador do serviço de destino", () => {
