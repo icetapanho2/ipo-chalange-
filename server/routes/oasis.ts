@@ -54,7 +54,20 @@ export function criarRotasOasis(store: typeof StoreType) {
     const pedidosExistentes = store.pedidos
       .filter((p) => p.consulta_origem_ato_id === ato.mvp_ato_id)
       .map((p) => pedidoParaJson(p, store.parametros.limiar_confianca));
-    res.json({ ato, doente, nota, pedidosExistentes });
+
+    // Resumo de todos os pedidos do doente (não só desta consulta): dá ao médico uma visão
+    // rápida do que está pendente/agendado/realizado antes de escrever o plano de hoje.
+    const pedidosDoente = doente ? store.pedidos.filter((p) => p.doente_id === doente.doente_id) : [];
+    const resumoPedidos = {
+      total: pedidosDoente.length,
+      pendentes: pedidosDoente.filter((p) =>
+        ["EXTRAIDO", "VALIDADO", "EM_TRIAGEM", "ACEITE", "SEM_VAGA", "DEVOLVIDO", "REENCAMINHADO"].includes(p.estado),
+      ).length,
+      agendados: pedidosDoente.filter((p) => p.estado === "MARCADO" || p.estado === "FALTOU").length,
+      realizados: pedidosDoente.filter((p) => p.estado === "REALIZADO").length,
+    };
+
+    res.json({ ato, doente, nota, pedidosExistentes, resumoPedidos });
   });
 
   // Guardar a nota SOAP e chamar o agente de extracção sobre o campo P.

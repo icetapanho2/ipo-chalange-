@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { OasisPainel, OasisShell } from "../../oasis/OasisShell";
-import { apiGet, apiPost } from "../../lib/api";
+import { apiGet, apiPost, apiPut } from "../../lib/api";
 import { DoenteModal } from "../../components/DoenteModal";
 import {
   User,
@@ -16,6 +16,13 @@ import {
   ExternalLink,
   ChevronRight,
   Info,
+  Pencil,
+  Stethoscope,
+  ShieldAlert,
+  Phone,
+  Hourglass,
+  CalendarCheck2,
+  BadgeCheck,
 } from "lucide-react";
 
 interface Ato {
@@ -33,7 +40,21 @@ interface Doente {
   n_utente: string;
   data_nascimento: string;
   sexo: string;
+  diagnostico_principal?: string;
+  estadiamento?: string;
+  alergias?: string[];
+  contacto?: string;
+  notas_clinicas?: string;
 }
+
+interface ResumoPedidos {
+  total: number;
+  pendentes: number;
+  agendados: number;
+  realizados: number;
+}
+
+const OPCOES_ESTADIAMENTO = ["", "Estádio I", "Estádio II", "Estádio III", "Estádio IV", "Metastático"];
 
 interface Nota {
   s: string;
@@ -71,6 +92,7 @@ interface RespostaConsulta {
   doente: Doente | null;
   nota: Nota | null;
   pedidosExistentes?: PedidoDetalhado[];
+  resumoPedidos?: ResumoPedidos;
 }
 
 interface NotificacaoAdministrativa {
@@ -113,8 +135,17 @@ export function OasisConsulta() {
   const [modalDoenteAberto, setModalDoenteAberto] = useState(false);
   const [modoFormulario, setModoFormulario] = useState<"soap" | "interativo">("soap");
   const [confirmacaoPendente, setConfirmacaoPendente] = useState(false);
+  const [aEditarClinico, setAEditarClinico] = useState(false);
+  const [formClinico, setFormClinico] = useState({
+    diagnostico_principal: "",
+    estadiamento: "",
+    alergias: "",
+    contacto: "",
+    notas_clinicas: "",
+  });
+  const [aGuardarClinico, setAGuardarClinico] = useState(false);
 
-  useEffect(() => {
+  function carregar() {
     if (!atoId) return;
     apiGet<RespostaConsulta>(`/oasis/consulta/${atoId}`)
       .then((r) => {
@@ -131,9 +162,33 @@ export function OasisConsulta() {
             alertas: [],
           });
         }
+        setFormClinico({
+          diagnostico_principal: r.doente?.diagnostico_principal ?? "",
+          estadiamento: r.doente?.estadiamento ?? "",
+          alergias: (r.doente?.alergias ?? []).join(", "),
+          contacto: r.doente?.contacto ?? "",
+          notas_clinicas: r.doente?.notas_clinicas ?? "",
+        });
       })
       .catch((e) => setErro(e instanceof Error ? e.message : String(e)));
-  }, [atoId]);
+  }
+
+  useEffect(carregar, [atoId]);
+
+  async function guardarClinico() {
+    if (!dados?.doente) return;
+    setErro(null);
+    setAGuardarClinico(true);
+    try {
+      await apiPut(`/doente/${dados.doente.doente_id}`, formClinico);
+      setAEditarClinico(false);
+      carregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAGuardarClinico(false);
+    }
+  }
 
   async function guardar() {
     if (!atoId) return;
@@ -172,6 +227,30 @@ export function OasisConsulta() {
       titulo="Registo Clínico da Consulta"
       acoes={
         <div className="flex items-center gap-2">
+          <div className="group relative">
+            <button
+              type="button"
+              className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-white hover:bg-white/10 transition-colors"
+              title="Como funciona o Agente Oasis"
+            >
+              <Info className="h-3.5 w-3.5" />
+            </button>
+            <div className="invisible absolute right-0 top-full z-20 mt-2 w-72 rounded-lg border border-slate-200 bg-white p-3 text-left text-slate-700 opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+              <h4 className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                <Sparkles className="h-3.5 w-3.5 text-oasis-accent" />
+                <span>Como funciona o Agente</span>
+              </h4>
+              <p className="text-[11px] leading-relaxed text-slate-600">
+                1. Digite no <strong>P — Plano</strong> ou use o <strong>Construtor Assistido</strong>.
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                2. Ao clicar em <strong>Guardar & Extrair</strong>, o agente traduz linguagem clínica livre para pedidos formais.
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                3. Consultas do mesmo serviço e exames são preparados para agendamento direto; interconsultas seguem para triagem.
+              </p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => navigate("/oasis/medico")}
@@ -260,25 +339,167 @@ export function OasisConsulta() {
                     Última gravação: {dados.nota.guardado_em.replace("T", " às ")}
                   </div>
                 )}
+
+                {/* Ícones de estado dos pedidos do doente: visão rápida antes de escrever o plano */}
+                {dados.resumoPedidos && dados.resumoPedidos.total > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setModalDoenteAberto(true)}
+                    className="grid w-full grid-cols-3 gap-1.5 text-center"
+                    title="Ver todos os pedidos do doente"
+                  >
+                    <span className="flex flex-col items-center gap-0.5 rounded-lg border border-red-200 bg-red-50 py-1.5">
+                      <Hourglass className="h-3.5 w-3.5 text-red-600" />
+                      <span className="text-xs font-bold text-red-800">{dados.resumoPedidos.pendentes}</span>
+                      <span className="text-[9px] font-semibold uppercase text-red-700">Pendentes</span>
+                    </span>
+                    <span className="flex flex-col items-center gap-0.5 rounded-lg border border-amber-200 bg-amber-50 py-1.5">
+                      <CalendarCheck2 className="h-3.5 w-3.5 text-amber-600" />
+                      <span className="text-xs font-bold text-amber-800">{dados.resumoPedidos.agendados}</span>
+                      <span className="text-[9px] font-semibold uppercase text-amber-700">Agendados</span>
+                    </span>
+                    <span className="flex flex-col items-center gap-0.5 rounded-lg border border-emerald-200 bg-emerald-50 py-1.5">
+                      <BadgeCheck className="h-3.5 w-3.5 text-emerald-600" />
+                      <span className="text-xs font-bold text-emerald-800">{dados.resumoPedidos.realizados}</span>
+                      <span className="text-[9px] font-semibold uppercase text-emerald-700">Realizados</span>
+                    </span>
+                  </button>
+                )}
               </div>
             </OasisPainel>
 
-            {/* Guia de Fluxo Rápido */}
-            <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-2xs space-y-2">
-              <h4 className="font-bold text-slate-700 flex items-center gap-1.5">
-                <Sparkles className="h-3.5 w-3.5 text-oasis-accent" />
-                <span>Como funciona o Agente</span>
-              </h4>
-              <p className="text-slate-600 text-[11px] leading-relaxed">
-                1. Digite no <strong>P — Plano</strong> ou use o <strong>Construtor Assistido</strong>.
-              </p>
-              <p className="text-slate-600 text-[11px] leading-relaxed">
-                2. Ao clicar em <strong>Guardar & Extrair</strong>, o agente traduz linguagem clínica livre para pedidos formais.
-              </p>
-              <p className="text-slate-600 text-[11px] leading-relaxed">
-                3. Consultas do mesmo serviço e exames são preparados para agendamento direto; interconsultas seguem para triagem.
-              </p>
-            </div>
+            {/* Perfil Clínico: mais detalhe + edição directa, sem sair da consulta */}
+            <OasisPainel
+              titulo="Perfil Clínico"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] text-slate-500">Usado no factor clínico da equação de prioridade</span>
+                {!aEditarClinico && (
+                  <button
+                    type="button"
+                    onClick={() => setAEditarClinico(true)}
+                    className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 shrink-0"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    <span>Editar</span>
+                  </button>
+                )}
+              </div>
+
+              {!aEditarClinico ? (
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-start gap-1.5">
+                    <Stethoscope className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-slate-500">Diagnóstico: </span>
+                      <span className="text-slate-800 font-medium">{dados.doente?.diagnostico_principal || "— Não registado"}</span>
+                      {dados.doente?.estadiamento && (
+                        <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold text-slate-600">
+                          {dados.doente.estadiamento}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <ShieldAlert className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-slate-500">Alergias: </span>
+                      <span className="text-slate-800">
+                        {dados.doente?.alergias && dados.doente.alergias.length > 0
+                          ? dados.doente.alergias.join(", ")
+                          : "— Nenhuma registada"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-slate-500">Contacto: </span>
+                      <span className="text-slate-800">{dados.doente?.contacto || "— Não registado"}</span>
+                    </div>
+                  </div>
+                  {dados.doente?.notas_clinicas && (
+                    <p className="rounded bg-slate-50 p-2 text-[11px] text-slate-600 border border-slate-100 leading-relaxed">
+                      {dados.doente.notas_clinicas}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Diagnóstico principal</label>
+                    <input
+                      type="text"
+                      value={formClinico.diagnostico_principal}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, diagnostico_principal: e.target.value }))}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Estadiamento</label>
+                    <select
+                      value={formClinico.estadiamento}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, estadiamento: e.target.value }))}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                    >
+                      {OPCOES_ESTADIAMENTO.map((op) => (
+                        <option key={op} value={op}>
+                          {op || "— Não registado"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Alergias (vírgula)</label>
+                    <input
+                      type="text"
+                      value={formClinico.alergias}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, alergias: e.target.value }))}
+                      placeholder="Ex: Penicilina, Contraste iodado"
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Contacto</label>
+                    <input
+                      type="text"
+                      value={formClinico.contacto}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, contacto: e.target.value }))}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Notas clínicas</label>
+                    <textarea
+                      value={formClinico.notas_clinicas}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, notas_clinicas: e.target.value }))}
+                      rows={2}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={guardarClinico}
+                      disabled={aGuardarClinico}
+                      className="rounded-lg bg-oasis-header px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:bg-slate-700 disabled:opacity-50"
+                    >
+                      {aGuardarClinico ? "A guardar…" : "Guardar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAEditarClinico(false);
+                        carregar();
+                      }}
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </OasisPainel>
 
             {/* Toggle: Formulário SOAP vs Construtor Interativo */}
             <div className="rounded-lg border border-slate-200 bg-white p-2 shadow-2xs">
