@@ -283,3 +283,28 @@ administrativa com a solução e a justificação, para ela validar.
 4. **Datas em dd/mm/aaaa** em toda a interface (`src/lib/datas.ts`); o ISO fica só na API.
 5. `ConstrutorPedidos.tsx` removido: não era usado e apontava para um campo "P — Plano" que já não existe.
 6. Navegação em telemóvel: uma linha com deslocamento horizontal em vez de empilhar os botões.
+
+## 2026-09-23 — Validação e Dicionário saem; Serviço reorganizado; equação por serviço
+
+Pedido do utilizador depois da revisão:
+1. **Validação, Dicionário e testador de extracção removidos da interface e da API.** O médico já
+   declara os pedidos no assistente; a tradução do agente deixou de ser necessária. O único pedido dos
+   dados que ainda esperava validação (TC do José) segue o circuito no arranque (`server/motor/arranque.ts`),
+   como se o médico o tivesse acabado de declarar: o caso 2 começa com a proposta de troca já pronta.
+2. **Troca de vaga reserva a vaga de destino.** Estava por reservar: se outra marcação a ocupasse antes
+   da aprovação, a troca punha dois doentes na mesma vaga. Consequência na demo: o Manuel passa para
+   14/10 08:00 e o TC da Maria fica a 14/10 08:20 (testes e guião actualizados).
+3. **Semáforo usa o intervalo da própria dependência** (o mesmo que o agendamento). Com os 2 dias
+   genéricos das análises, as 7 creatininas da R1 marcadas na véspera do TC davam vermelho falso.
+4. **Alertas: o que são e o que fazem.** Os que implicam mudar uma marcação (falta, avaria, ausência,
+   sem vaga a tempo, troca, sem vaga no prazo) têm sempre sugestão + porquê + validação da administrativa
+   em "Para decidir". Os restantes são avisos com o que fazer; "Visto" já não os reabre na acção seguinte.
+   "Sem vaga no prazo" passa a sugerir a primeira vaga (com os dias de atraso) e a permitir aceitá-la.
+5. **Serviço em 6 separadores** por tipo de trabalho: Para decidir · Vagas libertadas · Chamadas ·
+   Pedidos e avisos · Estatísticas · Definições. Saíram "Marcações em risco" e "Alertas e pendências"
+   (duplicavam as remarcações) e o "adiar e libertar vaga" que mudava marcações sem proposta.
+6. **Equação do índice configurável por serviço** (todas as variáveis da R-J), com pré-visualização da
+   fila reordenada antes de guardar. Os valores por omissão dão exactamente os índices anteriores.
+7. **Os meus doentes (médico):** lista + percurso em vez de 120 cartões; situação única por doente
+   (precisa de atenção / por marcar / tudo marcado / concluído) com o porquê.
+8. Páginas com a mesma largura do cabeçalho; o diário da consulta ocupa metade do ecrã.

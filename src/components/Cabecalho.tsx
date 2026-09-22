@@ -9,8 +9,6 @@ import {
   AlertTriangle,
   Activity,
   Layers,
-  FileCheck2,
-  BookOpen,
   Filter,
   Inbox,
   Building2,
@@ -28,8 +26,6 @@ const ICONES_NAV: Record<string, React.ElementType> = {
   "/": Activity,
   "/oasis/medico": Stethoscope,
   "/oasis/agendas": Layers,
-  "/validacao": FileCheck2,
-  "/dicionario": BookOpen,
   "/triagem": Filter,
   "/meus-pedidos": Inbox,
   "/servico": Building2,
@@ -48,7 +44,7 @@ const INICIO: ItemNav = { caminho: "/", etiqueta: "Início" };
  */
 const NAV_POR_PERFIL: Record<string, ItemNav[]> = {
   MEDICO: [INICIO, { caminho: "/oasis/medico", etiqueta: "Oasis · Médico" }, { caminho: "/meus-pedidos", etiqueta: "Meus Pedidos" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }],
-  ADMINISTRATIVO: [INICIO, { caminho: "/validacao", etiqueta: "Validação" }, { caminho: "/servico", etiqueta: "Serviço" }, { caminho: "/dicionario", etiqueta: "Dicionário" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }],
+  ADMINISTRATIVO: [INICIO, { caminho: "/servico", etiqueta: "Serviço" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }],
   TRIADOR: [INICIO, { caminho: "/triagem", etiqueta: "Triagem" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }],
   GESTAO: [INICIO, { caminho: "/gestao", etiqueta: "Gestão" }],
   TECNICO: [INICIO, { caminho: "/tecnico", etiqueta: "Técnico" }],

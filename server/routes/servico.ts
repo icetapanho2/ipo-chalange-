@@ -1,22 +1,21 @@
 import { Router } from "express";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
-import { apenasData, diferencaDias, parseIso, somarDias } from "../util.ts";
-import { aprovarPropostaTroca, rejeitarPropostaTroca, contarVagasLivres, janelaAgendamento } from "../motor/agendamento.ts";
-import { resolverAlerta } from "../motor/alertas.ts";
-import { calcularSemaforo } from "../motor/semaforo.ts";
+import { apenasData, diferencaDias, formatarDataPt, parseIso, somarDias } from "../util.ts";
+import { aprovarPropostaTroca, rejeitarPropostaTroca, contarVagasLivres, encontrarVagaLivre, janelaAgendamento, marcarPedidoNaVaga } from "../motor/agendamento.ts";
+import { recalcularAlertas, resolverAlerta } from "../motor/alertas.ts";
+import { VARIAVEIS_INDICE_OMISSAO, calcularIndice, variaveisIndice, type VariaveisIndice } from "../motor/indice.ts";
 import { reportarAvaria, resolverAvaria } from "../motor/avarias.ts";
 import {
   aceitarPlanoAvaria,
   aceitarPropostaRemarcacao,
   actualizarSugestaoFalta,
-  propostaFaltaPendente,
   rejeitarPropostaRemarcacao,
   resolverComVagaExtra,
   resolverComOutsourcing,
   pedirDecisaoAoMedico,
 } from "../motor/propostasRemarcacao.ts";
-import { remarcarPedido, adiarConsulta, marcarOutsourcing, pedirDecisaoMedico } from "../motor/fluxo.ts";
+import { marcarOutsourcing, pedirDecisaoMedico } from "../motor/fluxo.ts";
 import { desmarcarAPedidoDoDoente, expirarOfertas, responderOferta } from "../motor/antecipacao.ts";
 import { encaixesSugeridos, listaChamadas, registarChamada } from "../motor/chamadas.ts";
 import { PESOS_PRIORIDADE_OMISSAO, pesosPrioridadeDoServico } from "../motor/prioridade.ts";
@@ -62,7 +61,31 @@ export function criarRotasServico(store: typeof StoreType) {
       estado_legivel: descreverEstado(p.estado),
       n_remarcacoes: p.n_remarcacoes,
       decisao_pendente: !!p.decisao_pendente,
+      primeira_vaga: p.estado === "SEM_VAGA" ? primeiraVagaForaDoPrazo(p) : null,
+      sem_sugestao: p.estado === "SEM_VAGA" && !primeiraVagaForaDoPrazo(p) ? porqueSemVaga(p) : "",
+      data_marcada: p.ato_id ? store.atosMedicos.find((a) => a.mvp_ato_id === p.ato_id)?.data_hora ?? "" : "",
     };
+  }
+
+  /** Porque não há nenhuma vaga a sugerir (em linguagem simples). */
+  function porqueSemVaga(p: Pedido): string {
+    const { inicio } = janelaAgendamento(p, apenasData(agora()));
+    const ultima = store.vagas
+      .filter((v) => v.especialidade_codigo === p.especialidade_destino)
+      .reduce((m, v) => (v.data_hora > m ? v.data_hora : m), "");
+    const naoAntes = inicio.getTime() > somarDias(apenasData(agora()), 1).getTime() ? `Não pode ser antes de ${formatarDataPt(inicio)} (precisa dos resultados de que depende)` : "Não há vaga livre compatível";
+    return ultima && parseIso(ultima).getTime() < inicio.getTime()
+      ? `${naoAntes} e a agenda aberta do serviço só vai até ${formatarDataPt(parseIso(ultima))}.`
+      : `${naoAntes} nos 90 dias seguintes ao prazo.`;
+  }
+
+  /** Sem vaga no prazo: a primeira vaga que existe depois dele (sugestão; a administrativa decide). */
+  function primeiraVagaForaDoPrazo(p: Pedido): { vaga_id: string; data_hora: string; dias_fora: number } | null {
+    const { inicio } = janelaAgendamento(p, apenasData(agora()));
+    const prazo = parseIso(p.prazo_limite);
+    const vaga = encontrarVagaLivre(p.especialidade_destino, p.ato_codigo, inicio, somarDias(prazo, 90), undefined, { pedido: p, quando: agora() });
+    if (!vaga) return null;
+    return { vaga_id: vaga.vaga_id, data_hora: vaga.data_hora, dias_fora: Math.max(0, diferencaDias(apenasData(parseIso(vaga.data_hora)), prazo)) };
   }
 
   router.get("/pedidos", (req, res) => {
@@ -88,14 +111,24 @@ export function criarRotasServico(store: typeof StoreType) {
     const especialidade = especialidadeDoUtilizador(req.utilizadorId);
     const alertas = store.alertas
       .filter((a) => a.estado === "ABERTO" && a.especialidade === especialidade)
-      .map((a) => ({
-        alerta_id: a.alerta_id,
-        tipo: a.tipo,
-        gravidade: a.gravidade,
-        descricao: a.descricao,
-        doente_nome: a.doente_id ? descreverDoente(a.doente_id) : "",
-        criado_em: a.criado_em,
-      }));
+      .map((a) => {
+        const pedido = store.pedidos.find((p) => p.pedido_id === a.pedido_id);
+        const ato = pedido?.ato_id ? store.atosMedicos.find((x) => x.mvp_ato_id === pedido.ato_id) : undefined;
+        // Já há uma remarcação proposta (falta, avaria) para este doente? Então o aviso é só informativo.
+        const proposta = store.propostasRemarcacao.find((r) => r.doente_id === a.doente_id && r.estado === "PENDENTE");
+        return {
+          alerta_id: a.alerta_id,
+          tipo: a.tipo,
+          gravidade: a.gravidade,
+          descricao: a.descricao,
+          doente_id: a.doente_id,
+          doente_nome: a.doente_id ? descreverDoente(a.doente_id) : "",
+          pedido_descricao: pedido ? descreverPedido(pedido) : "",
+          data_marcada: pedido?.estado === "MARCADO" ? ato?.data_hora ?? "" : "",
+          tratado: proposta ? `Remarcação já proposta a ${descreverEspecialidade(proposta.especialidade)}, à espera de validação.` : "",
+          criado_em: a.criado_em,
+        };
+      });
     res.json(alertas);
   });
 
@@ -352,89 +385,23 @@ export function criarRotasServico(store: typeof StoreType) {
     res.json({ ok: true });
   });
 
-  // Consultas em risco (semáforo vermelho) nos próximos `semaforo_horizonte_dias` (secção 11).
-  router.get("/consultas-em-risco", (req, res) => {
-    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
-    const hoje = apenasData(agora());
-    const horizonte = store.parametros.semaforo_horizonte_dias;
-    const emRisco = store.pedidos
-      .filter((p) => p.especialidade_destino === especialidade)
-      .map((p) => ({ pedido: p, semaforo: calcularSemaforo(p, hoje, horizonte) }))
-      .filter((x) => x.semaforo?.cor === "vermelho")
-      .map(({ pedido, semaforo }) => {
-        const ato = store.atosMedicos.find((a) => a.mvp_ato_id === pedido.ato_id);
-        return {
-          pedido_id: pedido.pedido_id,
-          doente_id: pedido.doente_id,
-          doente_nome: descreverDoente(pedido.doente_id),
-          descricao: descreverPedido(pedido),
-          data_hora: ato?.data_hora ?? "",
-          porque: semaforo!.porque,
-        };
-      })
-      .sort((a, b) => a.data_hora.localeCompare(b.data_hora));
-    res.json(emRisco);
-  });
-
-  // Fila para rever: faltas por remarcar e consultas em risco (semáforo vermelho) que o sistema
-  // já sugere resolver, mas a admin decide (ou aplica directamente) — nunca acontece sozinho.
-  router.get("/para-rever", (req, res) => {
-    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
-    const hoje = apenasData(agora());
-    const horizonte = store.parametros.semaforo_horizonte_dias;
-
-    const faltas = store.pedidos
-      .filter((p) => p.estado === "FALTOU" && p.especialidade_destino === especialidade)
-      .map((p) => ({
-        pedido_id: p.pedido_id,
-        doente_nome: descreverDoente(p.doente_id),
-        descricao: descreverPedido(p),
-        prioridade_legivel: descreverPrioridade(p.prioridade),
-        prazo_limite: p.prazo_limite,
-        n_remarcacoes: p.n_remarcacoes,
-        sugestao: "O doente faltou; o sistema sugere remarcar para a primeira vaga livre dentro do prazo.",
-        accao: "remarcar" as const,
-      }));
-
-    const emRisco = store.pedidos
-      .filter((p) => p.especialidade_destino === especialidade && p.estado === "MARCADO")
-      .map((p) => ({ pedido: p, semaforo: calcularSemaforo(p, hoje, horizonte) }))
-      .filter((x) => x.semaforo?.cor === "vermelho")
-      .map(({ pedido, semaforo }) => ({
-        pedido_id: pedido.pedido_id,
-        doente_nome: descreverDoente(pedido.doente_id),
-        descricao: descreverPedido(pedido),
-        prioridade_legivel: descreverPrioridade(pedido.prioridade),
-        prazo_limite: pedido.prazo_limite,
-        n_remarcacoes: pedido.n_remarcacoes,
-        sugestao: `Dependência em risco: ${semaforo!.porque}. O sistema sugere adiar esta marcação para libertar a vaga.`,
-        accao: "adiar" as const,
-      }));
-
-    res.json({ faltas, emRisco });
-  });
-
-  router.post("/pedidos/:id/remarcar", (req, res) => {
+  // Sem vaga no prazo: a administrativa aceita a primeira vaga depois do prazo (fica registado porquê).
+  router.post("/pedidos/:id/aceitar-primeira-vaga", (req, res) => {
     const especialidade = especialidadeDoUtilizador(req.utilizadorId);
     const pedido = store.pedidos.find((p) => p.pedido_id === req.params.id && p.especialidade_destino === especialidade);
-    if (!pedido || pedido.estado !== "FALTOU") {
-      res.status(404).json({ erro: "Pedido não encontrado ou não está em falta por remarcar." });
+    const sugestao = pedido && pedido.estado === "SEM_VAGA" ? primeiraVagaForaDoPrazo(pedido) : null;
+    const vaga = sugestao ? store.vagas.find((v) => v.vaga_id === sugestao.vaga_id) : undefined;
+    if (!pedido || !sugestao || !vaga) {
+      res.status(404).json({ erro: "Pedido não encontrado, já tem vaga, ou não há vaga nos 90 dias seguintes ao prazo." });
       return;
     }
-    const proposta = propostaFaltaPendente(pedido.pedido_id);
-    if (proposta) aceitarPropostaRemarcacao(proposta.proposta_id, req.utilizadorId, agora());
-    else remarcarPedido(pedido, req.utilizadorId, agora());
-    res.json({ ok: true, pedido: pedidoResumo(pedido) });
-  });
-
-  router.post("/pedidos/:id/adiar", (req, res) => {
-    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
-    const pedido = store.pedidos.find((p) => p.pedido_id === req.params.id && p.especialidade_destino === especialidade);
-    if (!pedido || pedido.estado !== "MARCADO") {
-      res.status(404).json({ erro: "Pedido não encontrado ou não está marcado." });
-      return;
-    }
-    adiarConsulta(pedido, req.utilizadorId, agora());
+    marcarPedidoNaVaga(
+      pedido,
+      vaga,
+      agora(),
+      `Sem vaga até ao prazo: primeira vaga disponível, ${sugestao.dias_fora} dia(s) depois — aceite pela administrativa`,
+    );
+    recalcularAlertas(agora());
     res.json({ ok: true, pedido: pedidoResumo(pedido) });
   });
 
@@ -476,7 +443,11 @@ export function criarRotasServico(store: typeof StoreType) {
     const especialidade = especialidadeDoUtilizador(req.utilizadorId);
     const hoje = apenasData(agora());
     const pendentes = store.pedidos.filter(
-      (p) => p.especialidade_destino === especialidade && (p.estado === "ACEITE" || p.estado === "EM_TRIAGEM"),
+      (p) =>
+        p.especialidade_destino === especialidade &&
+        (p.estado === "ACEITE" || p.estado === "EM_TRIAGEM") &&
+        // quem já tem uma troca proposta está em "Para decidir"
+        !store.propostasTroca.some((t) => t.pedido_urgente === p.pedido_id && t.estado === "PENDENTE"),
     );
 
     const grupos = new Map<string, Pedido[]>();
@@ -602,6 +573,90 @@ export function criarRotasServico(store: typeof StoreType) {
     }
     delete store.pesosPrioridadePorServico[especialidade];
     res.json({ ok: true, pesos: PESOS_PRIORIDADE_OMISSAO });
+  });
+
+  // ------------------------------------------------ equação do índice de prioridade deste serviço
+  // Cada serviço ajusta as variáveis; a pré-visualização mostra como muda a ordem da fila antes de guardar.
+  const ESTADOS_FILA = new Set(["ACEITE", "SEM_VAGA", "FALTOU", "MARCADO", "EM_TRIAGEM"]);
+
+  function filaOrdenada(especialidade: string, v: VariaveisIndice) {
+    const quando = agora();
+    return store.pedidos
+      .filter((p) => p.especialidade_destino === especialidade && ESTADOS_FILA.has(p.estado))
+      .map((p) => {
+        const { valor, parcelas } = calcularIndice(p, quando, v);
+        const doente = store.doentes.find((d) => d.doente_id === p.doente_id);
+        return {
+          pedido_id: p.pedido_id,
+          doente_nome: descreverDoente(p.doente_id),
+          prioridade: p.prioridade,
+          estadio: descreverEstadioCuidado(doente?.estadio_cuidado ?? ""),
+          prazo_limite: p.prazo_limite,
+          indice: valor,
+          parcelas,
+        };
+      })
+      .sort((a, b) => b.indice - a.indice || a.prazo_limite.localeCompare(b.prazo_limite));
+  }
+
+  function lerVariaveis(corpo: unknown): VariaveisIndice | null {
+    const v = { ...VARIAVEIS_INDICE_OMISSAO };
+    for (const chave of Object.keys(v) as (keyof VariaveisIndice)[]) {
+      const n = Number((corpo as Record<string, unknown>)?.[chave]);
+      if (!Number.isFinite(n) || n < 0 || n > 1000) return null;
+      v[chave] = n;
+    }
+    return v;
+  }
+
+  router.get("/indice", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    if (!especialidade) {
+      res.status(400).json({ erro: "O perfil seleccionado não tem especialidade associada." });
+      return;
+    }
+    const v = variaveisIndice(especialidade);
+    res.json({
+      especialidade_legivel: descreverEspecialidade(especialidade),
+      variaveis: v,
+      omissao: VARIAVEIS_INDICE_OMISSAO,
+      personalizado: !!store.indicePorServico[especialidade],
+      fila: filaOrdenada(especialidade, v).slice(0, 12),
+    });
+  });
+
+  // Simula (não guarda): a mesma fila com as variáveis propostas.
+  router.post("/indice/simular", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    const v = lerVariaveis(req.body);
+    if (!especialidade || !v) {
+      res.status(400).json({ erro: "Valores inválidos (números entre 0 e 1000)." });
+      return;
+    }
+    res.json({ fila: filaOrdenada(especialidade, v).slice(0, 12) });
+  });
+
+  router.post("/indice", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    const v = lerVariaveis(req.body);
+    if (!especialidade || !v) {
+      res.status(400).json({ erro: "Valores inválidos (números entre 0 e 1000)." });
+      return;
+    }
+    store.indicePorServico[especialidade] = { ...v };
+    recalcularAlertas(agora()); // recalcula e guarda o índice de todos os pedidos
+    res.json({ ok: true, variaveis: v });
+  });
+
+  router.post("/indice/repor", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    if (!especialidade) {
+      res.status(400).json({ erro: "O perfil seleccionado não tem especialidade associada." });
+      return;
+    }
+    delete store.indicePorServico[especialidade];
+    recalcularAlertas(agora());
+    res.json({ ok: true, variaveis: VARIAVEIS_INDICE_OMISSAO });
   });
 
   // Estatísticas do serviço: tempo até agendamento (mediana + outliers), filtrável por estádio

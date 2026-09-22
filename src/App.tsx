@@ -6,8 +6,6 @@ import { OasisMedico } from "./pages/oasis/Medico";
 import { OasisConsulta } from "./pages/oasis/Consulta";
 import { OasisPedidosPosConsulta } from "./pages/oasis/PedidosPosConsulta";
 import { OasisAgendas } from "./pages/oasis/Agendas";
-import { Validacao } from "./pages/Validacao";
-import { Dicionario } from "./pages/Dicionario";
 import { Triagem } from "./pages/Triagem";
 import { MeusPedidos } from "./pages/MeusPedidos";
 import { Servico } from "./pages/Servico";
@@ -32,8 +30,6 @@ export function App() {
         <Route path="/oasis/medico/:atoId" element={<OasisConsulta />} />
         <Route path="/oasis/medico/:atoId/pedidos" element={<OasisPedidosPosConsulta />} />
         <Route path="/oasis/agendas" element={<OasisAgendas />} />
-        <Route path="/validacao" element={<Validacao />} />
-        <Route path="/dicionario" element={<Dicionario />} />
         <Route path="/triagem" element={<Triagem />} />
         <Route path="/meus-pedidos" element={<MeusPedidos />} />
         <Route path="/servico" element={<Servico />} />

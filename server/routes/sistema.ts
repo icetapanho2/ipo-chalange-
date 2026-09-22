@@ -1,9 +1,8 @@
 import { Router } from "express";
-import { gerarPropostasFaltasPendentes } from "../motor/propostasRemarcacao.ts";
+import { prepararEstadoInicial } from "../motor/arranque.ts";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
 import { isoDataHora } from "../util.ts";
-import { recalcularAlertas } from "../motor/alertas.ts";
 
 export function criarRotasSistema(store: typeof StoreType) {
   const router = Router();
@@ -46,8 +45,7 @@ export function criarRotasSistema(store: typeof StoreType) {
 
   router.post("/repor-demo", (_req, res) => {
     store.carregar();
-    recalcularAlertas(agora());
-    gerarPropostasFaltasPendentes(agora());
+    prepararEstadoInicial(agora());
     res.json({ ok: true, recarregadoEm: isoDataHora(agora()) });
   });
 

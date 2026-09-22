@@ -27,14 +27,6 @@ interface AtoAgenda {
   ato_id: string;
   data_hora: string;
 }
-interface GrupoValidacao {
-  chave: string;
-  consulta_ato_id: string;
-  doente_id: string;
-  medico_id: string;
-  pedidos: { pedido_id: string; tipo_pedido: string }[];
-  alertas: { alerta_id: string; descricao: string }[];
-}
 interface ItemTimeline {
   pedido_id: string;
   tipo: string;
@@ -45,13 +37,6 @@ function dataDaMarcacao(timeline: ItemTimeline[], pedidoId: string): string | nu
   const evento = timeline.find((e) => e.pedido_id === pedidoId && e.tipo === "MARCACAO");
   const m = evento?.detalhe.match(/(\d{2}\/\d{2}\/\d{4}) (\d{2}:\d{2})/);
   return m ? `${m[1]} ${m[2]}` : null;
-}
-
-async function grupoDoDoente(doenteId: string, utilizadorId: string): Promise<GrupoValidacao> {
-  const grupos = await get<GrupoValidacao[]>("/api/validacao/consultas", utilizadorId);
-  const grupo = grupos.find((g) => g.doente_id === doenteId);
-  if (!grupo) throw new Error(`Sem grupo de validação para o doente ${doenteId}`);
-  return grupo;
 }
 
 /** Corre os 8 passos do guião pela API real e devolve um retrato dos resultados. */
@@ -82,13 +67,11 @@ async function correrGuiao() {
   for (const p of respMaria.pedidos) resultado[`maria_${p.tipo_pedido}`] = dataDaMarcacao(doente100101.timeline, p.pedido_id);
 
   // 2. José (100104)
-  const grupoJose = await grupoDoDoente("100104", "U03");
-  await post("/api/validacao/aprovar", "U03", { pedidoIds: grupoJose.pedidos.map((p) => p.pedido_id) });
   const propostasRadiologia = await get<{ proposta_id: string; pedido_urgente_doente: string }[]>("/api/servico/propostas", "U07");
   const propostaJose = propostasRadiologia.find((p) => p.pedido_urgente_doente.includes("José"))!;
   await post(`/api/servico/propostas/${propostaJose.proposta_id}/aprovar`, "U07");
   const doente100104 = await get<{ timeline: ItemTimeline[] }>("/api/doente/100104", "U03");
-  resultado.jose_tc = dataDaMarcacao(doente100104.timeline, grupoJose.pedidos[0].pedido_id);
+  resultado.jose_tc = dataDaMarcacao(doente100104.timeline, "P00007");
 
   // 3. Rosa (100105)
   const atoRosa = agendaU01.atos.find((a) => a.data_hora === "2026-09-23T09:50")!;
@@ -200,7 +183,7 @@ describe("Guião da demo pela API (Fase 9)", () => {
     const primeiraPassagem = await correrGuiao();
 
     expect(primeiraPassagem.maria_analises).toBe("24/09/2026 07:30");
-    expect(primeiraPassagem.maria_exame).toBe("14/10/2026 08:00");
+    expect(primeiraPassagem.maria_exame).toBe("14/10/2026 08:20");
     expect(primeiraPassagem.maria_consulta).toBe("21/10/2026 08:30");
     expect(primeiraPassagem.jose_tc).toBe("02/10/2026 10:00");
     expect(primeiraPassagem.rosa_cvc).toBe("24/09/2026 09:00");

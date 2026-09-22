@@ -107,7 +107,7 @@ const SECAO_DIARIO = {
     "cólon estádio III sob vigilância, boa evolução. Vigilância pós-adjuvante; rever com TC de reestadiamento e analítica.",
 };
 
-/** Cartão no estilo usado no resto do site (Triagem, Validação, Serviço): branco, cabeçalho leve. */
+/** Cartão no estilo usado no resto do site (Triagem, Serviço): branco, cabeçalho leve. */
 function Painel({ titulo, acoes, children }: { titulo?: string; acoes?: ReactNode; children: ReactNode }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -178,7 +178,7 @@ export function OasisConsulta() {
     }
   }
 
-  // Grava o diário (documentação livre, sem Agente Oasis) e segue directamente para o
+  // Grava o diário (documentação livre) e segue directamente para o
   // assistente de pedidos: o médico declara o que pretende, sem etapa intermédia.
   async function guardarESeguir() {
     if (!atoId) return;
@@ -194,7 +194,7 @@ export function OasisConsulta() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+    <div className="mx-auto max-w-7xl px-4 py-6">
       {/* Cabeçalho da página, igual ao resto do site */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
@@ -246,7 +246,7 @@ export function OasisConsulta() {
           <span>A carregar consulta e prontuário do utente…</span>
         </div>
       ) : (
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
           {/* PAINEL ESQUERDO: DOENTE E DADOS DO ATO */}
           <div className="space-y-3">
             <Painel titulo="Identificação do Utente">
@@ -503,8 +503,7 @@ export function OasisConsulta() {
                 </div>
                 <textarea
                   id="campo-diario"
-                  className="w-full rounded border border-slate-300 bg-white p-2.5 text-xs text-slate-800 leading-relaxed transition-colors focus:outline-none focus:border-oasis-accent"
-                  rows={10}
+                  className="min-h-[50vh] w-full resize-y rounded border border-slate-300 bg-white p-3 text-sm text-slate-800 leading-relaxed transition-colors focus:outline-none focus:border-oasis-accent"
                   value={diario}
                   onChange={(e) => setDiario(e.target.value)}
                   placeholder={SECAO_DIARIO.ajuda}

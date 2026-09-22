@@ -53,6 +53,11 @@ export function recalcularAlertas(quando: Date = agora()): void {
   recalcularIndices(quando);
   store.alertas = store.alertas.filter((a) => !(TIPOS_AUTOMATICOS.includes(a.tipo) && a.estado === "ABERTO"));
 
+  // Um alerta automático que a administrativa já marcou como visto não volta a abrir para o mesmo pedido.
+  const vistos = new Set(store.alertas.filter((a) => a.estado === "RESOLVIDO").map((a) => `${a.tipo}:${a.pedido_id}`));
+  const criarAlerta: typeof criarAlertaBase = (campos, q) =>
+    vistos.has(`${campos.tipo}:${campos.pedido_id}`) ? (campos as Alerta) : criarAlertaBase(campos, q);
+
   const hoje = apenasData(quando);
   const horizonte = store.parametros.semaforo_horizonte_dias;
   const diasTriagemParada = store.parametros.alerta_triagem_parada_dias;
@@ -194,3 +199,5 @@ function descricaoPedido(p: Pedido): string {
   );
   return catalogo?.ato_descricao ?? p.tipo_pedido;
 }
+
+const criarAlertaBase = criarAlerta;

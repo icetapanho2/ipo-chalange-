@@ -212,7 +212,7 @@ export function Doente() {
 
   if (!dados) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-12 flex justify-center text-slate-500 gap-2 items-center">
+      <div className="mx-auto max-w-7xl px-4 py-12 flex justify-center text-slate-500 gap-2 items-center">
         <Clock className="h-5 w-5 animate-spin text-oasis-header" />
         <span>A carregar perfil clínico e diagnóstico de prontidão…</span>
       </div>
@@ -223,7 +223,7 @@ export function Doente() {
   const temAmarelos = dados.oQueFalta?.some((it) => it.nivel === "amarelo");
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+    <div className="mx-auto max-w-7xl px-4 py-6">
       {/* Botão Voltar */}
       <div className="mb-3">
         <Link

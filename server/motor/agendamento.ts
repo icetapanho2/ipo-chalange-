@@ -363,6 +363,9 @@ function procurarTrocaSegura(
     escolhido_regra_antiga: regraAntiga?.doente_nome ?? "",
   };
   store.propostasTroca.push(proposta);
+  // A vaga para onde o ocupante vai fica reservada até à decisão (senão outra marcação podia ocupá-la).
+  const destino = store.vagas.find((v) => v.vaga_id === proposta.vaga_destino);
+  if (destino) destino.reserva_id = proposta.proposta_id;
   registarEvento(pedidoUrgente, "PROPOSTA_TROCA", "", "AGENTE", {
     motivo: "Sem vaga directa; proposta de troca segura gerada",
     detalhe: proposta.proposta_id,
@@ -392,6 +395,7 @@ export function aprovarPropostaTroca(propostaId: string, utilizadorId: string, q
   atoOcupante.mvp_n_remarcacoes += 1;
   atoOcupante.data_atualizacao = isoDataHora(quando);
   vagaDestino.ato_id = atoOcupante.mvp_ato_id;
+  vagaDestino.reserva_id = "";
   pedidoOcupante.n_remarcacoes += 1;
   registarEvento(pedidoOcupante, "REMARCACAO", pedidoOcupante.estado, "SISTEMA", {
     motivo: "Troca segura aprovada",
@@ -414,6 +418,8 @@ export function rejeitarPropostaTroca(propostaId: string, utilizadorId: string, 
   proposta.estado = "REJEITADA";
   proposta.decidido_por = utilizadorId;
   proposta.decidido_em = isoDataHora(quando);
+  const destino = store.vagas.find((v) => v.vaga_id === proposta.vaga_destino);
+  if (destino && destino.reserva_id === proposta.proposta_id) destino.reserva_id = "";
   const pedidoUrgente = store.pedidos.find((p) => p.pedido_id === proposta.pedido_urgente);
   if (pedidoUrgente && pedidoUrgente.estado === "ACEITE") {
     pedidoUrgente.estado = "SEM_VAGA";

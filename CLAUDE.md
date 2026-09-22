@@ -35,6 +35,8 @@ O projecto vai ser importado mais tarde para o **Google AI Studio (Build mode)**
 8. Etiqueta visível **"Dados simulados"** no dashboard de gestão.
 
 ## Extracção
+> **Desde 23/09/2026** o médico declara os pedidos no assistente da consulta: a extracção por IA, a Validação e o Dicionário saíram da interface (decisão do utilizador, ver `DECISOES.md`). `server/extracao/` fica com os seus testes, sem uso nos ecrãs. Não voltar a pôr estas páginas sem perguntar.
+
 - Interface única: `extrair(texto, medicoId, doenteId) → { pedidos[], alertas[] }`.
 - Pipeline: dicionário (global + do médico) → LLM → validação contra o catálogo → regras R1–R3 → confiança.
 - Fornecedores (variável `EXTRACTOR`):

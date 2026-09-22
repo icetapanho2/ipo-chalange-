@@ -17,20 +17,62 @@ import type { ParcelaCusto, Pedido } from "../types.ts";
  */
 
 const ESTADOS_ACTIVOS = new Set(["EXTRAIDO", "VALIDADO", "EM_TRIAGEM", "ACEITE", "MARCADO", "SEM_VAGA", "FALTOU", "DEVOLVIDO"]);
-const PONTOS_NIVEL = { MP: 400, P: 250, N: 100 } as const;
 
-export function calcularIndice(pedido: Pedido, quando: Date): { valor: number; parcelas: ParcelaCusto[] } {
+/** Variáveis da equação do índice. Cada serviço pode ajustar as suas (Serviço → Definições). */
+export interface VariaveisIndice {
+  nivel_mp: number;
+  nivel_p: number;
+  nivel_n: number;
+  prazo_max: number; // pontos quando o prazo termina hoje
+  prazo_por_dia: number; // perde-se isto por cada dia de folga
+  fora_prazo_por_dia: number; // soma-se isto por cada dia fora do prazo
+  fora_prazo_max: number;
+  diagnostico: number;
+  tratamento: number;
+  score_clinico_peso: number; // multiplica o score clínico (0–100)
+  remarcacao_por: number;
+  remarcacao_max: number;
+  espera_por_dia: number;
+  espera_max: number;
+}
+
+export const VARIAVEIS_INDICE_OMISSAO: VariaveisIndice = {
+  nivel_mp: 400,
+  nivel_p: 250,
+  nivel_n: 100,
+  prazo_max: 200,
+  prazo_por_dia: 5,
+  fora_prazo_por_dia: 5,
+  fora_prazo_max: 100,
+  diagnostico: 80,
+  tratamento: 60,
+  score_clinico_peso: 1,
+  remarcacao_por: 50,
+  remarcacao_max: 100,
+  espera_por_dia: 1,
+  espera_max: 30,
+};
+
+export function variaveisIndice(especialidade: string): VariaveisIndice {
+  return { ...VARIAVEIS_INDICE_OMISSAO, ...(store.indicePorServico[especialidade] ?? {}) };
+}
+
+export function calcularIndice(pedido: Pedido, quando: Date, v: VariaveisIndice = variaveisIndice(pedido.especialidade_destino)): { valor: number; parcelas: ParcelaCusto[] } {
   const hoje = apenasData(quando);
   const parcelas: ParcelaCusto[] = [];
-  parcelas.push({ rotulo: `nível ${pedido.prioridade}`, pontos: PONTOS_NIVEL[pedido.prioridade] ?? 100 });
+  const nivel = { MP: v.nivel_mp, P: v.nivel_p, N: v.nivel_n }[pedido.prioridade] ?? v.nivel_n;
+  parcelas.push({ rotulo: `nível ${pedido.prioridade}`, pontos: nivel });
 
   const folga = diferencaDias(parseIso(pedido.prazo_limite), hoje);
-  if (folga < 0) parcelas.push({ rotulo: `${-folga} dias fora do prazo`, pontos: 200 + Math.min(100, -folga * 5) });
-  else if (folga < 40) parcelas.push({ rotulo: folga === 0 ? "prazo termina hoje" : `prazo em ${folga} dias`, pontos: 200 - folga * 5 });
+  if (folga < 0) parcelas.push({ rotulo: `${-folga} dias fora do prazo`, pontos: v.prazo_max + Math.min(v.fora_prazo_max, -folga * v.fora_prazo_por_dia) });
+  else {
+    const pontos = v.prazo_max - folga * v.prazo_por_dia;
+    if (pontos > 0) parcelas.push({ rotulo: folga === 0 ? "prazo termina hoje" : `prazo em ${folga} dias`, pontos });
+  }
 
   const doente = store.doentes.find((d) => d.doente_id === pedido.doente_id);
-  if (doente?.estadio_cuidado === "NOVO" || doente?.estadio_cuidado === "PRE_TRATAMENTO") parcelas.push({ rotulo: "em diagnóstico", pontos: 80 });
-  else if (doente?.estadio_cuidado === "EM_TRATAMENTO") parcelas.push({ rotulo: "em tratamento", pontos: 60 });
+  if (doente?.estadio_cuidado === "NOVO" || doente?.estadio_cuidado === "PRE_TRATAMENTO") parcelas.push({ rotulo: "em diagnóstico", pontos: v.diagnostico });
+  else if (doente?.estadio_cuidado === "EM_TRATAMENTO") parcelas.push({ rotulo: "em tratamento", pontos: v.tratamento });
 
   const score =
     pedido.score_prioridade ??
@@ -40,15 +82,15 @@ export function calcularIndice(pedido: Pedido, quando: Date): { valor: number; p
       undefined,
       pedido.especialidade_destino,
     ).score;
-  parcelas.push({ rotulo: `score clínico ${score}`, pontos: score });
+  parcelas.push({ rotulo: `score clínico ${score}`, pontos: Math.round(score * v.score_clinico_peso) });
 
   const rem = remarcacoesHospital(pedido.doente_id, quando);
-  if (rem > 0) parcelas.push({ rotulo: `já remarcado ${rem}× pelo hospital`, pontos: Math.min(100, rem * 50) });
+  if (rem > 0) parcelas.push({ rotulo: `já remarcado ${rem}× pelo hospital`, pontos: Math.min(v.remarcacao_max, rem * v.remarcacao_por) });
 
   const espera = diferencaDias(hoje, apenasData(parseIso(pedido.criado_em)));
-  if (espera > 0) parcelas.push({ rotulo: `${espera} dias à espera`, pontos: Math.min(30, espera) });
+  if (espera > 0) parcelas.push({ rotulo: `${espera} dias à espera`, pontos: Math.min(v.espera_max, Math.round(espera * v.espera_por_dia)) });
 
-  return { valor: parcelas.reduce((s, p) => s + p.pontos, 0), parcelas };
+  return { valor: parcelas.filter((p) => p.pontos !== 0).reduce((s, p) => s + p.pontos, 0), parcelas: parcelas.filter((p) => p.pontos !== 0) };
 }
 
 /** Recalcula e guarda o índice (e, para quem está marcado, o custo de o remarcar) de todos os pedidos activos. */

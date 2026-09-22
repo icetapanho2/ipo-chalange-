@@ -81,6 +81,8 @@ Desvios: `DEVOLVIDO` (pedir informação / correcção pelo médico), `RECUSADO`
 
 ## 6. Extracção (o único ponto com IA)
 
+> **Actualização 23/09/2026 (decisão do utilizador):** o médico passou a declarar os pedidos no assistente da consulta, por isso a extracção por IA, a fila de **Validação** e o **Dicionário** saíram da interface. O módulo `server/extracao/` e os seus testes ficam no repositório, sem uso nos ecrãs. As secções 6 e 7 descrevem o desenho original.
+
 Pipeline, por esta ordem:
 1. **Normalização por dicionário** (determinística): termos globais + termos do médico requisitante.
 2. **LLM** com saída em JSON schema. O prompt inclui o catálogo (códigos válidos), o dicionário, as correcções anteriores desse médico e a regra: *se não reconheceres um termo ou serviço, devolve-o em `alertas` e não inventes*.
@@ -122,7 +124,7 @@ Alargamento aprovado pelo dono do produto (22/09/2026). Tudo determinístico em 
 - **R-F — Remarcação inevitável** (avaria): continua automática; quem já tinha sido remarcado escolhe primeiro e gera alerta `SEGUNDA_REMARCACAO` (alta).
 - **R-G — Aviso, preparação e lista de chamadas:** cada marcação gera aviso ao doente com a preparação (`preparacoes.csv`, texto provisório) e lembrete a D-3 (simulados). A lista de chamadas do serviço inclui só marcações dos próximos 10 dias com risco ≥ 2: sem contacto digital (2), preparação crítica — TC com contraste e diabetes/metformina (2, em qualquer data), faltas no último ano (1 falta = 1, 2+ = 2), 80+ anos (1), 2.ª remarcação (3). Nunca baixa a prioridade clínica.
 - **R-H — Dia único:** doente a ≥ 50 km com outra marcação na janela → primeira vaga compatível nesse dia, com ≥ 30 min de intervalo, de preferência a partir das 10:00; nunca para lá do prazo.
-- **R-J — Índice de prioridade guardado** (`server/motor/indice.ts`): cada pedido activo tem o índice calculado e guardado, refrescado no arranque e depois de cada acção (não no momento de remarcar). Nível (MP 400 · P 250 · N 100) + prazo (até +200; fora do prazo +200 e +5/dia, máx. +100) + estádio (diagnóstico +80, tratamento +60) + score clínico (0–100) + remarcações já sofridas (+50 cada, máx. +100) + espera (+1/dia, máx. +30). Distingue doentes do mesmo nível; é o critério (3) da ordem da fila. Quem está marcado guarda também o custo de o remarcar (R-B).
+- **R-J — Índice de prioridade guardado** (`server/motor/indice.ts`): cada pedido activo tem o índice calculado e guardado, refrescado no arranque e depois de cada acção (não no momento de remarcar). Nível (MP 400 · P 250 · N 100) + prazo (até +200; fora do prazo +200 e +5/dia, máx. +100) + estádio (diagnóstico +80, tratamento +60) + score clínico (0–100) + remarcações já sofridas (+50 cada, máx. +100) + espera (+1/dia, máx. +30). Distingue doentes do mesmo nível; é o critério (3) da ordem da fila. Quem está marcado guarda também o custo de o remarcar (R-B). **Todas estas variáveis são configuráveis por serviço** (Serviço → Definições); os valores acima são os por omissão, e guardar recalcula o índice de todos os pedidos.
 - **R-K — Remarcações propostas, nunca às escondidas:** (a) **avaria** — ao ser reportada (serviço, acto opcional, a partir de, dias), o sistema cria logo o plano de todas as marcações afectadas, por ordem do índice: vaga sugerida (reservada até decisão), justificação ("2.º a escolher — índice 621 …; a única vaga dentro do prazo ficou para X: índice 717 contra 621") e avisos (fora do prazo → vaga extra/outsourcing; 2.ª remarcação → ligar; sem contacto digital). A administrativa recebe a notificação com o número de marcações e aceita uma a uma ou "Aceitar todas"; o doente e o médico são avisados e o técnico recebe "avaria resolvida" quando o plano fica decidido. (b) **falta** — a falta gera logo uma sugestão individual: a primeira vaga que ainda dá tempo ao resultado antes da consulta dependente (senão avisa que a consulta terá de ser adiada); a administrativa aceita. Não conta como remarcação pelo hospital.
 - **R-K (cont.) — Sem vaga a tempo:** se a consulta que depende do exame deixa de ter o resultado a tempo (o exame teria de ser até consulta − intervalo e não há vaga), a proposta não traz vaga: gera alerta `SEM_VAGA_A_TEMPO` e três saídas — "Resolvi com vaga extra" (data/hora sugerida: último dia útil a tempo, 13:30; cria uma vaga fora do horário), "Resolvi com outsourcing", ou "Não há solução — enviar ao médico". O médico da consulta recebe a notificação e decide em "Os Meus Pedidos": **avançar** com a consulta e ver o exame depois (o exame vai para a primeira vaga e a dependência deixa de bloquear) ou **adiar** a consulta para uma data (sugerida: primeira vaga do exame + tempo do resultado); o sistema marca a consulta no primeiro dia livre a partir dessa data, com o mesmo médico, e o exame a tempo. "Aceitar todas" nunca resolve estes casos sozinho.
 - **Ausência de médico:** a administrativa regista (médico, a partir de, dias, motivo); é uma avaria só na agenda desse médico — mesmo plano, continuidade primeiro. Marcações sem pedido no sistema nunca são antecipadas: procura-se a partir da data original.
@@ -164,7 +166,7 @@ Só em **marcações com dependências**, nos próximos `semaforo_horizonte_dias
 - 🟡 dependência marcada antes da consulta, ainda por realizar, com tempo para o resultado;
 - 🔴 dependência não marcada, marcada depois da consulta, ou falta do doente.
 
-Aparece na timeline do doente e na lista **"consultas em risco"** do serviço. O vermelho gera alerta e pede **decisão humana** (antecipar o exame ou adiar a consulta).
+Aparece na timeline do doente, no acompanhamento do médico e nos avisos do serviço. O intervalo até ao resultado é o **da própria dependência** (o mesmo que o agendamento usa: a creatinina da R1 tem resultado no dia seguinte). Quando o vermelho vem de uma falta, a remarcação já está proposta (R-K) e o aviso só informa.
 
 ## 12. Alertas
 
@@ -180,7 +182,7 @@ Aparece na timeline do doente e na lista **"consultas em risco"** do serviço. O
 | ≥ `alerta_remarcacoes` remarcações do mesmo doente | Serviço | média |
 | Prazo ultrapassado | Gestão | alta |
 
-Cada alerta fecha-se com uma **acção registada** (quem, quando, o quê).
+Cada alerta fecha-se com uma **acção registada** (quem, quando, o quê). Um alerta automático marcado como visto não volta a abrir para o mesmo pedido. Os que pedem uma decisão (troca, sem vaga, remarcação) aparecem no Serviço em **"Para decidir"**, sempre com a sugestão e o porquê; os restantes em **"Avisos a acompanhar"**, cada um com o que fazer.
 
 ## 13. Métricas (dashboard de gestão)
 
@@ -200,9 +202,9 @@ Calculadas a partir de `pedidos`, `eventos` e `oasis_atos_medicos`. Etiqueta vis
 Selector de perfil no topo (sem autenticação) + botão **"Repor demo"** (recarrega o seed).
 1. **Oasis 2.0 — Médico:** agenda do dia → consulta com SOAP → Guardar.
 2. **Oasis 2.0 — Agendas:** grelha por serviço/dia, vagas livres/ocupadas (onde se vê o agente a marcar).
-3. **Validação (administrativa):** texto original ao lado dos pedidos extraídos; aprovar / corrigir.
-4. **Triagem (por serviço):** fila com Aceitar / Recusar / Reencaminhar / Pedir informação.
-5. **Pedidos do serviço + alertas + propostas de troca.**
+3. **Triagem (por serviço):** fila com Aceitar / Recusar / Reencaminhar / Pedir informação.
+4. **Serviço (administrativa):** Para decidir (remarcações propostas, trocas de vaga, sem vaga no prazo — tudo com sugestão e validação) · Vagas libertadas · Chamadas · Pedidos e avisos · Estatísticas · Definições (equação do índice de prioridade **por serviço**, com pré-visualização da fila).
+5. **Os meus doentes (médico):** o que precisa da resposta dele + lista de doentes por situação + percurso de cada um (datas, prazos, dependências).
 6. **Doente — timeline e semáforo.**
 7. **Gestão — métricas.**
 

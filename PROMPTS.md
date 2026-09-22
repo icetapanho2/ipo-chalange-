@@ -102,8 +102,8 @@ Não alteres a lógica do motor nesta fase.
 
 | # | Passo | Resultado esperado |
 |---|---|---|
-| 1 | Maria (100101): Dr. Pedro guarda o plano A; Joana aprova | Colheita c/ jejum **24/09 07:30**; TC TAP **14/10 08:00** (depende da colheita, R1); Revisão Dr. Pedro **21/10 08:30** (depende de ambos) |
-| 2 | José (100104): Joana aprova o TC TAP MP (prazo 05/10) | Sem vaga livre até 05/10 → proposta: José fica com **02/10 10:00**, Manuel (100106) passa para **14/10 08:20** (prazo dele 31/12). Radiologia aprova → ambos actualizados; Manuel com 1 remarcação |
+| 1 | Maria (100101): Dr. Pedro guarda o plano A; Joana aprova | Colheita c/ jejum **24/09 07:30**; TC TAP **14/10 08:20** (depende da colheita, R1); Revisão Dr. Pedro **21/10 08:30** (depende de ambos) |
+| 2 | José (100104): Joana aprova o TC TAP MP (prazo 05/10) | Sem vaga livre até 05/10 → proposta: José fica com **02/10 10:00**, Manuel (100106) passa para **14/10 08:00** (prazo dele 31/12). Radiologia aprova → ambos actualizados; Manuel com 1 remarcação |
 | 3 | Rosa (100105): plano B; Joana vê alerta "HPC" e corrige para Manutenção CVC | Entrada "HPC" no dicionário do Dr. Pedro; CVC **24/09 09:00**; colheita s/ jejum **24/09 07:30**; revisão **14/10 08:50** (sem continuidade) |
 | 4 | Carlos (100107): plano C | "HPC" reconhecido com selo "aprendido"; CVC **24/09 09:30**; revisão Dr. Pedro **14/10 09:30** |
 | 5 | Luísa (100103): triador de Onc. Médica reencaminha para Radioterapia; triadora RT aceita | 1.ª consulta RT **30/09 09:00** |
@@ -117,10 +117,10 @@ Nota: as horas exactas pressupõem esta ordem. Os testes devem seguir a mesma or
 
 | Caso | Passo | Resultado esperado |
 |---|---|---|
-| 1 | Maria: Dr. Pedro declara colheita c/ jejum + TC TAP c/ contraste + revisão dependente | Colheita **24/09 07:30**; TC **14/10 08:00**; revisão **21/10 08:30** (Dr. Pedro) |
+| 1 | Maria: Dr. Pedro declara colheita c/ jejum + TC TAP c/ contraste + revisão dependente | Colheita **24/09 07:30**; TC **14/10 08:20**; revisão **21/10 08:30** (Dr. Pedro) |
 | 1 | Luísa: reencaminhar para RT; RT aceita | RT **30/09 09:00** |
 | 1 | Fernando: HD aceite | HD **25/09 08:30**; colheita pré-QT **24/09 07:30** |
-| 2 | José: aprovar TC → proposta | Escolhido Manuel (custo −30): **02/10 10:00 → 14/10 08:20**; regra antiga escolheria Joaquim (70); Beatriz e Tiago excluídos; Graça 49 |
+| 2 | José: aprovar TC → proposta | Escolhido Manuel (custo −30): **02/10 10:00 → 14/10 08:00**; regra antiga escolheria Joaquim (70); Beatriz e Tiago excluídos; Graça 49 |
 | 2 | Laboratório: Manuel com 1 remarcação | Passa a ser Graça Pereira Santos |
 | 3 | Rui desmarca (a partir de 19/10); Helena aceita | Rui **19/10 08:40**; Helena **30/09 09:00** (+13 dias); cascata para Luís Martins Alves **13/10 09:00** |
 | 4 | Dr. Pedro pede colheita s/ jejum ao Joaquim | **01/10 10:00** (dia único); lista de chamadas: Joaquim (sem contacto, 81 anos), Maria (preparação) |

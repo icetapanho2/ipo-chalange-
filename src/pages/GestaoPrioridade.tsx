@@ -76,7 +76,7 @@ export function GestaoPrioridade() {
   const outcomesFiltrados = dados?.outcomes.filter((o) => filtroPrioridade === "TODOS" || o.prioridade === filtroPrioridade) ?? [];
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+    <div className="mx-auto max-w-7xl px-4 py-6">
       <div className="mb-3">
         <Link to="/gestao" className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-oasis-header">
           <ArrowLeft className="h-3.5 w-3.5" />

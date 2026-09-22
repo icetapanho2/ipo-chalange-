@@ -4,8 +4,6 @@ import express from "express";
 import { store } from "./store.ts";
 import { criarRotasSistema } from "./routes/sistema.ts";
 import { criarRotasOasis } from "./routes/oasis.ts";
-import { criarRotasValidacao } from "./routes/validacao.ts";
-import { criarRotasDicionario } from "./routes/dicionario.ts";
 import { criarRotasTriagem } from "./routes/triagem.ts";
 import { criarRotasMeusPedidos } from "./routes/meusPedidos.ts";
 import { criarRotasServico } from "./routes/servico.ts";
@@ -14,8 +12,7 @@ import { criarRotasGestao } from "./routes/gestao.ts";
 import { criarRotasNotificacoes } from "./routes/notificacoes.ts";
 import { criarRotasTecnico } from "./routes/tecnico.ts";
 import { criarRotasPrioridades } from "./routes/prioridades.ts";
-import { recalcularAlertas } from "./motor/alertas.ts";
-import { gerarPropostasFaltasPendentes } from "./motor/propostasRemarcacao.ts";
+import { prepararEstadoInicial } from "./motor/arranque.ts";
 import { agora } from "./clock.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,8 +31,6 @@ export function criarApp() {
 
   app.use("/api", criarRotasSistema(store));
   app.use("/api/oasis", criarRotasOasis(store));
-  app.use("/api/validacao", criarRotasValidacao(store));
-  app.use("/api/dicionario", criarRotasDicionario(store));
   app.use("/api/triagem", criarRotasTriagem(store));
   app.use("/api/meus-pedidos", criarRotasMeusPedidos(store));
   app.use("/api/servico", criarRotasServico(store));
@@ -57,5 +52,4 @@ export function criarApp() {
 }
 
 // Os alertas são recalculados no arranque e depois de cada acção (secção 12 da especificação).
-recalcularAlertas(agora());
-gerarPropostasFaltasPendentes(agora());
+prepararEstadoInicial(agora());

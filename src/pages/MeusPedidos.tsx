@@ -1,28 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { dataPT } from "../lib/datas";
+import { Link } from "react-router-dom";
+import { dataHoraPT, dataPT } from "../lib/datas";
 import { apiGet, apiPost } from "../lib/api";
 import { DecisoesRemarcacao } from "../components/DecisoesRemarcacao";
-import {
-  ChevronDown,
-  ChevronUp,
-  Clock,
-  AlertTriangle,
-  XCircle,
-  CalendarClock,
-  User,
-  Filter,
-  HelpCircle,
-} from "lucide-react";
+import { AlertTriangle, CalendarCheck2, CheckCircle2, Clock, ExternalLink, HelpCircle, Hourglass, Search, XCircle } from "lucide-react";
 
 interface ResumoPedido {
   pedido_id: string;
   doente_nome: string;
-  tipo_pedido_legivel: string;
-  especialidade_destino_legivel: string;
   descricao: string;
-  estado: string;
-  estado_legivel: string;
-  criado_em: string;
   pergunta_triagem: string;
   motivo_recusa: string;
 }
@@ -34,443 +20,287 @@ interface Resposta {
   todos: ResumoPedido[];
 }
 
-type Cor = "vermelho" | "laranja" | "verde" | "cinza";
-
-interface PedidoCard {
+interface Etapa {
   pedido_id: string;
   descricao: string;
   tipo_pedido_legivel: string;
   especialidade_destino_legivel: string;
   estado: string;
   estado_legivel: string;
+  prioridade: string;
   prazo_limite: string;
-  cor: Exclude<Cor, "cinza">;
+  data_marcada: string;
+  depende_de: string[];
+  semaforo: { cor: string; porque: string } | null;
+  problema: string;
 }
 
-interface CartaoDoente {
+type Situacao = "atencao" | "por_marcar" | "marcado" | "concluido";
+
+interface DoenteAcompanhado {
   doente_id: string;
   doente_nome: string;
   estadio_cuidado: string;
   estadio_cuidado_legivel: string;
-  proxima_marcacao: string;
-  cor: Cor;
-  contagens: { pendentes: number; agendados: number; realizados: number; total: number };
-  pedidos: PedidoCard[];
+  situacao: Situacao;
+  problemas: string[];
+  proxima: { data_hora: string; descricao: string } | null;
+  percurso: Etapa[];
 }
 
-const ESTADIOS: { valor: string; legivel: string }[] = [
-  { valor: "NOVO", legivel: "Novo" },
-  { valor: "PRE_TRATAMENTO", legivel: "Pré-tratamento" },
-  { valor: "EM_TRATAMENTO", legivel: "Em tratamento" },
-  { valor: "FOLLOW_UP", legivel: "Follow-up" },
+const SITUACOES: { valor: Situacao | "todos"; legivel: string; cor: string }[] = [
+  { valor: "todos", legivel: "Todos", cor: "" },
+  { valor: "atencao", legivel: "Precisa de atenção", cor: "bg-rose-500" },
+  { valor: "por_marcar", legivel: "Em curso, por marcar", cor: "bg-sky-500" },
+  { valor: "marcado", legivel: "Tudo marcado", cor: "bg-emerald-500" },
+  { valor: "concluido", legivel: "Concluído", cor: "bg-slate-300" },
 ];
+const COR_SITUACAO = Object.fromEntries(SITUACOES.map((s) => [s.valor, s.cor])) as Record<Situacao, string>;
 
-const CORES: { valor: Cor; legivel: string; dot: string }[] = [
-  { valor: "vermelho", legivel: "Por agendar", dot: "bg-red-500" },
-  { valor: "laranja", legivel: "Agendado", dot: "bg-amber-500" },
-  { valor: "verde", legivel: "Realizado", dot: "bg-emerald-500" },
-];
+function IconeEtapa({ e }: { e: Etapa }) {
+  if (e.problema) return <AlertTriangle className="h-4 w-4 text-rose-600" />;
+  if (e.estado === "REALIZADO") return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
+  if (e.estado === "MARCADO") return <CalendarCheck2 className="h-4 w-4 text-sky-600" />;
+  if (e.estado === "RECUSADO" || e.estado === "CANCELADO") return <XCircle className="h-4 w-4 text-slate-400" />;
+  return <Hourglass className="h-4 w-4 text-amber-600" />;
+}
 
-const JANELAS: { valor: string; legivel: string }[] = [
-  { valor: "todos", legivel: "Todas as datas" },
-  { valor: "semana", legivel: "Esta semana" },
-  { valor: "mes", legivel: "Este mês" },
-];
-
-const ESTILO_COR_CARD: Record<Cor, string> = {
-  vermelho: "border-l-red-500",
-  laranja: "border-l-amber-500",
-  verde: "border-l-emerald-500",
-  cinza: "border-l-slate-300",
-};
-
-const ESTILO_BADGE_PEDIDO: Record<Exclude<Cor, "cinza">, string> = {
-  vermelho: "border-red-200 bg-red-50 text-red-800",
-  laranja: "border-amber-200 bg-amber-50 text-amber-800",
-  verde: "border-emerald-200 bg-emerald-50 text-emerald-800",
-};
-
-function formatarDataHora(iso: string): string {
-  if (!iso) return "";
-  const [data, hora] = iso.split("T");
-  const [ano, mes, dia] = data.split("-");
-  return `${dia}/${mes}/${ano}${hora ? ` às ${hora}` : ""}`;
+/** O percurso de um doente: cada pedido pela ordem das datas, com prazo, dependências e o que está mal. */
+function Percurso({ d }: { d: DoenteAcompanhado }) {
+  const nomes = new Map(d.percurso.map((e) => [e.pedido_id, e.descricao]));
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">{d.doente_nome}</h2>
+          <p className="text-xs text-slate-500">
+            {d.estadio_cuidado_legivel} · {d.percurso.length} pedido(s) seus
+          </p>
+        </div>
+        <Link to={`/doente/${d.doente_id}`} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+          Ficha completa <ExternalLink className="h-3 w-3" />
+        </Link>
+      </div>
+      {d.problemas.length > 0 && (
+        <ul className="mt-3 space-y-1 rounded-lg border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-800">
+          {d.problemas.map((p) => (
+            <li key={p} className="flex gap-1.5">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {p}
+            </li>
+          ))}
+        </ul>
+      )}
+      <ol className="relative mt-4 space-y-3 border-l-2 border-slate-100 pl-5">
+        {d.percurso.map((e) => (
+          <li key={e.pedido_id} className="relative">
+            <span className="absolute -left-[31px] top-0 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white">
+              <IconeEtapa e={e} />
+            </span>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+              <p className="text-sm font-semibold text-slate-800">{e.descricao}</p>
+              <p className={`text-xs font-semibold ${e.problema ? "text-rose-700" : "text-slate-700"}`}>
+                {e.data_marcada ? dataHoraPT(e.data_marcada) : e.estado_legivel}
+              </p>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              {e.especialidade_destino_legivel} · {e.estado_legivel} · {e.prioridade} · prazo {dataPT(e.prazo_limite)}
+            </p>
+            {e.depende_de.length > 0 && (
+              <p className="text-[11px] text-slate-500">Precisa antes: {e.depende_de.map((id) => nomes.get(id) ?? "exame de outra consulta").join(", ")}</p>
+            )}
+            {e.problema ? (
+              <p className="mt-0.5 text-[11px] font-semibold text-rose-700">{e.problema}</p>
+            ) : (
+              e.semaforo && <p className={`mt-0.5 text-[11px] ${e.semaforo.cor === "verde" ? "text-emerald-700" : "text-amber-700"}`}>{e.semaforo.porque}</p>
+            )}
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
 }
 
 export function MeusPedidos() {
   const [dados, setDados] = useState<Resposta | null>(null);
-  const [cartoes, setCartoes] = useState<CartaoDoente[] | null>(null);
+  const [doentes, setDoentes] = useState<DoenteAcompanhado[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [respostas, setRespostas] = useState<Record<string, string>>({});
-  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
-
-  const [filtroEstadios, setFiltroEstadios] = useState<Set<string>>(new Set());
-  const [filtroCores, setFiltroCores] = useState<Set<Cor>>(new Set());
-  const [filtroJanela, setFiltroJanela] = useState("todos");
+  const [situacao, setSituacao] = useState<Situacao | "todos">("todos");
+  const [estadio, setEstadio] = useState("");
+  const [pesquisa, setPesquisa] = useState("");
+  const [selecionado, setSelecionado] = useState<string | null>(null);
 
   function recarregar() {
     apiGet<Resposta>("/meus-pedidos").then(setDados).catch((e) => setErro(String(e)));
-  }
-
-  function recarregarPainel() {
-    const params = new URLSearchParams();
-    if (filtroEstadios.size > 0) params.set("estadio", [...filtroEstadios].join(","));
-    if (filtroCores.size > 0) params.set("cor", [...filtroCores].join(","));
-    if (filtroJanela !== "todos") params.set("janela", filtroJanela);
-    const query = params.toString();
-    apiGet<CartaoDoente[]>(`/meus-pedidos/painel${query ? `?${query}` : ""}`)
-      .then(setCartoes)
+    apiGet<DoenteAcompanhado[]>("/meus-pedidos/painel")
+      .then((l) => {
+        setDoentes(l);
+        setSelecionado((s) => s ?? l[0]?.doente_id ?? null);
+      })
       .catch((e) => setErro(String(e)));
   }
-
   useEffect(recarregar, []);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(recarregarPainel, [filtroEstadios, filtroCores, filtroJanela]);
 
-  async function responder(pedidoId: string) {
+  async function executar(caminho: string, corpo: unknown) {
     setErro(null);
     try {
-      await apiPost(`/meus-pedidos/${pedidoId}/responder`, { resposta: respostas[pedidoId] ?? "" });
+      await apiPost(caminho, corpo);
       recarregar();
-      recarregarPainel();
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     }
   }
 
-  async function decidirSemVaga(pedidoId: string, decisao: "MANTER" | "CANCELAR") {
-    setErro(null);
-    try {
-      await apiPost(`/meus-pedidos/${pedidoId}/decidir-sem-vaga`, { decisao });
-      recarregar();
-      recarregarPainel();
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  function alternarEstadio(valor: string) {
-    setFiltroEstadios((s) => {
-      const novo = new Set(s);
-      if (novo.has(valor)) novo.delete(valor);
-      else novo.add(valor);
-      return novo;
-    });
-  }
-
-  function alternarCor(valor: Cor) {
-    setFiltroCores((s) => {
-      const novo = new Set(s);
-      if (novo.has(valor)) novo.delete(valor);
-      else novo.add(valor);
-      return novo;
-    });
-  }
-
-  function alternarExpandido(doenteId: string) {
-    setExpandidos((s) => {
-      const novo = new Set(s);
-      if (novo.has(doenteId)) novo.delete(doenteId);
-      else novo.add(doenteId);
-      return novo;
-    });
-  }
-
-  const totalCartoes = cartoes?.length ?? 0;
-  const resumoCores = useMemo(() => {
-    const c = { vermelho: 0, laranja: 0, verde: 0 };
-    for (const cartao of cartoes ?? []) {
-      if (cartao.cor !== "cinza") c[cartao.cor]++;
-    }
+  const contagens = useMemo(() => {
+    const c: Record<string, number> = { todos: doentes?.length ?? 0 };
+    for (const d of doentes ?? []) c[d.situacao] = (c[d.situacao] ?? 0) + 1;
     return c;
-  }, [cartoes]);
+  }, [doentes]);
+
+  const termo = pesquisa.trim().toLowerCase();
+  const lista = (doentes ?? []).filter(
+    (d) => (situacao === "todos" || d.situacao === situacao) && (!estadio || d.estadio_cuidado === estadio) && (!termo || d.doente_nome.toLowerCase().includes(termo)),
+  );
+  const atual = doentes?.find((d) => d.doente_id === selecionado) ?? null;
+  const porResponder = (dados?.devolvidos.length ?? 0) + (dados?.semVagaDecisao.length ?? 0);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-bold text-slate-800">Os Meus Pedidos</h1>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 font-bold text-red-800">
-            <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> {resumoCores.vermelho} por agendar
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-bold text-amber-800">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> {resumoCores.laranja} agendados
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-bold text-emerald-800">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> {resumoCores.verde} concluídos
-          </span>
+    <div className="mx-auto max-w-7xl px-4 py-6">
+      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-slate-200 pb-3">
+        <div>
+          <h1 className="text-xl font-bold text-slate-800">Os meus doentes</h1>
+          <p className="text-xs text-slate-500">O percurso de cada doente depois da sua consulta: o que já está marcado, o que falta, e o que precisa de si.</p>
+        </div>
+        <div className="text-xs text-slate-600">
+          <strong className="text-rose-700">{contagens.atencao ?? 0}</strong> precisam de atenção · <strong>{contagens.todos}</strong> doentes
         </div>
       </div>
 
       {erro && <p className="mt-3 text-sm text-red-600">{erro}</p>}
 
-      <DecisoesRemarcacao
-        aoMudar={() => {
-          recarregar();
-          recarregarPainel();
-        }}
-      />
-
-      {/* Sem vaga (nem interna, nem outsourcing): a administração pede ao médico para decidir */}
-      {dados && dados.semVagaDecisao.length > 0 && (
-        <section className="mt-4 rounded-xl border border-red-300 bg-red-50 p-3">
-          <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-red-800">
-            <HelpCircle className="h-3.5 w-3.5" />
-            <span>Sem vaga — precisam da sua decisão ({dados.semVagaDecisao.length})</span>
+      {/* O que precisa de uma resposta do médico */}
+      <DecisoesRemarcacao aoMudar={recarregar} />
+      {porResponder > 0 && dados && (
+        <section className="mt-4 space-y-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
+          <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-900">
+            <HelpCircle className="h-3.5 w-3.5" /> Precisa da sua resposta ({porResponder})
           </h2>
-          <div className="mt-2 space-y-2">
-            {dados.semVagaDecisao.map((p) => (
-              <div key={p.pedido_id} className="rounded-lg border border-red-300 bg-white p-3">
-                <p className="text-sm font-semibold text-slate-800">
-                  {p.doente_nome} — {p.descricao}
-                </p>
-                <p className="mt-1 text-xs text-red-700">
-                  A administração não conseguiu vaga interna nem capacidade externa dentro do prazo. Quer manter o
-                  pedido em espera ou cancelá-lo?
-                </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => decidirSemVaga(p.pedido_id, "MANTER")}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
-                  >
-                    Manter em espera
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => decidirSemVaga(p.pedido_id, "CANCELAR")}
-                    className="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-800"
-                  >
-                    Cancelar pedido
-                  </button>
-                </div>
+          {dados.semVagaDecisao.map((p) => (
+            <div key={p.pedido_id} className="rounded-lg border border-amber-200 bg-white p-3">
+              <p className="text-sm font-semibold text-slate-800">
+                {p.doente_nome} — {p.descricao}
+              </p>
+              <p className="mt-0.5 text-xs text-slate-600">Sem vaga no prazo; a administração não conseguiu vaga interna nem externa. Manter em espera ou cancelar?</p>
+              <div className="mt-2 flex gap-2">
+                <button type="button" onClick={() => executar(`/meus-pedidos/${p.pedido_id}/decidir-sem-vaga`, { decisao: "MANTER" })} className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-50">
+                  Manter em espera
+                </button>
+                <button type="button" onClick={() => executar(`/meus-pedidos/${p.pedido_id}/decidir-sem-vaga`, { decisao: "CANCELAR" })} className="rounded-lg bg-red-700 px-3 py-1 text-xs font-bold text-white hover:bg-red-800">
+                  Cancelar pedido
+                </button>
               </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Pedidos devolvidos: precisam de resposta do médico antes de tudo o resto */}
-      {dados && dados.devolvidos.length > 0 && (
-        <section className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3">
-          <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-800">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            <span>Devolvidos pelo triador — aguardam a sua resposta ({dados.devolvidos.length})</span>
-          </h2>
-          <div className="mt-2 space-y-2">
-            {dados.devolvidos.map((p) => (
-              <div key={p.pedido_id} className="rounded-lg border border-amber-300 bg-white p-3">
-                <p className="text-sm font-semibold text-slate-800">
-                  {p.doente_nome} — {p.descricao}
-                </p>
-                <p className="mt-1 text-xs text-amber-800">Pergunta do triador: {p.pergunta_triagem}</p>
-                <textarea
-                  className="mt-2 w-full rounded border border-slate-300 p-2 text-xs"
-                  rows={2}
+            </div>
+          ))}
+          {dados.devolvidos.map((p) => (
+            <div key={p.pedido_id} className="rounded-lg border border-amber-200 bg-white p-3">
+              <p className="text-sm font-semibold text-slate-800">
+                {p.doente_nome} — {p.descricao}
+              </p>
+              <p className="mt-0.5 text-xs text-amber-800">Pergunta do triador: {p.pergunta_triagem}</p>
+              <div className="mt-2 flex gap-2">
+                <input
                   value={respostas[p.pedido_id] ?? ""}
                   onChange={(e) => setRespostas((r) => ({ ...r, [p.pedido_id]: e.target.value }))}
                   placeholder="A sua resposta…"
+                  className="flex-1 rounded border border-slate-300 px-2 py-1 text-xs"
                 />
-                <button
-                  type="button"
-                  onClick={() => responder(p.pedido_id)}
-                  className="mt-2 rounded-lg bg-oasis-header px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-700"
-                >
+                <button type="button" onClick={() => executar(`/meus-pedidos/${p.pedido_id}/responder`, { resposta: respostas[p.pedido_id] ?? "" })} className="rounded-lg bg-oasis-header px-3 py-1 text-xs font-bold text-white hover:bg-slate-700">
                   Responder
                 </button>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </section>
       )}
-
-      {/* Recusados: informativo, sem acção pendente */}
       {dados && dados.recusados.length > 0 && (
-        <section className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3">
-          <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-red-800">
-            <XCircle className="h-3.5 w-3.5" />
-            <span>Recusados pelo serviço de destino ({dados.recusados.length})</span>
-          </h2>
-          <div className="mt-2 space-y-1.5">
+        <details className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+          <summary className="cursor-pointer font-semibold text-slate-700">{dados.recusados.length} pedido(s) recusado(s) pelo serviço de destino</summary>
+          <ul className="mt-1.5 space-y-1 text-slate-600">
             {dados.recusados.map((p) => (
-              <div key={p.pedido_id} className="rounded-lg border border-red-200 bg-white p-2.5 text-xs">
-                <p className="font-semibold text-slate-800">
-                  {p.doente_nome} — {p.descricao}
-                </p>
-                <p className="mt-0.5 text-red-700">Motivo: {p.motivo_recusa}</p>
-              </div>
+              <li key={p.pedido_id}>
+                <strong>{p.doente_nome}</strong> — {p.descricao}
+                {p.motivo_recusa && <span className="text-slate-500"> · {p.motivo_recusa}</span>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {/* Lista + percurso do doente seleccionado */}
+      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,380px)_1fr]">
+        <div className="min-w-0">
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {SITUACOES.map((s) => (
+              <button
+                key={s.valor}
+                type="button"
+                onClick={() => setSituacao(s.valor)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                  situacao === s.valor ? "bg-oasis-header text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {s.cor && <span className={`h-2 w-2 rounded-full ${s.cor}`} />}
+                {s.legivel} <span className="opacity-70">{contagens[s.valor] ?? 0}</span>
+              </button>
             ))}
           </div>
-        </section>
-      )}
-
-      {/* Filtros: estádio do percurso oncológico, janela da próxima marcação, cor do cartão */}
-      <div className="mt-5 rounded-xl border border-slate-200 bg-white p-3">
-        <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-500 mb-2.5">
-          <Filter className="h-3.5 w-3.5" />
-          <span>Filtros</span>
+          <div className="mb-2 flex gap-2">
+            <label className="relative flex-1">
+              <Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-slate-400" />
+              <input value={pesquisa} onChange={(e) => setPesquisa(e.target.value)} placeholder="Procurar doente" className="w-full rounded-lg border border-slate-300 py-1.5 pl-7 pr-2 text-xs" />
+            </label>
+            <select value={estadio} onChange={(e) => setEstadio(e.target.value)} className="rounded-lg border border-slate-300 px-2 text-xs">
+              <option value="">Todos os estádios</option>
+              <option value="NOVO">Novo</option>
+              <option value="PRE_TRATAMENTO">Pré-tratamento</option>
+              <option value="EM_TRATAMENTO">Em tratamento</option>
+              <option value="FOLLOW_UP">Follow-up</option>
+            </select>
+          </div>
+          <ul className="max-h-[70vh] divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+            {!doentes && <li className="p-3 text-xs text-slate-400">A carregar…</li>}
+            {doentes && lista.length === 0 && <li className="p-3 text-xs text-slate-400">Nenhum doente com estes filtros.</li>}
+            {lista.map((d) => (
+              <li key={d.doente_id}>
+                <button
+                  type="button"
+                  onClick={() => setSelecionado(d.doente_id)}
+                  className={`flex w-full items-start gap-2.5 px-3 py-2 text-left ${selecionado === d.doente_id ? "bg-sky-50" : "hover:bg-slate-50"}`}
+                >
+                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${COR_SITUACAO[d.situacao]}`} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-slate-800">{d.doente_nome}</span>
+                    <span className={`block truncate text-[11px] ${d.problemas.length ? "text-rose-700" : "text-slate-500"}`}>
+                      {d.problemas[0] ?? (d.proxima ? `${dataHoraPT(d.proxima.data_hora)} · ${d.proxima.descricao}` : d.estadio_cuidado_legivel)}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-[10px] text-slate-400">{d.estadio_cuidado_legivel}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
-        <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
-          <div>
-            <span className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Estádio do doente</span>
-            <div className="flex flex-wrap gap-1.5">
-              {ESTADIOS.map((e) => (
-                <button
-                  key={e.valor}
-                  type="button"
-                  onClick={() => alternarEstadio(e.valor)}
-                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                    filtroEstadios.has(e.valor)
-                      ? "border-oasis-header bg-oasis-header text-white"
-                      : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  {e.legivel}
-                </button>
-              ))}
-            </div>
-          </div>
 
-          <div>
-            <span className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Próxima consulta</span>
-            <div className="flex flex-wrap gap-1.5">
-              {JANELAS.map((j) => (
-                <button
-                  key={j.valor}
-                  type="button"
-                  onClick={() => setFiltroJanela(j.valor)}
-                  className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                    filtroJanela === j.valor
-                      ? "border-oasis-header bg-oasis-header text-white"
-                      : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  {j.legivel}
-                </button>
-              ))}
+        <div className="min-w-0">
+          {atual ? (
+            <Percurso d={atual} />
+          ) : (
+            <div className="flex items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
+              <Clock className="h-4 w-4" /> Escolha um doente para ver o percurso.
             </div>
-          </div>
-
-          <div>
-            <span className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Estado do cartão</span>
-            <div className="flex flex-wrap gap-1.5">
-              {CORES.map((c) => (
-                <button
-                  key={c.valor}
-                  type="button"
-                  onClick={() => alternarCor(c.valor)}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                    filtroCores.has(c.valor)
-                      ? "border-oasis-header bg-oasis-header text-white"
-                      : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full ${filtroCores.has(c.valor) ? "bg-white" : c.dot}`} />
-                  {c.legivel}
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
         </div>
       </div>
-
-      {/* Cartões por doente */}
-      <div className="mt-4">
-        {!cartoes && !erro && <p className="text-sm text-slate-500">A carregar…</p>}
-        {cartoes && totalCartoes === 0 && (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-            Sem doentes a corresponder aos filtros escolhidos.
-          </div>
-        )}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {cartoes?.map((cartao) => {
-            const aberto = expandidos.has(cartao.doente_id);
-            return (
-              <div
-                key={cartao.doente_id}
-                className={`rounded-xl border border-slate-200 border-l-4 bg-white shadow-sm ${ESTILO_COR_CARD[cartao.cor]}`}
-              >
-                <button
-                  type="button"
-                  onClick={() => alternarExpandido(cartao.doente_id)}
-                  className="w-full p-3.5 text-left"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                        <User className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-slate-900">{cartao.doente_nome}</p>
-                        <span className="inline-block rounded bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold uppercase text-slate-600">
-                          {cartao.estadio_cuidado_legivel}
-                        </span>
-                      </div>
-                    </div>
-                    {aberto ? (
-                      <ChevronUp className="h-4 w-4 shrink-0 text-slate-400" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
-                    )}
-                  </div>
-
-                  <div className="mt-2.5 flex items-center gap-1.5 text-xs text-slate-500">
-                    <CalendarClock className="h-3.5 w-3.5 text-slate-400" />
-                    {cartao.proxima_marcacao ? (
-                      <span>
-                        Próxima consulta: <strong className="text-slate-700">{formatarDataHora(cartao.proxima_marcacao)}</strong>
-                      </span>
-                    ) : (
-                      <span>Sem marcação futura</span>
-                    )}
-                  </div>
-
-                  <div className="mt-2.5 flex items-center gap-3 text-[11px] font-semibold">
-                    <span className="flex items-center gap-1 text-red-700">
-                      <span className="h-1.5 w-1.5 rounded-full bg-red-500" /> {cartao.contagens.pendentes}
-                    </span>
-                    <span className="flex items-center gap-1 text-amber-700">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> {cartao.contagens.agendados}
-                    </span>
-                    <span className="flex items-center gap-1 text-emerald-700">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> {cartao.contagens.realizados}
-                    </span>
-                    <span className="ml-auto text-slate-400">{cartao.contagens.total} pedido(s)</span>
-                  </div>
-                </button>
-
-                {aberto && (
-                  <div className="space-y-1.5 border-t border-slate-100 p-3">
-                    {cartao.pedidos.map((p) => (
-                      <div
-                        key={p.pedido_id}
-                        className={`rounded-lg border px-2.5 py-2 text-xs ${ESTILO_BADGE_PEDIDO[p.cor]}`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="font-semibold">{p.descricao}</span>
-                          <span className="shrink-0 rounded bg-white/70 px-1.5 py-0.2 text-[10px] font-bold">
-                            {p.estado_legivel}
-                          </span>
-                        </div>
-                        <p className="mt-0.5 opacity-80">
-                          {p.especialidade_destino_legivel} · Prazo: {dataPT(p.prazo_limite)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {dados && dados.todos.length === 0 && (
-        <div className="mt-6 flex items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
-          <Clock className="h-4 w-4" />
-          <span>Ainda não fez nenhum pedido.</span>
-        </div>
-      )}
     </div>
   );
 }

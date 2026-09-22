@@ -2,7 +2,6 @@ import { Router } from "express";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
 import { isoData, isoDataHora } from "../util.ts";
-import { extrair } from "../extracao/index.ts";
 import { pedidoParaJson, descreverUtilizador } from "../apresentacao.ts";
 import { registarEvento } from "../motor/estados.ts";
 import { aplicarR1, criarDependencia, intervaloResultado } from "../motor/dependencias.ts";
@@ -235,54 +234,6 @@ export function criarRotasOasis(store: typeof StoreType) {
     });
   });
 
-  // Testador / Sandbox do tradutor de linguagem natural médica
-  router.post("/tradutor/testar", async (req, res) => {
-    const {
-      texto = "",
-      medicoId = "U01",
-      doenteId = "100101",
-      especialidadeOrigem = "2102",
-      apenasSimular = true,
-    } = req.body ?? {};
-
-    if (!texto || !texto.trim()) {
-      res.status(400).json({ erro: "Texto clínico a traduzir é obrigatório." });
-      return;
-    }
-
-    const quando = agora();
-    const pedidosAntes = new Set(store.pedidos.map((p) => p.pedido_id));
-    const eventosAntes = new Set(store.eventos.map((e) => e.evento_id));
-    const alertasAntes = new Set(store.alertas.map((a) => a.alerta_id));
-
-    const resultado = await extrair(texto.trim(), medicoId, doenteId, {
-      consultaAtoId: "ATO_TESTE_TRADUTOR",
-      especialidadeOrigem,
-      quando,
-    });
-
-    const pedidosFormatados = resultado.pedidos.map((p) => pedidoParaJson(p, store.parametros.limiar_confianca));
-
-    // Se for simulação, reverter a persistência para manter o store limpo
-    if (apenasSimular) {
-      store.pedidos = store.pedidos.filter((p) => pedidosAntes.has(p.pedido_id));
-      store.eventos = store.eventos.filter((e) => eventosAntes.has(e.evento_id));
-      store.alertas = store.alertas.filter((a) => alertasAntes.has(a.alerta_id));
-    }
-
-    res.json({
-      ok: true,
-      textoOriginal: texto,
-      fornecedorUsado: resultado.fornecedorUsado,
-      usouFallback: resultado.usouFallback,
-      totalPedidos: resultado.pedidos.length,
-      pedidos: pedidosFormatados,
-      alertas: resultado.alertas,
-      simulado: apenasSimular,
-    });
-  });
-
-  // Grelha das agendas dos serviços (vagas livres/ocupadas) para um dia.
   router.get("/agendas", (req, res) => {
     const especialidade = String(req.query.especialidade ?? "");
     const dia = String(req.query.dia ?? store.parametros.DEMO_DATE);

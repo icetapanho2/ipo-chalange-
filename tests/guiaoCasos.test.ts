@@ -54,9 +54,7 @@ async function correrCasos() {
   r.fernando = (await get<Agenda>("/api/doente/100108", "U10")).agenda.map((m) => `${m.especialidade_legivel} ${m.data_hora}`);
 
   // Caso B — TAC cheio: quem cede a vaga ao José?
-  const grupos = await get<{ doente_id: string; pedidos: { pedido_id: string }[] }[]>("/api/validacao/consultas", "U03");
-  const gJose = grupos.find((g) => g.doente_id === "100104")!;
-  await post("/api/validacao/aprovar", "U03", { pedidoIds: gJose.pedidos.map((p) => p.pedido_id) });
+  // O TC do José (P00007) segue o circuito no arranque: sem vaga, a proposta de troca já está à espera da Radiologia.
   const propostas = await get<{ proposta_id: string; pedido_urgente_doente: string; avaliacao: Candidato[]; escolhido_regra_antiga: string }[]>(
     "/api/servico/propostas",
     "U07",
@@ -224,7 +222,7 @@ describe("Guião por casos (caso normal + casos em que a prioridade decide)", ()
     expect(primeira.maria).toEqual([
       "Onc. Cirúrgica-C. Digestivo 2026-09-23T09:30",
       "Patologia Clínica-Geral 2026-09-24T07:30",
-      "Radiologia-Geral (TAC) 2026-10-14T08:00",
+      "Radiologia-Geral (TAC) 2026-10-14T08:20",
       "Onc. Cirúrgica-C. Digestivo 2026-10-21T08:30",
     ]);
     expect(primeira.luisa).toEqual(["2026-09-30T09:00"]);
@@ -236,7 +234,7 @@ describe("Guião por casos (caso normal + casos em que a prioridade decide)", ()
     expect(primeira.jose_excluidos).toEqual(expect.arrayContaining(["Beatriz Sousa Rocha", "Tiago Marques Silva"]));
     expect(primeira.jose_custos).toEqual(["Manuel Costa Ferreira:-30", "Graça Pereira Santos:49", "Joaquim Alves Pereira:70"]);
     expect(primeira.jose).toEqual(["2026-10-02T10:00"]);
-    expect(primeira.manuel).toEqual(["2026-10-14T08:20"]);
+    expect(primeira.manuel).toEqual(["2026-10-14T08:00"]);
     expect(primeira.lab_original).toBe("Manuel Costa Ferreira");
     expect(primeira.lab_manuel_remarcado).toBe("Graça Pereira Santos");
 

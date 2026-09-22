@@ -95,7 +95,7 @@ export function LaboratorioPrioridades() {
   const mudou = resultado && resultado.escolhido !== resultado.escolhido_original;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+    <div className="mx-auto max-w-7xl px-4 py-6">
       <Link to="/gestao" className="mb-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-oasis-header">
         <ArrowLeft className="h-3.5 w-3.5" /> Voltar à Gestão
       </Link>

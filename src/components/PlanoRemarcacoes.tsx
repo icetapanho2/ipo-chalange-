@@ -274,6 +274,7 @@ export function PlanoRemarcacoes({ aoMudar }: { aoMudar?: (mensagem: string) => 
   // Ausência de médico (férias, doença): mesmo plano que uma avaria, só na agenda desse médico.
   const [medicos, setMedicos] = useState<{ utilizador_id: string; nome: string }[]>([]);
   const [ausencia, setAusencia] = useState({ medico_id: "", data_inicio: "", duracao_dias: 1, motivo: "Férias" });
+  const [mostrarAusencia, setMostrarAusencia] = useState(false);
   useEffect(() => {
     apiGet<{ utilizador_id: string; nome: string }[]>("/servico/medicos").then((m) => {
       setMedicos(m);
@@ -295,9 +296,18 @@ export function PlanoRemarcacoes({ aoMudar }: { aoMudar?: (mensagem: string) => 
   if (!dados) return <p className="mt-5 text-sm text-slate-500">A carregar…</p>;
 
   return (
-    <div className="mt-5 space-y-5">
+    <div className="space-y-4">
       {erro && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
-      {medicos.length > 0 && (
+      {medicos.length > 0 && !mostrarAusencia && (
+        <button
+          type="button"
+          onClick={() => setMostrarAusencia(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          <CalendarOff className="h-3.5 w-3.5" /> Registar ausência de médico
+        </button>
+      )}
+      {medicos.length > 0 && mostrarAusencia && (
         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
           <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-700">
             <CalendarOff className="h-4 w-4 text-slate-500" /> Registar ausência de médico
@@ -341,7 +351,10 @@ export function PlanoRemarcacoes({ aoMudar }: { aoMudar?: (mensagem: string) => 
             </select>
             <button
               type="button"
-              onClick={() => executar("/servico/ausencias", ausencia, "Ausência registada: o plano de remarcação das consultas afectadas está abaixo.")}
+              onClick={() => {
+                setMostrarAusencia(false);
+                executar("/servico/ausencias", ausencia, "Ausência registada: o plano de remarcação das consultas afectadas está abaixo.");
+              }}
               className="rounded bg-slate-800 px-3 py-1 font-bold text-white hover:bg-slate-900"
             >
               Registar e planear remarcações
@@ -350,11 +363,7 @@ export function PlanoRemarcacoes({ aoMudar }: { aoMudar?: (mensagem: string) => 
         </div>
       )}
 
-      {dados.avarias.length === 0 && dados.faltas.length === 0 && (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-          Sem remarcações propostas neste serviço.
-        </div>
-      )}
+      {dados.avarias.length === 0 && dados.faltas.length === 0 && <p className="text-xs text-slate-400">Sem remarcações propostas.</p>}
 
       {dados.avarias.map((a) => {
         const pendentes = a.propostas.filter((p) => p.estado === "PENDENTE" && !p.sem_vaga_a_tempo).length;

@@ -1,7 +1,8 @@
 import { Router } from "express";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
-import { apenasData, parseIso, somarDias } from "../util.ts";
+import { apenasData, isoData } from "../util.ts";
+import { calcularSemaforo } from "../motor/semaforo.ts";
 import { decidirSemVaga, responderDevolucao } from "../motor/fluxo.ts";
 import { dataMinimaParaAdiar, decidirRemarcacaoMedico } from "../motor/propostasRemarcacao.ts";
 import {
@@ -13,14 +14,6 @@ import {
   descreverTipoPedido,
 } from "../apresentacao.ts";
 import type { Pedido } from "../types.ts";
-
-/** Cor do semáforo de um pedido individual (pedido "N2 — Os Meus Pedidos" em cards): vermelho =
- * ainda não agendado, laranja = agendado mas por realizar, verde = já realizado. */
-function corPedido(estado: Pedido["estado"]): "vermelho" | "laranja" | "verde" {
-  if (estado === "REALIZADO") return "verde";
-  if (estado === "MARCADO") return "laranja";
-  return "vermelho";
-}
 
 export function criarRotasMeusPedidos(store: typeof StoreType) {
   const router = Router();
@@ -106,90 +99,79 @@ export function criarRotasMeusPedidos(store: typeof StoreType) {
     res.json({ ok: true, pedido: resumo(pedido) });
   });
 
-  // Painel do médico por doente (secção N2): um cartão por doente, agrupando todos os pedidos
-  // que fez para ele. Cada pedido tem uma cor própria (vermelho=por agendar, laranja=agendado,
-  // verde=realizado); o cartão herda a cor mais "vermelha" dos seus pedidos. Filtrável por
-  // estádio do percurso oncológico, janela da próxima marcação e cor do cartão.
+  // Acompanhamento do médico: um item por doente com o percurso dos pedidos que fez para ele (datas,
+  // prazos, dependências) e uma situação única — "precisa de atenção" diz porquê. O filtro e a
+  // pesquisa são feitos no ecrã, para ser imediato.
   router.get("/painel", (req, res) => {
     const meus = store.pedidos.filter((p) => p.medico_requisitante_id === req.utilizadorId);
     const hoje = apenasData(agora());
-
-    const estadiosFiltro = String(req.query.estadio ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const coresFiltro = String(req.query.cor ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const janela = String(req.query.janela ?? "todos"); // "semana" | "mes" | "todos"
-    const limiteJanela = janela === "semana" ? somarDias(hoje, 7) : janela === "mes" ? somarDias(hoje, 30) : null;
+    const horizonte = store.parametros.semaforo_horizonte_dias;
 
     const porDoente = new Map<string, Pedido[]>();
-    for (const p of meus) {
-      if (!porDoente.has(p.doente_id)) porDoente.set(p.doente_id, []);
-      porDoente.get(p.doente_id)!.push(p);
-    }
+    for (const p of meus) porDoente.set(p.doente_id, [...(porDoente.get(p.doente_id) ?? []), p]);
 
-    let cartoes = [...porDoente.entries()].map(([doenteId, pedidos]) => {
+    const doentes = [...porDoente.entries()].map(([doenteId, pedidos]) => {
       const doente = store.doentes.find((d) => d.doente_id === doenteId);
-      const marcacoesFuturas = pedidos
-        .filter((p) => p.estado === "MARCADO" && p.ato_id)
-        .map((p) => store.atosMedicos.find((a) => a.mvp_ato_id === p.ato_id))
-        .filter((a): a is NonNullable<typeof a> => !!a && apenasData(parseIso(a.data_hora)).getTime() >= hoje.getTime())
-        .sort((a, b) => a.data_hora.localeCompare(b.data_hora));
+      const percurso = pedidos
+        .map((p) => {
+          const ato = p.ato_id ? store.atosMedicos.find((a) => a.mvp_ato_id === p.ato_id) : undefined;
+          const dataMarcada = ato && (p.estado === "MARCADO" || p.estado === "REALIZADO" || p.estado === "FALTOU") ? ato.data_hora : "";
+          const foraDoPrazo = !!dataMarcada && p.estado === "MARCADO" && dataMarcada.slice(0, 10) > p.prazo_limite;
+          const semaforo = calcularSemaforo(p, hoje, horizonte);
+          const problema =
+            p.estado === "SEM_VAGA"
+              ? "Sem vaga no prazo"
+              : p.estado === "FALTOU"
+                ? "O doente faltou"
+                : p.estado === "DEVOLVIDO"
+                  ? "Devolvido pela triagem"
+                  : semaforo?.cor === "vermelho"
+                    ? semaforo.porque
+                    : foraDoPrazo
+                      ? "Marcado depois do prazo"
+                      : "";
+          return {
+            pedido_id: p.pedido_id,
+            descricao: descreverPedido(p),
+            tipo_pedido_legivel: descreverTipoPedido(p.tipo_pedido),
+            especialidade_destino_legivel: descreverEspecialidade(p.especialidade_destino),
+            estado: p.estado,
+            estado_legivel: descreverEstado(p.estado),
+            prioridade: p.prioridade,
+            prazo_limite: p.prazo_limite,
+            criado_em: p.criado_em,
+            data_marcada: dataMarcada,
+            depende_de: store.dependencias.filter((d) => d.pedido_id === p.pedido_id).map((d) => d.depende_de_pedido_id),
+            semaforo: semaforo ? { cor: semaforo.cor, porque: semaforo.porque } : null,
+            problema,
+          };
+        })
+        .sort((a, b) => (a.data_marcada || a.prazo_limite).localeCompare(b.data_marcada || b.prazo_limite));
 
-      const pedidosCard = [...pedidos]
-        .sort((a, b) => a.prazo_limite.localeCompare(b.prazo_limite))
-        .map((p) => ({
-          pedido_id: p.pedido_id,
-          descricao: descreverPedido(p),
-          tipo_pedido_legivel: descreverTipoPedido(p.tipo_pedido),
-          especialidade_destino_legivel: descreverEspecialidade(p.especialidade_destino),
-          estado: p.estado,
-          estado_legivel: descreverEstado(p.estado),
-          prazo_limite: p.prazo_limite,
-          cor: corPedido(p.estado),
-        }));
-
-      const pendentes = pedidosCard.filter((p) => p.cor === "vermelho").length;
-      const agendados = pedidosCard.filter((p) => p.cor === "laranja").length;
-      const realizados = pedidosCard.filter((p) => p.cor === "verde").length;
-      const corCard: "vermelho" | "laranja" | "verde" | "cinza" =
-        pedidosCard.length === 0 ? "cinza" : pendentes > 0 ? "vermelho" : agendados > 0 ? "laranja" : "verde";
-
+      const problemas = percurso.filter((p) => p.problema);
+      const ativos = percurso.filter((p) => !["REALIZADO", "RECUSADO", "CANCELADO"].includes(p.estado));
+      const situacao = problemas.length > 0 ? "atencao" : ativos.some((p) => p.estado !== "MARCADO") ? "por_marcar" : ativos.length > 0 ? "marcado" : "concluido";
+      const proxima = percurso.filter((p) => p.data_marcada && p.estado === "MARCADO" && p.data_marcada.slice(0, 10) >= isoData(hoje))[0];
       return {
         doente_id: doenteId,
         doente_nome: descreverDoente(doenteId),
         estadio_cuidado: doente?.estadio_cuidado || "",
         estadio_cuidado_legivel: descreverEstadioCuidado(doente?.estadio_cuidado),
-        proxima_marcacao: marcacoesFuturas[0]?.data_hora ?? "",
-        cor: corCard,
-        contagens: { pendentes, agendados, realizados, total: pedidosCard.length },
-        pedidos: pedidosCard,
+        situacao,
+        problemas: problemas.map((p) => `${p.problema} — ${p.descricao}`),
+        proxima: proxima ? { data_hora: proxima.data_marcada, descricao: proxima.descricao } : null,
+        percurso,
       };
     });
 
-    if (estadiosFiltro.length > 0) cartoes = cartoes.filter((c) => estadiosFiltro.includes(c.estadio_cuidado));
-    if (coresFiltro.length > 0) cartoes = cartoes.filter((c) => coresFiltro.includes(c.cor));
-    if (limiteJanela) {
-      cartoes = cartoes.filter((c) => {
-        if (!c.proxima_marcacao) return false;
-        const data = apenasData(parseIso(c.proxima_marcacao));
-        return data.getTime() >= hoje.getTime() && data.getTime() <= limiteJanela.getTime();
-      });
-    }
-
-    cartoes.sort((a, b) => {
-      const ordemCor: Record<string, number> = { vermelho: 0, laranja: 1, verde: 2, cinza: 3 };
-      if (ordemCor[a.cor] !== ordemCor[b.cor]) return ordemCor[a.cor] - ordemCor[b.cor];
-      if (a.proxima_marcacao && b.proxima_marcacao) return a.proxima_marcacao.localeCompare(b.proxima_marcacao);
-      if (a.proxima_marcacao) return -1;
-      if (b.proxima_marcacao) return 1;
-      return a.doente_nome.localeCompare(b.doente_nome);
-    });
-
-    res.json(cartoes);
+    const ordem: Record<string, number> = { atencao: 0, por_marcar: 1, marcado: 2, concluido: 3 };
+    doentes.sort(
+      (a, b) =>
+        ordem[a.situacao] - ordem[b.situacao] ||
+        (a.proxima?.data_hora ?? "9").localeCompare(b.proxima?.data_hora ?? "9") ||
+        a.doente_nome.localeCompare(b.doente_nome),
+    );
+    res.json(doentes);
   });
 
   router.post("/:id/responder", (req, res) => {

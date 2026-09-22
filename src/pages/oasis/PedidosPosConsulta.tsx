@@ -12,7 +12,7 @@ import {
   CalendarClock,
 } from "lucide-react";
 
-/** Cartão no estilo usado no resto do site (Triagem, Validação, Serviço): branco, cabeçalho leve. */
+/** Cartão no estilo usado no resto do site (Triagem, Serviço): branco, cabeçalho leve. */
 function Painel({ titulo, children }: { titulo?: string; children: ReactNode }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -263,12 +263,12 @@ export function OasisPedidosPosConsulta() {
   const voltarAgenda = () => navigate(dia ? `/oasis/medico?data=${dia}` : "/oasis/medico");
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+    <div className="mx-auto max-w-7xl px-4 py-6">
       {/* Cabeçalho da página, igual ao resto do site */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Pedidos Pós-Consulta</h1>
-          <p className="mt-1 text-xs text-slate-500">Declare directamente o que pretende pedir: sem Agente Oasis, sem validação prévia.</p>
+          <p className="mt-1 text-xs text-slate-500">Escolha o que pretende pedir. Os pedidos seguem logo para triagem ou marcação, com as dependências entre eles.</p>
         </div>
         <div className="flex items-center gap-2">
           {dados?.doente && (

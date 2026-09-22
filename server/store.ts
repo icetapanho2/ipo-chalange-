@@ -82,6 +82,8 @@ class Store {
   /** Pesos da equação de prioridade personalizados por serviço (especialidade_codigo); um serviço
    * sem entrada aqui usa os pesos por omissão. Estado só do MVP, não vem de CSV. */
   pesosPrioridadePorServico: Record<string, { urgencia: number; tipo: number; paciente: number }> = {};
+  /** Variáveis do índice de prioridade ajustadas por serviço (só as alteradas; o resto é o valor por omissão). */
+  indicePorServico: Record<string, Record<string, number>> = {};
   /** Regras de preparação por acto e vagas protegidas por serviço (secção 8A) — vêm de CSV. */
   preparacoes: Preparacao[] = [];
   regrasCapacidade: RegraCapacidade[] = [];
@@ -335,6 +337,7 @@ class Store {
     this.silenciamentos = [];
     this.avarias = [];
     this.pesosPrioridadePorServico = {};
+    this.indicePorServico = {};
     this.vagasLibertadas = [];
     this.ofertasAntecipacao = [];
     this.comunicacoesDoente = [];

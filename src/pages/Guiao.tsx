@@ -5,19 +5,15 @@ import { usePerfil } from "../lib/PerfilContext";
 import { apiGet, apiPost, apiPut } from "../lib/api";
 import { PainelImpacto } from "../components/PainelImpacto";
 import {
-  Sparkles,
   UserCheck,
   UserPlus,
   Play,
-  CheckCircle2,
   ArrowRight,
   Stethoscope,
   RefreshCw,
   Check,
-  ExternalLink,
   ShieldAlert,
   Search,
-  BookOpen,
 } from "lucide-react";
 
 interface AcaoPasso {
@@ -62,7 +58,7 @@ const CASOS: Caso[] = [
         descricao:
           "Dr. Pedro, consulta das 09:30: escrever no Diário Clínico e \"Guardar & Seguinte\". No assistente escolher Análises, Exames e Consulta de revisão. Colheita com jejum (hemograma, bioquímica com creatinina, CEA, CA 19.9); TC TAP com contraste; revisão que depende dos exames desta consulta, com continuidade. Submeter.",
         resultado:
-          "Marcado automaticamente: colheita 24/09 07:30 → TC 14/10 08:00 (regra R1: creatinina antes do contraste) → revisão com o Dr. Pedro 21/10 08:30 (7 dias depois do TC, para haver resultado).",
+          "Marcado automaticamente: colheita 24/09 07:30 → TC 14/10 08:20 (regra R1: creatinina antes do contraste) → revisão com o Dr. Pedro 21/10 08:30 (7 dias depois do TC, para haver resultado).",
         acoes: [{ etiqueta: "Agenda do Dr. Pedro", utilizadorId: "U01", caminho: "/oasis/medico" }],
         fala: "O médico declara os pedidos uma vez. O sistema percebe as dependências e marca tudo pela ordem certa, sem papel.",
       },
@@ -109,17 +105,12 @@ const CASOS: Caso[] = [
     ],
     passos: [
       {
-        titulo: "A administrativa aprova o TC do José",
-        descricao: "Na Validação, aprovar o TC do José. Sem vaga livre, o sistema prepara uma proposta de troca para a Radiologia.",
-        resultado: "Proposta de troca criada, à espera de aprovação da Radiologia.",
-        acoes: [{ etiqueta: "Validação (Joana)", utilizadorId: "U03", caminho: "/validacao" }],
-      },
-      {
         titulo: "Radiologia: \"Porquê esta escolha?\"",
-        descricao: "Abrir a proposta e o painel \"Porquê esta escolha?\" — todos os doentes avaliados, as exclusões e o custo de cada um. Aprovar.",
+        descricao:
+          "O Dr. Pedro pediu o TC do José ontem; como não havia vaga, o sistema preparou logo uma proposta de troca para a Radiologia. Serviço → Para decidir → Trocas de vaga: abrir \"Porquê esta escolha?\" — todos os doentes avaliados, as exclusões e o custo de cada um. Aprovar.",
         resultado:
-          "Cede a vaga Manuel Costa (follow-up, SMS, prazo 31/12): 02/10 10:00 → 14/10 08:20. Excluídos: Beatriz (já remarcada uma vez) e Tiago (em quimioterapia). Pela regra antiga seria o Sr. Joaquim — mais folga, mas 81 anos, sem telemóvel, Castelo Branco, ambulância e consulta no mesmo dia: custo 70 contra −30.",
-        acoes: [{ etiqueta: "Propostas (Radiologia)", utilizadorId: "U07", caminho: "/servico?aba=pendencias" }],
+          "Cede a vaga Manuel Costa (follow-up, SMS, prazo 31/12): 02/10 10:00 → 14/10 08:00 (vaga reservada desde que a proposta foi criada). Excluídos: Beatriz (já remarcada uma vez) e Tiago (em quimioterapia). Pela regra antiga seria o Sr. Joaquim — mais folga, mas 81 anos, sem telemóvel, Castelo Branco, ambulância e consulta no mesmo dia: custo 70 contra −30.",
+        acoes: [{ etiqueta: "Propostas (Radiologia)", utilizadorId: "U07", caminho: "/servico?aba=decidir" }],
         fala: "O sistema não decide sozinho: propõe, explica porquê em linguagem simples, e um humano aprova.",
       },
       {
@@ -188,7 +179,7 @@ const CASOS: Caso[] = [
       },
       {
         titulo: "Lista de chamadas da Radiologia",
-        descricao: "Separador \"Lista de chamadas\": o Sr. Joaquim aparece (sem contacto digital, 81 anos) e a Maria aparece por causa da preparação (TC com contraste e metformina).",
+        descricao: "Separador \"Chamadas\": o Sr. Joaquim aparece (sem contacto digital, 81 anos) e a Maria aparece por causa da preparação (TC com contraste e metformina).",
         resultado: "Cerca de 1 em cada 5 marcações precisa de chamada; as restantes ficam só com o SMS/email e o lembrete a D-3.",
         acoes: [{ etiqueta: "Lista de chamadas (Radiologia)", utilizadorId: "U07", caminho: "/servico?aba=chamadas" }],
         fala: "Não ligamos a toda a gente: ligamos a quem, sem chamada, provavelmente falharia o exame.",
@@ -218,10 +209,10 @@ const CASOS: Caso[] = [
       {
         titulo: "A administrativa revê o plano e aceita",
         descricao:
-          "Serviço → Remarcações: as 5 propostas por ordem do índice, com a vaga sugerida, o porquê e os avisos (carregar no índice mostra cada ponto). \"Aceitar todas\" aplica as 4 que têm solução.",
+          "Serviço → Para decidir → Remarcações propostas: as 5 propostas por ordem do índice, com a vaga sugerida, o porquê e os avisos (carregar no índice mostra cada ponto). \"Aceitar todas\" aplica as 4 que têm solução.",
         resultado:
           "1.º Sónia (MP, em diagnóstico, 717) → 25/09 10:40, a única vaga no prazo. 2.º Artur (MP, 621) → 28/09 11:00, 3 dias fora do prazo, com aviso. 3.º Fátima (em QT) → 28/09 12:00, aviso \"2.ª remarcação — ligar\". 4.º Olga (84 anos, Santarém) → 01/10 11:40, no dia da consulta dela. 5.º Diogo (índice 134) → sem vaga a tempo (ver passo seguinte).",
-        acoes: [{ etiqueta: "Remarcações (Ecografia)", utilizadorId: "U11", caminho: "/servico?aba=remarcacoes" }],
+        acoes: [{ etiqueta: "Remarcações (Ecografia)", utilizadorId: "U11", caminho: "/servico?aba=decidir" }],
         fala: "Cinco remarcações em segundos, cada uma com o porquê. Quem decide continua a ser a administrativa.",
       },
       {
@@ -229,7 +220,7 @@ const CASOS: Caso[] = [
         descricao:
           "O Diogo tem revisão com a Dra. Sofia a 29/09 que precisa do resultado da ecografia (3 dias): o exame teria de ser até 26/09 e a única vaga (25/09) ficou para a Sónia, com índice 717 contra 134. O cartão fica a vermelho, com um alerta, e três saídas: \"Resolvi com vaga extra\" (já sugere 25/09 13:30), \"Resolvi com outsourcing\", ou \"Não há solução — enviar ao médico\". Para a demo: enviar ao médico.",
         resultado: "A Dra. Sofia recebe a notificação \"Decisão necessária: Diogo Almeida Reis — revisão de 29/09\". (Com vaga extra, o exame ficaria a 25/09 13:30 e a consulta mantinha-se.)",
-        acoes: [{ etiqueta: "Remarcações (Ecografia)", utilizadorId: "U11", caminho: "/servico?aba=remarcacoes" }],
+        acoes: [{ etiqueta: "Remarcações (Ecografia)", utilizadorId: "U11", caminho: "/servico?aba=decidir" }],
         fala: "Quem tem menos prioridade não fica esquecido: fica um alerta com as opções, e se a administração não resolve, decide o médico.",
       },
       {
@@ -253,9 +244,9 @@ const CASOS: Caso[] = [
     passos: [
       {
         titulo: "A administrativa regista a ausência",
-        descricao: "Perfil Joana Moreira → Serviço → Remarcações → \"Registar ausência de médico\": Dra. Sofia Lemos, 08/10, 1 dia, Férias. Rever o plano e \"Aceitar todas\".",
+        descricao: "Perfil Joana Moreira → Serviço → Para decidir → \"Registar ausência de médico\": Dra. Sofia Lemos, 08/10, 1 dia, Férias. Rever o plano e \"Aceitar todas\".",
         resultado: "7 consultas remarcadas pela ordem do índice, com a própria Dra. Sofia: o 1.º (MP, em diagnóstico) para 13/10 09:10 e os restantes a 13/10 e 15/10.",
-        acoes: [{ etiqueta: "Remarcações (Onc. Cirúrgica)", utilizadorId: "U03", caminho: "/servico?aba=remarcacoes" }],
+        acoes: [{ etiqueta: "Remarcações (Onc. Cirúrgica)", utilizadorId: "U03", caminho: "/servico?aba=decidir" }],
         fala: "Férias, doença, formação: a agenda de um médico inteiro muda em segundos, sem perder a continuidade.",
       },
     ],
@@ -269,10 +260,10 @@ const CASOS: Caso[] = [
       {
         titulo: "A administrativa recebe a sugestão e aceita",
         descricao:
-          "Perfil Rita Vieira (Patologia Clínica): a notificação da falta já traz a sugestão. Serviço → Remarcações → Faltas: ler o porquê e \"Aceitar\". Na ficha do António o semáforo passa de vermelho a amarelo.",
+          "Perfil Rita Vieira (Patologia Clínica): a notificação da falta já traz a sugestão. Serviço → Para decidir → Remarcações propostas (falta): ler o porquê e \"Aceitar\". Na ficha do António o semáforo passa de vermelho a amarelo.",
         resultado: "Colheita a 24/09 07:40 — a primeira vaga que ainda dá tempo ao resultado (2 dias) antes da consulta de 28/09. Não conta como remarcação pelo hospital.",
         acoes: [
-          { etiqueta: "Remarcações (Patologia Clínica)", utilizadorId: "U08", caminho: "/servico?aba=remarcacoes" },
+          { etiqueta: "Remarcações (Patologia Clínica)", utilizadorId: "U08", caminho: "/servico?aba=decidir" },
           { etiqueta: "Ficha do António", utilizadorId: "U08", caminho: "/doente/100102" },
         ],
         fala: "Uma falta deixa de rebentar a consulta seguinte: a solução chega à administrativa antes de ela ter de a procurar.",
@@ -307,39 +298,6 @@ const CASOS: Caso[] = [
   },
 ];
 
-interface PedidoTraduzido {
-  pedido_id: string;
-  tipo_pedido: string;
-  tipo_pedido_legivel?: string;
-  especialidade_destino: string;
-  especialidade_legivel?: string;
-  ato_codigo: string;
-  ato_descricao?: string;
-  descricao?: string;
-  exames?: string[];
-  analises?: string[];
-  especificacao?: string;
-  prioridade: string;
-  prioridade_legivel?: string;
-  prazo_limite: string;
-  nao_antes?: string;
-  depende_de?: string[];
-  confianca: number;
-  texto_origem: string;
-  origem_dicionario?: boolean;
-}
-
-interface RespostaTradutor {
-  ok: boolean;
-  textoOriginal: string;
-  fornecedorUsado: string;
-  usouFallback: boolean;
-  totalPedidos: number;
-  pedidos: PedidoTraduzido[];
-  alertas: string[];
-  simulado: boolean;
-}
-
 interface DoenteCompleto {
   doente_id: string;
   n_utente: string;
@@ -357,47 +315,11 @@ interface DoenteCompleto {
   pedidos_em_curso?: number;
 }
 
-const EXEMPLOS_TRADUTOR = [
-  {
-    titulo: "Cenário 1: Prescrição Multimodal (Maria Fernandes)",
-    texto: "TC TAP c/ contraste + colheita c/ jejum (hemog, bioq c/ creat, CEA, CA 19.9). Rev c/ exames 1/12 comigo.",
-    medico: "U01",
-    explicacao: "Extrai 3 pedidos interdependentes: Análises clínicas com jejum, TC TAP com contraste, e Consulta de Revisão em 35 dias com o Dr. Pedro (continuidade obrigatória). Aplica regras R1 e R3.",
-  },
-  {
-    titulo: "Cenário 2: Abreviatura por Aprender (Rosa Teixeira)",
-    texto: "HPC 4/4s. Colheita s/ jejum (hemog, CEA). Rev c/ resultados 1/12.",
-    medico: "U01",
-    explicacao: "O termo 'HPC' não está inicialmente no dicionário, gerando um alerta clínico de termo desconhecido para revisão administrativa.",
-  },
-  {
-    titulo: "Cenário 3: Abreviatura Aprendida (Carlos Mendes)",
-    texto: "Mantém vigilância. HPC 4/4s. Rev 1/12 comigo.",
-    medico: "U01",
-    explicacao: "Quando a entrada HPC é aprendida no dicionário do Dr. Pedro, gera automaticamente o tratamento de manutenção de cateter venoso central (CVC).",
-  },
-  {
-    titulo: "Cenário 4: Interconsulta Cirúrgica Urgente",
-    texto: "Pedido de consulta urgente de Cirurgia Geral para avaliação de nódulo hepático secundário. Urgente hoje.",
-    medico: "U01",
-    explicacao: "Extrai pedido inter-serviços com fluxo de Triagem, prioridade Muito Prioritário (MP) e alerta de comunicação telefónica fora do sistema.",
-  },
-];
-
 export function Guiao() {
-  const { definirUtilizadorId, utilizadores } = usePerfil();
+  const { definirUtilizadorId } = usePerfil();
   const navigate = useNavigate();
 
-  // Separador ativo: 'guiao' | 'tradutor' | 'perfil'
-  const [separador, setSeparador] = useState<"guiao" | "tradutor" | "perfil">("guiao");
-
-  // Estado do Testador de Tradução
-  const [textoTradutor, setTextoTradutor] = useState(EXEMPLOS_TRADUTOR[0].texto);
-  const [medicoSelecionado, setMedicoSelecionado] = useState("U01");
-  const [apenasSimular, setApenasSimular] = useState(true);
-  const [aTraduzir, setATraduzir] = useState(false);
-  const [resultadoTradutor, setResultadoTradutor] = useState<RespostaTradutor | null>(null);
-  const [erroTradutor, setErroTradutor] = useState<string | null>(null);
+  const [separador, setSeparador] = useState<"guiao" | "perfil">("guiao");
 
   // Estado da Gestão de Perfil do Paciente
   const [modoPerfil, setModoPerfil] = useState<"completar" | "criar">("completar");
@@ -449,27 +371,6 @@ export function Guiao() {
   function ir(acao: AcaoPasso) {
     definirUtilizadorId(acao.utilizadorId);
     navigate(acao.caminho);
-  }
-
-  async function executarTraducao() {
-    if (!textoTradutor.trim()) return;
-    setATraduzir(true);
-    setErroTradutor(null);
-    setResultadoTradutor(null);
-
-    try {
-      const resp = await apiPost<RespostaTradutor>("/oasis/tradutor/testar", {
-        texto: textoTradutor,
-        medicoId: medicoSelecionado,
-        doenteId: doenteSelecionadoId || "100101",
-        apenasSimular,
-      });
-      setResultadoTradutor(resp);
-    } catch (e) {
-      setErroTradutor(e instanceof Error ? e.message : "Falha na tradução.");
-    } finally {
-      setATraduzir(false);
-    }
   }
 
   async function guardarPerfilExistente() {
@@ -535,7 +436,7 @@ export function Guiao() {
             </div>
             <h1 className="text-2xl font-bold text-slate-900 mt-1">Guião da demonstração</h1>
             <p className="text-sm text-slate-600 mt-1">
-              Os casos pela ordem de apresentação, um testador da extracção e os perfis dos doentes.
+              Os casos pela ordem de apresentação e os perfis dos doentes.
             </p>
           </div>
 
@@ -554,18 +455,6 @@ export function Guiao() {
               <span>Casos da Demo</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setSeparador("tradutor")}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
-                separador === "tradutor"
-                  ? "bg-white text-slate-900 shadow-2xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Sparkles className="h-3.5 w-3.5 text-sky-600" />
-              <span>Testar extracção</span>
-            </button>
 
             <button
               type="button"
@@ -676,280 +565,6 @@ export function Guiao() {
               </section>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* SEPARADOR 2: TESTADOR DO TRADUTOR CLÍNICO */}
-      {separador === "tradutor" && (
-        <div className="space-y-6">
-          {/* Caixa de Configuração e Entrada */}
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 mb-4">
-              <div>
-                <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-sky-600" />
-                  <span>Laboratório de Tradução Clínica de Linguagem Natural</span>
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Teste a extração de pedidos, catálogo de atos SNS, inferência de prazos e dependências R1/R3 a partir de texto médico livre.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 text-xs">
-                <label className="flex items-center gap-1.5 text-slate-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={apenasSimular}
-                    onChange={(e) => setApenasSimular(e.target.checked)}
-                    className="rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                  />
-                  <span>Modo Simulação (não polui a base de dados)</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Presets Rápidos */}
-            <div className="mb-4">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-2">
-                Exemplos de Prescrições Médicas Reais:
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {EXEMPLOS_TRADUTOR.map((ex, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      setTextoTradutor(ex.texto);
-                      setMedicoSelecionado(ex.medico);
-                    }}
-                    className={`text-left p-2.5 rounded-lg border text-xs transition-colors ${
-                      textoTradutor === ex.texto
-                        ? "border-sky-500 bg-sky-50 text-sky-950 font-medium"
-                        : "border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 text-slate-700"
-                    }`}
-                  >
-                    <div className="font-semibold">{ex.titulo}</div>
-                    <div className="text-[11px] text-slate-500 line-clamp-1 mt-0.5 font-mono">{ex.texto}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Contexto Médico */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Médico Requisitante / Contexto:
-                </label>
-                <select
-                  value={medicoSelecionado}
-                  onChange={(e) => setMedicoSelecionado(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-800 bg-white"
-                >
-                  {utilizadores
-                    .filter((u) => u.e_medico)
-                    .map((m) => (
-                      <option key={m.utilizador_id} value={m.utilizador_id}>
-                        {m.nome} ({m.especialidade_codigo}) {m.utilizador_id === "U01" ? "— Tem Dicionário Pessoal" : ""}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Paciente de Referência:
-                </label>
-                <select
-                  value={doenteSelecionadoId}
-                  onChange={(e) => setDoenteSelecionadoId(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-800 bg-white"
-                >
-                  {listaDoentes.map((d) => (
-                    <option key={d.doente_id} value={d.doente_id}>
-                      {d.nome} (SNS {d.n_utente})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Caixa de Texto Clínico */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-700">
-                  Texto livre do plano:
-                </label>
-                <span className="text-[11px] text-slate-400">
-                  Experimente acrónimos, exames com contraste, ou interconsultas urgentes
-                </span>
-              </div>
-              <textarea
-                value={textoTradutor}
-                onChange={(e) => setTextoTradutor(e.target.value)}
-                rows={3}
-                className="w-full rounded-lg border border-slate-300 p-3 text-xs font-mono text-slate-900 focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
-                placeholder="Exemplo: TC TAP c/ contraste + colheita c/ jejum... Rev 1/12 comigo"
-              />
-            </div>
-
-            {/* Botão de Tradução */}
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <span className="text-xs text-slate-500">
-                O agente normaliza abreviaturas, consulta atos no catálogo e calcula dependências.
-              </span>
-              <button
-                type="button"
-                onClick={executarTraducao}
-                disabled={aTraduzir || !textoTradutor.trim()}
-                className="inline-flex items-center gap-2 rounded-lg bg-sky-700 px-4 py-2 text-xs font-semibold text-white hover:bg-sky-800 disabled:opacity-50 transition-colors shadow-2xs"
-              >
-                {aTraduzir ? (
-                  <>
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    <span>A Processar com IA...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-3.5 w-3.5" />
-                    <span>Traduzir e Extrair Pedidos</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          {erroTradutor && (
-            <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-xs text-red-700">
-              <strong>Erro no processamento:</strong> {erroTradutor}
-            </div>
-          )}
-
-          {/* Resultado Estruturado */}
-          {resultadoTradutor && (
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Resultado da Tradução Estruturada
-                  </h3>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="rounded bg-slate-100 px-2 py-0.5 text-[11px] font-mono text-slate-700">
-                    Motor: <strong>{resultadoTradutor.fornecedorUsado}</strong>
-                  </span>
-                  <span className="rounded bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-800">
-                    {resultadoTradutor.totalPedidos} Pedido(s) Identificado(s)
-                  </span>
-                  {resultadoTradutor.simulado && (
-                    <span className="rounded bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
-                      Simulação
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Alertas Gerados pelo Agente */}
-              {resultadoTradutor.alertas.length > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <ShieldAlert className="h-4 w-4 text-amber-600" />
-                    <span>Alertas Clínicos & Termos Desconhecidos:</span>
-                  </div>
-                  {resultadoTradutor.alertas.map((alerta, idx) => (
-                    <p key={idx} className="pl-5 text-amber-800">
-                      • {alerta}
-                    </p>
-                  ))}
-                </div>
-              )}
-
-              {/* Lista de Pedidos Extraídos */}
-              {resultadoTradutor.pedidos.length === 0 ? (
-                <p className="text-xs text-slate-500 py-4 text-center">
-                  Nenhum pedido estruturado pôde ser inferido a partir deste texto.
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {resultadoTradutor.pedidos.map((p, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-lg border border-slate-200 bg-slate-50/60 p-3.5 space-y-2 text-xs"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 font-semibold text-white text-[10px] uppercase tracking-wider">
-                          {p.tipo_pedido}
-                        </span>
-                        <span className="text-[11px] font-mono text-slate-500">
-                          ID: {p.pedido_id}
-                        </span>
-                      </div>
-
-                      <div>
-                        <div className="font-bold text-slate-900 text-sm">
-                          {p.descricao || `${p.tipo_pedido} (${p.especialidade_destino})`}
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          Especialidade Destino: <strong>{p.especialidade_legivel || p.especialidade_destino}</strong> (Ato: {p.ato_codigo})
-                        </div>
-                      </div>
-
-                      {p.especificacao && (
-                        <div className="text-[11px] text-slate-600">
-                          Especificação: <em>{p.especificacao}</em>
-                        </div>
-                      )}
-
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-600 pt-1 border-t border-slate-200">
-                        <div>
-                          Prioridade: <strong>{p.prioridade}</strong> ({p.prioridade_legivel || "Normal"})
-                        </div>
-                        <div>
-                          Prazo Limite: <strong>{dataPT(p.prazo_limite)}</strong>
-                        </div>
-                        <div>
-                          Confiança: <strong>{(p.confianca * 100).toFixed(0)}%</strong>
-                        </div>
-                      </div>
-
-                      {p.origem_dicionario && (
-                        <div className="inline-flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
-                          <BookOpen className="h-3 w-3" />
-                          <span>Reconhecido via Dicionário do Médico</span>
-                        </div>
-                      )}
-
-                      {p.depende_de && p.depende_de.length > 0 && (
-                        <div className="rounded bg-sky-50 border border-sky-100 p-2 text-[11px] text-sky-800">
-                          <strong>Dependência Clínica (R1/R3):</strong> Bloqueado até realização do exame/análise prévio.
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Ação rápida para testar na validação */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-xs text-slate-500">
-                  Quer ver como a administrativa valida estes pedidos?
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    definirUtilizadorId("U03");
-                    navigate("/validacao");
-                  }}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
-                >
-                  <ExternalLink className="h-3.5 w-3.5 text-slate-500" />
-                  <span>Abrir Fila de Validação Administrativa</span>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 

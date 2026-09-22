@@ -44,19 +44,20 @@ async function tarefasDoPerfil(perfil: string): Promise<Tarefa[]> {
     ];
   }
   if (perfil === "ADMINISTRATIVO") {
-    const [remarcacoes, vagas, chamadas, propostas, validacao] = await Promise.all([
+    const [remarcacoes, vagas, chamadas, propostas, pedidos] = await Promise.all([
       obter<{ pendentes: number }>("/servico/remarcacoes"),
       obter<{ pendentes: unknown[] }>("/servico/vagas-libertadas"),
       obter<{ itens: { chamada?: unknown }[] }>("/servico/chamadas"),
       obter<unknown[]>("/servico/propostas"),
-      obter<unknown[]>("/validacao/consultas"),
+      obter<{ porEstado: Record<string, { decisao_pendente?: boolean }[]> }>("/servico/pedidos"),
     ]);
+    const semVaga = (pedidos?.porEstado.SEM_VAGA ?? []).filter((p) => !p.decisao_pendente).length;
     return [
-      { n: remarcacoes?.pendentes ?? null, texto: "remarcação(ões) propostas (avaria, ausência ou falta) a validar", para: "/servico?aba=remarcacoes", urgente: true },
-      { n: len(propostas), texto: "proposta(s) de troca de vaga a aprovar", para: "/servico?aba=pendencias", urgente: true },
+      { n: remarcacoes?.pendentes ?? null, texto: "remarcação(ões) propostas (avaria, ausência ou falta) a validar", para: "/servico?aba=decidir", urgente: true },
+      { n: len(propostas), texto: "troca(s) de vaga a aprovar", para: "/servico?aba=decidir", urgente: true },
+      { n: semVaga, texto: "pedido(s) sem vaga no prazo, com a primeira vaga sugerida", para: "/servico?aba=decidir", urgente: true },
       { n: len(vagas?.pendentes), texto: "vaga(s) libertada(s) com oferta de antecipação", para: "/servico?aba=vagas" },
       { n: chamadas ? chamadas.itens.filter((i) => !i.chamada).length : null, texto: "chamada(s) a fazer (só marcações com risco)", para: "/servico?aba=chamadas" },
-      { n: len(validacao), texto: "consulta(s) com pedidos por validar", para: "/validacao" },
     ];
   }
   if (perfil === "TRIADOR") {
@@ -110,7 +111,7 @@ export function Inicio() {
   const porFazer = (tarefas ?? []).filter((t) => t.n === null || t.n > 0);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
+    <div className="mx-auto max-w-7xl px-4 py-6">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-200 pb-4">
         <div>
           <p className="text-xs text-slate-500">
@@ -121,7 +122,7 @@ export function Inicio() {
             {utilizador ? `Olá, ${utilizador.nome}` : "Pedidos pós-consulta"}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            O médico escreve o plano no Oasis; os pedidos seguem para validação, triagem e marcação automática, com as regras de prioridade à vista.
+            O médico declara os pedidos na consulta; seguem para triagem e marcação automática, com as regras de prioridade à vista.
           </p>
         </div>
         <Link

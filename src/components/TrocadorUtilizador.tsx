@@ -44,7 +44,7 @@ interface Especialidade {
 }
 
 const ROTA_POR_TIPO: Record<TipoNotificacao, string> = {
-  CONSULTA_SUBMETIDA: "/validacao",
+  CONSULTA_SUBMETIDA: "/servico",
   PEDIDO_EM_TRIAGEM: "/triagem",
   PEDIDO_MARCADO: "/meus-pedidos",
   PEDIDO_SEM_VAGA: "/servico",

@@ -43,7 +43,10 @@ export function avaliarDependenciasDetalhado(pedido: Pedido, dataConsulta: Date)
   for (const dep of dependenciasDe(pedido)) {
     const requisito = store.pedidos.find((p) => p.pedido_id === dep.depende_de_pedido_id);
     if (!requisito) continue;
-    resultado.push({ requisito, estado: avaliarDependencia(requisito, dataConsulta, descreverPedido(requisito)) });
+    // O intervalo é o da própria dependência (o mesmo que o agendamento usa): a creatinina da R1 tem
+    // resultado no dia seguinte, não nos 2 dias genéricos das análises.
+    const intervalo = dep.intervalo_min_dias || intervaloResultado(requisito.especialidade_destino);
+    resultado.push({ requisito, estado: avaliarDependencia(requisito, dataConsulta, descreverPedido(requisito), intervalo) });
   }
   return resultado;
 }
@@ -53,7 +56,7 @@ function piorCor(a: EstadoSemaforo, b: EstadoSemaforo): EstadoSemaforo {
   return ordem[b.cor] > ordem[a.cor] ? b : a;
 }
 
-function avaliarDependencia(requisito: Pedido, dataConsulta: Date, nomeReq: string): EstadoSemaforo {
+function avaliarDependencia(requisito: Pedido, dataConsulta: Date, nomeReq: string, intervalo: number): EstadoSemaforo {
   if (requisito.estado === "FALTOU") {
     return { cor: "vermelho", porque: `${nomeReq}: doente faltou.` };
   }
@@ -68,7 +71,7 @@ function avaliarDependencia(requisito: Pedido, dataConsulta: Date, nomeReq: stri
     return { cor: "verde", porque: `${nomeReq}: realizado.` };
   }
   // MARCADO, antes da consulta: verifica se há tempo para o resultado
-  const disponivelEm = somarDias(dataReq, intervaloResultado(requisito.especialidade_destino));
+  const disponivelEm = somarDias(dataReq, intervalo);
   if (disponivelEm.getTime() > dataConsulta.getTime()) {
     return { cor: "vermelho", porque: `${nomeReq}: marcado, mas sem tempo para o resultado antes da consulta.` };
   }
