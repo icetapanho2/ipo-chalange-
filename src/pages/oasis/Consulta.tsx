@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { OasisPainel, OasisShell } from "../../oasis/OasisShell";
 import { apiGet, apiPost, apiPut } from "../../lib/api";
 import { DoenteModal } from "../../components/DoenteModal";
@@ -8,13 +8,9 @@ import {
   Activity,
   Sparkles,
   ArrowRight,
-  CheckCircle2,
-  AlertTriangle,
+  ClipboardList,
   Clock,
-  FileEdit,
-  Wand2,
   ExternalLink,
-  ChevronRight,
   Info,
   Pencil,
   Stethoscope,
@@ -103,20 +99,6 @@ interface RespostaConsulta {
   resumoPedidos?: ResumoPedidos;
 }
 
-interface NotificacaoAdministrativa {
-  nome: string;
-  cargo: string;
-  especialidade_legivel: string;
-}
-
-interface RespostaGuardar {
-  ok: boolean;
-  pedidosCriados: number;
-  pedidos: PedidoDetalhado[];
-  alertas: string[];
-  notificacaoAdministrativa?: NotificacaoAdministrativa | null;
-}
-
 const SECAO_CLINICA = {
   titulo: "S/O/A — Registo Clínico",
   subtitulo: "Subjectivo, objectivo e avaliação: sintomas, achados do exame físico e diagnóstico/evolução, em texto livre",
@@ -127,9 +109,9 @@ const SECAO_CLINICA = {
 
 const SECAO_PLANO = {
   chave: "p" as const,
-  titulo: "P — Plano Terapêutico & Pedidos Pós-Consulta",
-  subtitulo: "Exames, análises, consultas de revisão e interconsultas a outros serviços",
-  ajuda: "O Agente Oasis analisa este plano para extrair pedidos, marcar no serviço e enviar a triagem.",
+  titulo: "P — Plano Terapêutico",
+  subtitulo: "Orientação clínica para os exames, análises, consultas ou tratamentos a pedir a seguir",
+  ajuda: "Ex: Vigilância pós-adjuvante. Rever com TC de reestadiamento e analítica.",
 };
 
 export function OasisConsulta() {
@@ -139,10 +121,7 @@ export function OasisConsulta() {
   const [campos, setCampos] = useState({ soa: "", p: "" });
   const [erro, setErro] = useState<string | null>(null);
   const [aGuardar, setAGuardar] = useState(false);
-  const [resultado, setResultado] = useState<RespostaGuardar | null>(null);
   const [modalDoenteAberto, setModalDoenteAberto] = useState(false);
-  const [modoFormulario, setModoFormulario] = useState<"soap" | "interativo">("soap");
-  const [confirmacaoPendente, setConfirmacaoPendente] = useState(false);
   const [aEditarClinico, setAEditarClinico] = useState(false);
   const [formClinico, setFormClinico] = useState({
     diagnostico_principal: "",
@@ -162,14 +141,6 @@ export function OasisConsulta() {
         if (r.nota) {
           const soa = [r.nota.s, r.nota.o, r.nota.a].filter((texto) => texto.trim()).join("\n\n");
           setCampos({ soa, p: r.nota.p });
-        }
-        if (r.pedidosExistentes && r.pedidosExistentes.length > 0) {
-          setResultado({
-            ok: true,
-            pedidosCriados: r.pedidosExistentes.length,
-            pedidos: r.pedidosExistentes,
-            alertas: [],
-          });
         }
         setFormClinico({
           diagnostico_principal: r.doente?.diagnostico_principal ?? "",
@@ -200,36 +171,24 @@ export function OasisConsulta() {
     }
   }
 
-  async function guardar() {
+  // Grava a nota SOAP (sem Agente Oasis — o P é só texto clínico) e segue directamente para o
+  // assistente de pedidos: o médico declara o que pretende, sem etapa intermédia.
+  async function guardarESeguir() {
     if (!atoId) return;
     setAGuardar(true);
     setErro(null);
-    setResultado(null);
     try {
-      // O S/O/A fica junto num único campo de escrita livre; o servidor continua a guardar
-      // s/o/a/p em separado, por isso todo o texto clínico vai para "s" e o P fica à parte.
-      const r = await apiPost<RespostaGuardar>(`/oasis/consulta/${atoId}/guardar`, {
+      await apiPost(`/oasis/consulta/${atoId}/guardar`, {
         s: campos.soa,
         o: "",
         a: "",
         p: campos.p,
       });
-      setResultado(r);
-      setConfirmacaoPendente(true);
+      navigate(`/oasis/medico/${atoId}/pedidos`);
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
-    } finally {
       setAGuardar(false);
     }
-  }
-
-  function avancarParaAgenda() {
-    setConfirmacaoPendente(false);
-    const dia = dados?.ato.data_hora.slice(0, 10);
-    const destino = dia ? `/oasis/medico?data=${dia}` : "/oasis/medico";
-    navigate(destino, {
-      state: resultado?.notificacaoAdministrativa ? { toastAdministrativo: resultado.notificacaoAdministrativa } : undefined,
-    });
   }
 
   return (
@@ -241,23 +200,23 @@ export function OasisConsulta() {
             <button
               type="button"
               className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-300 text-white hover:bg-white/10 transition-colors"
-              title="Como funciona o Agente Oasis"
+              title="Como funciona este registo"
             >
               <Info className="h-3.5 w-3.5" />
             </button>
             <div className="invisible absolute right-0 top-full z-20 mt-2 w-72 rounded-lg border border-slate-200 bg-white p-3 text-left text-slate-700 opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
               <h4 className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
                 <Sparkles className="h-3.5 w-3.5 text-oasis-accent" />
-                <span>Como funciona o Agente</span>
+                <span>Como funciona</span>
               </h4>
               <p className="text-[11px] leading-relaxed text-slate-600">
-                1. Digite no <strong>P — Plano</strong> ou use o <strong>Construtor Assistido</strong>.
+                1. Registe o S/O/A e o P (plano) em texto livre.
               </p>
               <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
-                2. Ao clicar em <strong>Guardar & Extrair</strong>, o agente traduz linguagem clínica livre para pedidos formais.
+                2. Em <strong>Guardar & Seguinte</strong>, escolhe os tipos de pedido (consulta, exame, análises…) e preenche cada um.
               </p>
               <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
-                3. Consultas do mesmo serviço e exames são preparados para agendamento direto; interconsultas seguem para triagem.
+                3. Reveja o resumo e submeta: os pedidos seguem de imediato para agendamento ou triagem do serviço.
               </p>
             </div>
           </div>
@@ -531,277 +490,102 @@ export function OasisConsulta() {
               )}
             </OasisPainel>
 
-            {/* Toggle: Formulário SOAP vs Construtor Interativo */}
-            <div className="rounded-lg border border-slate-200 bg-white p-2 shadow-2xs">
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-md">
-                <button
-                  type="button"
-                  onClick={() => setModoFormulario("soap")}
-                  className={`flex-1 rounded px-2 py-1.5 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
-                    modoFormulario === "soap" ? "bg-white text-oasis-header shadow-2xs" : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <FileEdit className="h-3.5 w-3.5" />
-                  <span>Formulário SOAP</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModoFormulario("interativo")}
-                  className={`flex-1 rounded px-2 py-1.5 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 ${
-                    modoFormulario === "interativo" ? "bg-white text-oasis-header shadow-2xs" : "text-slate-600 hover:text-slate-900"
-                  }`}
-                >
-                  <Wand2 className="h-3.5 w-3.5" />
-                  <span>Construtor Interativo</span>
-                </button>
-              </div>
-            </div>
           </div>
 
-          {/* PAINEL DIREITO: REGISTO CLÍNICO & CONSTRUTOR */}
+          {/* PAINEL DIREITO: REGISTO CLÍNICO */}
           <div className="space-y-4">
-            {/* SEPARADOR: CONSTRUTOR DE PEDIDOS ASSISTIDO — em desenvolvimento, fica em stand-by */}
-            {modoFormulario === "interativo" && (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-                <Wand2 className="mx-auto h-8 w-8 text-slate-400 mb-2" />
-                <h4 className="text-sm font-bold text-slate-600">Construtor Interativo — em trabalho, brevemente disponível</h4>
-                <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
-                  Este formulário assistido para preencher pedidos por selecção visual está em desenvolvimento. Por
-                  agora, use o Formulário SOAP para registar a consulta e gerar pedidos.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setModoFormulario("soap")}
-                  className="mt-3 rounded-lg bg-oasis-header px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
-                >
-                  Usar Formulário SOAP
-                </button>
-              </div>
-            )}
-
-            {/* SEPARADOR: REGISTO SOAP REALISTA DO OASIS */}
-            {modoFormulario === "soap" && (
-              <OasisPainel titulo="Folha Clínica de Registo Médico (SOAP)">
-                <div className="space-y-4">
-                  {/* S/O/A num único campo de escrita livre */}
-                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-2xs">
-                    <div className="mb-1.5">
-                      <label className="text-xs font-bold text-slate-800">{SECAO_CLINICA.titulo}</label>
-                      <span className="text-[11px] text-slate-400 block">{SECAO_CLINICA.subtitulo}</span>
-                    </div>
-                    <textarea
-                      id="campo-soap-soa"
-                      className="w-full rounded border border-slate-300 bg-white p-2.5 text-xs text-slate-800 transition-colors focus:outline-none focus:border-oasis-accent"
-                      rows={5}
-                      value={campos.soa}
-                      onChange={(e) => setCampos((c) => ({ ...c, soa: e.target.value }))}
-                      placeholder={SECAO_CLINICA.ajuda}
-                    />
+            <OasisPainel titulo="Folha Clínica de Registo Médico (SOAP)">
+              <div className="space-y-4">
+                {/* S/O/A num único campo de escrita livre */}
+                <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-2xs">
+                  <div className="mb-1.5">
+                    <label className="text-xs font-bold text-slate-800">{SECAO_CLINICA.titulo}</label>
+                    <span className="text-[11px] text-slate-400 block">{SECAO_CLINICA.subtitulo}</span>
                   </div>
-
-                  {/* P — Plano, à parte e por último: é o campo que o Agente Oasis lê */}
-                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-2xs">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div>
-                        <label className="text-xs font-bold text-slate-800">{SECAO_PLANO.titulo}</label>
-                        <span className="text-[11px] text-slate-400 block">{SECAO_PLANO.subtitulo}</span>
-                      </div>
-                      <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800 flex items-center gap-1">
-                        <Sparkles className="h-3 w-3" />
-                        <span>Lido pelo Agente Oasis</span>
-                      </span>
-                    </div>
-                    <textarea
-                      id="campo-soap-p"
-                      className="w-full rounded border border-sky-300 bg-sky-50/20 p-2.5 text-xs text-slate-800 font-mono leading-relaxed transition-colors focus:outline-none focus:border-sky-600 focus:bg-white"
-                      rows={5}
-                      value={campos.p}
-                      onChange={(e) => setCampos((c) => ({ ...c, p: e.target.value }))}
-                      placeholder={SECAO_PLANO.ajuda}
-                    />
-                  </div>
+                  <textarea
+                    id="campo-soap-soa"
+                    className="w-full rounded border border-slate-300 bg-white p-2.5 text-xs text-slate-800 transition-colors focus:outline-none focus:border-oasis-accent"
+                    rows={5}
+                    value={campos.soa}
+                    onChange={(e) => setCampos((c) => ({ ...c, soa: e.target.value }))}
+                    placeholder={SECAO_CLINICA.ajuda}
+                  />
                 </div>
 
-                <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-200">
-                  <div className="text-xs text-slate-500">
-                    O formulário cumpre as normas de documentação clínica hospitalar do SNS.
+                {/* P — Plano, à parte e por último */}
+                <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-2xs">
+                  <div className="mb-1.5">
+                    <label className="text-xs font-bold text-slate-800">{SECAO_PLANO.titulo}</label>
+                    <span className="text-[11px] text-slate-400 block">{SECAO_PLANO.subtitulo}</span>
                   </div>
+                  <textarea
+                    id="campo-soap-p"
+                    className="w-full rounded border border-slate-300 bg-white p-2.5 text-xs text-slate-800 leading-relaxed transition-colors focus:outline-none focus:border-oasis-accent"
+                    rows={5}
+                    value={campos.p}
+                    onChange={(e) => setCampos((c) => ({ ...c, p: e.target.value }))}
+                    placeholder={SECAO_PLANO.ajuda}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-200">
+                <div className="text-xs text-slate-500">
+                  O formulário cumpre as normas de documentação clínica hospitalar do SNS.
+                </div>
+                <button
+                  id="btn-guardar-consulta"
+                  type="button"
+                  onClick={guardarESeguir}
+                  disabled={aGuardar}
+                  className="rounded-lg bg-oasis-header px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 transition-transform active:scale-95"
+                >
+                  {aGuardar ? (
+                    <>
+                      <Clock className="h-4 w-4 animate-spin" />
+                      <span>A guardar…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Guardar & Seguinte</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </OasisPainel>
+
+            {/* Pedidos já submetidos nesta consulta (se o médico voltar a abrir o ecrã) */}
+            {dados.pedidosExistentes && dados.pedidosExistentes.length > 0 && (
+              <div id="pedidos-existentes-consulta" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                    <ClipboardList className="h-3.5 w-3.5 text-oasis-accent" />
+                    <span>Pedidos já submetidos nesta consulta ({dados.pedidosExistentes.length})</span>
+                  </h4>
                   <button
-                    id="btn-guardar-consulta"
                     type="button"
-                    onClick={guardar}
-                    disabled={aGuardar}
-                    className="rounded-lg bg-oasis-header px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 transition-transform active:scale-95"
+                    onClick={() => atoId && navigate(`/oasis/medico/${atoId}/pedidos`)}
+                    className="text-[11px] font-semibold text-oasis-accent hover:underline shrink-0"
                   >
-                    {aGuardar ? (
-                      <>
-                        <Clock className="h-4 w-4 animate-spin" />
-                        <span>Agente a processar plano…</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 text-sky-300" />
-                        <span>Guardar Consulta & Extrair com IA</span>
-                      </>
-                    )}
+                    + Adicionar mais pedidos
                   </button>
                 </div>
-              </OasisPainel>
-            )}
-
-            {/* PAINEL DINÂMICO DE RESULTADOS DO AGENTE DE IA */}
-            {resultado && (
-              <div
-                id="resultado-extracao-agente"
-                className="rounded-xl border border-sky-300 bg-white p-4 shadow-sm animate-in fade-in duration-300"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-100 pb-3 mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-2xs">
-                      <CheckCircle2 className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-800">
-                        {resultado.pedidosCriados > 0
-                          ? `Agente Oasis traduziu com sucesso ${resultado.pedidosCriados} pedido(s) estruturado(s)`
-                          : "Agente Oasis não identificou pedidos pendentes no plano"}
-                      </h4>
-                      <p className="text-xs text-slate-500">
-                        Traduzido para os atos, especialidades e prazos do catálogo hospitalar
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {dados.pedidosExistentes.map((p) => (
+                    <div key={p.pedido_id} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs">
+                      <span className="inline-block rounded bg-sky-100 px-1.5 py-0.2 text-[10px] font-bold text-sky-800 uppercase mb-1">
+                        {p.tipo_pedido_legivel}
+                      </span>
+                      <p className="font-bold text-slate-800">{p.descricao}</p>
+                      <p className="text-slate-500 mt-0.5">
+                        {p.especialidade_destino_legivel} · {p.estado_legivel}
                       </p>
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Link
-                      to="/validacao"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700"
-                    >
-                      <span>Aceder à Validação</span>
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Lista Detalhada de Pedidos Extraídos */}
-                {resultado.pedidos.length > 0 && (
-                  <div className="space-y-2.5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                      Pedidos estruturados gerados a partir do plano:
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                      {resultado.pedidos.map((p) => (
-                        <div
-                          key={p.pedido_id}
-                          className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs shadow-2xs hover:border-sky-300 transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <span className="inline-block rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800 uppercase tracking-wider mb-1">
-                                {p.tipo_pedido_legivel || p.tipo_pedido}
-                              </span>
-                              <h5 className="font-bold text-slate-800 text-sm">{p.descricao || p.ato_codigo}</h5>
-                              <p className="text-slate-600 mt-0.5">
-                                Destino: <strong className="text-slate-700">{p.especialidade_destino_legivel || p.especialidade_destino}</strong>
-                              </p>
-                            </div>
-                            <span
-                              className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                                p.prioridade === "MP"
-                                  ? "bg-red-100 text-red-800"
-                                  : p.prioridade === "P"
-                                  ? "bg-amber-100 text-amber-800"
-                                  : "bg-slate-200 text-slate-700"
-                              }`}
-                            >
-                              {p.prioridade_legivel || p.prioridade}
-                            </span>
-                          </div>
-
-                          <div className="mt-2 flex flex-wrap items-center justify-between text-[11px] text-slate-500 border-t border-slate-200 pt-1.5">
-                            <span>Prazo limite: <strong>{p.prazo_limite || "—"}</strong></span>
-                            {p.confianca !== undefined && (
-                              <span className="text-emerald-700 font-semibold">
-                                Confiança IA: {(p.confianca * 100).toFixed(0)}%
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Alertas Detectados pelo Agente */}
-                {resultado.alertas && resultado.alertas.length > 0 && (
-                  <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-                    <div className="flex items-center gap-1.5 font-bold mb-1">
-                      <AlertTriangle className="h-4 w-4 text-amber-600" />
-                      <span>Alertas Clínicos & Regras Detectadas:</span>
-                    </div>
-                    <ul className="list-disc pl-5 space-y-1">
-                      {resultado.alertas.map((a, i) => (
-                        <li key={i}>{a}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Próximos Passos */}
-                <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 rounded-lg p-2.5 border border-slate-200">
-                  <div className="flex items-center gap-1.5">
-                    <Info className="h-3.5 w-3.5 text-slate-400" />
-                    <span>
-                      Estes pedidos seguem para o ecrã de <strong>Validação</strong> administrativa para confirmação antes do agendamento ou triagem externa.
-                    </span>
-                  </div>
-                  <Link
-                    to="/validacao"
-                    className="text-oasis-accent font-semibold hover:underline inline-flex items-center gap-0.5 shrink-0"
-                  >
-                    <span>Ir para Validação</span>
-                    <ArrowRight className="h-3 w-3" />
-                  </Link>
+                  ))}
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Modal de confirmação pós-gravação: exige confirmação explícita do médico antes de sair */}
-      {confirmacaoPendente && resultado && (
-        <div
-          id="toast-confirmacao-submissao"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200"
-        >
-          <div className="w-full max-w-md rounded-2xl border border-emerald-200 bg-white p-6 text-center shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-2 duration-300">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
-              <CheckCircle2 className="h-8 w-8 text-emerald-600" />
-            </div>
-            <p className="mt-4 text-base font-bold text-slate-900">Consulta guardada com sucesso</p>
-            <p className="mt-2 text-sm text-slate-600 leading-relaxed">
-              {resultado.pedidosCriados > 0
-                ? `O Agente Oasis gerou ${resultado.pedidosCriados} pedido(s) a partir do plano. Confirme que submeteu todas as requisições necessárias para o que foi prescrito nesta consulta.`
-                : "Não foram identificados pedidos no plano. Confirme que não há requisições pendentes para esta consulta."}
-            </p>
-            <div className="mt-5 flex flex-col gap-2">
-              <button
-                id="btn-confirmar-submissao"
-                type="button"
-                onClick={avancarParaAgenda}
-                className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"
-              >
-                Avançar, sim — voltar à agenda
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmacaoPendente(false)}
-                className="rounded-lg px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50"
-              >
-                Rever plano primeiro
-              </button>
-            </div>
           </div>
         </div>
       )}

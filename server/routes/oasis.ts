@@ -1,10 +1,14 @@
 import { Router } from "express";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
-import { isoDataHora } from "../util.ts";
+import { isoData, isoDataHora } from "../util.ts";
 import { extrair } from "../extracao/index.ts";
-import { pedidoParaJson, descreverDoente, descreverEspecialidade, descreverUtilizador } from "../apresentacao.ts";
-import { notificar, utilizadoresPorPerfil } from "../motor/notificacoes.ts";
+import { pedidoParaJson, descreverUtilizador } from "../apresentacao.ts";
+import { registarEvento } from "../motor/estados.ts";
+import { aplicarR1, criarDependencia, intervaloResultado } from "../motor/dependencias.ts";
+import { aprovarPedidos } from "../motor/fluxo.ts";
+import { calcularPrazo, calcularPrioridadeSistema } from "../motor/prioridade.ts";
+import type { Pedido, Prioridade, TipoPedido } from "../types.ts";
 
 export function criarRotasOasis(store: typeof StoreType) {
   const router = Router();
@@ -70,8 +74,10 @@ export function criarRotasOasis(store: typeof StoreType) {
     res.json({ ato, doente, nota, pedidosExistentes, resumoPedidos });
   });
 
-  // Guardar a nota SOAP e chamar o agente de extracção sobre o campo P.
-  router.post("/consulta/:atoId/guardar", async (req, res) => {
+  // Guardar a nota SOAP (S/O/A/P em texto livre). Já não chama o Agente Oasis: o P deixou de
+  // ser interpretado automaticamente — os pedidos passam a ser declarados directamente pelo
+  // médico no assistente "Tipo de pedidos" → "Preenchimento" → "Resumo" (ver /consulta/:atoId/pedidos).
+  router.post("/consulta/:atoId/guardar", (req, res) => {
     const ato = store.atosMedicos.find((a) => a.mvp_ato_id === req.params.atoId);
     if (!ato) {
       res.status(404).json({ erro: "Consulta não encontrada." });
@@ -96,47 +102,135 @@ export function criarRotasOasis(store: typeof StoreType) {
       });
     }
 
-    const resultado = p.trim()
-      ? await extrair(p, medicoId, ato.doente_id, {
-          consultaAtoId: ato.mvp_ato_id,
-          especialidadeOrigem: ato.especialidade_codigo,
-          soap: { s, o, a },
-          quando,
-        })
-      : { pedidos: [], alertas: [] as string[] };
+    res.json({ ok: true });
+  });
 
-    const destinatariosAdministrativo = utilizadoresPorPerfil("ADMINISTRATIVO", ato.especialidade_codigo);
-    notificar({
-      tipo: "CONSULTA_SUBMETIDA",
-      destinatarios: destinatariosAdministrativo,
-      titulo: `Fim de consulta: ${descreverDoente(ato.doente_id)}`,
-      mensagem:
-        resultado.pedidos.length > 0
-          ? `${descreverUtilizador(medicoId)} submeteu ${resultado.pedidos.length} pedido(s) para rever e aprovar.`
-          : `${descreverUtilizador(medicoId)} terminou a consulta sem pedidos pendentes. Reveja a transcrição, se necessário.`,
-      doenteId: ato.doente_id,
-      consultaAtoId: ato.mvp_ato_id,
-      quando,
-    });
+  // Pedido estruturado tal como declarado pelo médico no assistente (sem IA): já vem com o
+  // acto/especialidade escolhidos, por isso o tipo_pedido vem sempre do catálogo, nunca de
+  // texto livre.
+  interface PedidoDeclarado {
+    especialidade_destino: string;
+    ato_codigo: string;
+    exames?: string[];
+    analises?: string[];
+    especificacao?: string;
+    prioridade?: Prioridade | "" | null;
+    nao_antes?: string; // "aaaa-mm-dd" ou ""
+    depende_exames_consulta?: boolean; // só relevante para tipo_pedido "consulta"
+  }
 
-    // Quem recebeu a notificação administrativa (secção N2): usado pelo toast no canto da
-    // agenda do médico — dá ênfase ao cargo/serviço, não ao nome (mais claro numa demo).
-    const primeiroAdministrativo = destinatariosAdministrativo
-      .map((id) => store.utilizadores.find((u) => u.utilizador_id === id))
-      .find((u): u is NonNullable<typeof u> => !!u);
+  // Cria pedidos directamente a partir do que o médico declarou no assistente (etapas 2-4):
+  // sem Agente Oasis, sem validação administrativa prévia — validado e encaminhado de imediato
+  // (regra de negócio: o médico passa a declarar directamente o que pretende pedir).
+  router.post("/consulta/:atoId/pedidos", (req, res) => {
+    const ato = store.atosMedicos.find((a) => a.mvp_ato_id === req.params.atoId);
+    if (!ato) {
+      res.status(404).json({ erro: "Consulta não encontrada." });
+      return;
+    }
+    const itens: PedidoDeclarado[] = Array.isArray(req.body?.pedidos) ? req.body.pedidos : [];
+    if (itens.length === 0) {
+      res.status(400).json({ erro: "Sem pedidos para submeter." });
+      return;
+    }
+
+    const quando = agora();
+    const medicoId = ato.mvp_medico_id;
+    const doente = store.doentes.find((d) => d.doente_id === ato.doente_id) ?? null;
+    const criados: Pedido[] = [];
+    const dependeExamesConsulta: Pedido[] = [];
+
+    for (const item of itens) {
+      const catalogo = store.catalogoAtos.find(
+        (c) => c.especialidade_codigo === item.especialidade_destino && c.ato_codigo === item.ato_codigo,
+      );
+      if (!catalogo) {
+        res.status(400).json({ erro: `Acto desconhecido (${item.especialidade_destino}/${item.ato_codigo}).` });
+        return;
+      }
+      const tipoPedido = catalogo.tipo_pedido as TipoPedido;
+      const especificacao = item.especificacao ?? "";
+      const exames = catalogo.tipo_pedido === "exame" ? item.exames ?? [] : [];
+      const analises = catalogo.tipo_pedido === "analises" ? item.analises ?? [] : [];
+
+      const resultadoEquacao = calcularPrioridadeSistema(
+        { tipo_pedido: tipoPedido, ato_codigo: item.ato_codigo, especificacao, prioridade_sugerida: item.prioridade || null },
+        doente,
+        undefined,
+        item.especialidade_destino,
+      );
+      const prioridade: Prioridade = item.prioridade || resultadoEquacao.prioridade;
+      const prazo = calcularPrazo(tipoPedido, prioridade, quando, null);
+      const naoAntes = item.nao_antes && /^\d{4}-\d{2}-\d{2}$/.test(item.nao_antes) ? item.nao_antes : "";
+
+      const pedido: Pedido = {
+        pedido_id: store.proximoId("pedido"),
+        doente_id: ato.doente_id,
+        consulta_origem_ato_id: ato.mvp_ato_id,
+        especialidade_origem: ato.especialidade_codigo,
+        medico_requisitante_id: medicoId,
+        criado_em: isoDataHora(quando),
+        tipo_pedido: tipoPedido,
+        fluxo: tipoPedido === "pedido_consulta" || tipoPedido === "pedido_hd" ? "TRIAGEM" : "DIRETO",
+        especialidade_destino: item.especialidade_destino,
+        ato_codigo: item.ato_codigo,
+        exames,
+        analises,
+        especificacao,
+        prioridade,
+        prazo_limite: isoData(prazo),
+        nao_antes: naoAntes,
+        medico_preferido_id: "",
+        continuidade_obrigatoria: false,
+        recorrencia: "",
+        texto_origem: especificacao,
+        confianca: 1,
+        aprovado_direto: true,
+        validado_por: "",
+        validado_em: "",
+        triado_por: "",
+        triado_em: "",
+        decisao_triagem: "",
+        marcado_em: "",
+        ato_id: "",
+        estado: "EXTRAIDO",
+        n_remarcacoes: 0,
+        prioridade_por_defeito: !item.prioridade,
+        score_prioridade: resultadoEquacao.score,
+        equacao_prioridade_detalhe: resultadoEquacao.detalheEquacao,
+        prioridade_calculada_sistema: !item.prioridade,
+      };
+      store.pedidos.push(pedido);
+      registarEvento(pedido, "CORRECAO", "EXTRAIDO", medicoId, {
+        detalhe: "Pedido declarado directamente pelo médico (sem Agente Oasis)",
+        dataHora: quando,
+      });
+      criados.push(pedido);
+      if (tipoPedido === "consulta" && item.depende_exames_consulta) dependeExamesConsulta.push(pedido);
+    }
+
+    // R1 (determinística, sem IA): TC com contraste exige creatinina recente, senão cria/liga a
+    // colheita. R3: em vez de "cheirar" o texto ("c/ exames"), o médico assinala explicitamente
+    // que a consulta depende dos exames/análises pedidos agora.
+    for (const p of criados) {
+      if (p.tipo_pedido === "exame") aplicarR1(p, criados, quando);
+    }
+    for (const revisao of dependeExamesConsulta) {
+      const mcdt = criados.filter((p) => p.pedido_id !== revisao.pedido_id && (p.tipo_pedido === "exame" || p.tipo_pedido === "analises"));
+      for (const requisito of mcdt) {
+        criarDependencia(revisao, requisito, intervaloResultado(requisito.especialidade_destino), "MEDICO");
+      }
+    }
+
+    // Validação + encaminhamento imediato: sem passar pela fila de validação administrativa.
+    aprovarPedidos(criados, medicoId, quando);
 
     res.json({
       ok: true,
-      pedidosCriados: resultado.pedidos.length,
-      pedidos: resultado.pedidos.map((pedido) => pedidoParaJson(pedido, store.parametros.limiar_confianca)),
-      alertas: resultado.alertas,
-      notificacaoAdministrativa: primeiroAdministrativo
-        ? {
-            nome: primeiroAdministrativo.nome,
-            cargo: "Administrativo",
-            especialidade_legivel: descreverEspecialidade(ato.especialidade_codigo),
-          }
-        : null,
+      protocolo: `${ato.mvp_ato_id}-${isoDataHora(quando).replace(/[-:T]/g, "")}`,
+      criadoEm: isoDataHora(quando),
+      medicoNome: descreverUtilizador(medicoId),
+      pedidos: criados.map((pedido) => pedidoParaJson(pedido, store.parametros.limiar_confianca)),
     });
   });
 

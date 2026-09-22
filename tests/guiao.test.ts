@@ -67,10 +67,19 @@ async function correrGuiao() {
     a: "",
     p: "TC TAP c/ contraste + colheita c/ jejum (hemog, bioq c/ creat, CEA, CA 19.9). Rev c/ exames 1/12 comigo.",
   });
-  const grupoMaria = await grupoDoDoente("100101", "U03");
-  await post("/api/validacao/aprovar", "U03", { pedidoIds: grupoMaria.pedidos.map((p) => p.pedido_id) });
+  const respMaria = await post<{ pedidos: { pedido_id: string; tipo_pedido: string }[] }>(
+    `/api/oasis/consulta/${atoMaria.ato_id}/pedidos`,
+    "U01",
+    {
+      pedidos: [
+        { especialidade_destino: "6100", ato_codigo: "9", analises: ["A001", "A002", "A003", "A004", "A005"] },
+        { especialidade_destino: "7000_2", ato_codigo: "1", exames: ["7000002", "7000004", "7000009"], especificacao: "com contraste" },
+        { especialidade_destino: "2102", ato_codigo: "22", especificacao: "revisão com exames", depende_exames_consulta: true },
+      ],
+    },
+  );
   const doente100101 = await get<{ timeline: ItemTimeline[] }>("/api/doente/100101", "U03");
-  for (const p of grupoMaria.pedidos) resultado[`maria_${p.tipo_pedido}`] = dataDaMarcacao(doente100101.timeline, p.pedido_id);
+  for (const p of respMaria.pedidos) resultado[`maria_${p.tipo_pedido}`] = dataDaMarcacao(doente100101.timeline, p.pedido_id);
 
   // 2. José (100104)
   const grupoJose = await grupoDoDoente("100104", "U03");
@@ -89,22 +98,21 @@ async function correrGuiao() {
     a: "",
     p: "HPC 4/4s. Colheita s/ jejum (hemog, CEA). Rev c/ resultados 1/12.",
   });
-  const grupoRosa = await grupoDoDoente("100105", "U03");
-  const alertaHpc = grupoRosa.alertas[0];
-  const { pedido: cvcRosa } = await post<{ pedido: { pedido_id: string } }>(`/api/validacao/alertas/${alertaHpc.alerta_id}/criar-pedido`, "U03", {
-    consultaAtoId: grupoRosa.consulta_ato_id,
-    medicoId: "U01",
-    tipo_pedido: "tratamento",
-    especialidade_destino: "9602",
-    ato_codigo: "3",
-    exames: ["65270"],
-    recorrencia: "4 semanas",
-    correcaoDicionario: { termo: "HPC", significado: "Manutenção e heparinização de cateter", mapeiaPara: "tratamento 9602/3: 65270" },
-  });
-  await post("/api/validacao/aprovar", "U03", { pedidoIds: [...grupoRosa.pedidos.map((p) => p.pedido_id), cvcRosa.pedido_id] });
+  const respRosa = await post<{ pedidos: { pedido_id: string; tipo_pedido: string }[] }>(
+    `/api/oasis/consulta/${atoRosa.ato_id}/pedidos`,
+    "U01",
+    {
+      pedidos: [
+        { especialidade_destino: "6100", ato_codigo: "4", analises: ["A001", "A004"] },
+        { especialidade_destino: "9602", ato_codigo: "3", exames: ["65270"], especificacao: "CVC" },
+        { especialidade_destino: "2102", ato_codigo: "23", especificacao: "revisão com resultados", depende_exames_consulta: true },
+      ],
+    },
+  );
   const doente100105 = await get<{ timeline: ItemTimeline[] }>("/api/doente/100105", "U03");
-  resultado.rosa_cvc = dataDaMarcacao(doente100105.timeline, cvcRosa.pedido_id);
-  for (const p of grupoRosa.pedidos) resultado[`rosa_${p.tipo_pedido}`] = dataDaMarcacao(doente100105.timeline, p.pedido_id);
+  const cvcRosaId = respRosa.pedidos.find((p) => p.tipo_pedido === "tratamento")!.pedido_id;
+  resultado.rosa_cvc = dataDaMarcacao(doente100105.timeline, cvcRosaId);
+  for (const p of respRosa.pedidos) resultado[`rosa_${p.tipo_pedido}`] = dataDaMarcacao(doente100105.timeline, p.pedido_id);
 
   // 4. Carlos (100107)
   const atoCarlos = agendaU01.atos.find((a) => a.data_hora === "2026-09-23T10:10")!;
@@ -114,10 +122,18 @@ async function correrGuiao() {
     a: "",
     p: "Mantém vigilância. HPC 4/4s. Rev 1/12 comigo.",
   });
-  const grupoCarlos = await grupoDoDoente("100107", "U03");
-  await post("/api/validacao/aprovar", "U03", { pedidoIds: grupoCarlos.pedidos.map((p) => p.pedido_id) });
+  const respCarlos = await post<{ pedidos: { pedido_id: string; tipo_pedido: string }[] }>(
+    `/api/oasis/consulta/${atoCarlos.ato_id}/pedidos`,
+    "U01",
+    {
+      pedidos: [
+        { especialidade_destino: "9602", ato_codigo: "3", exames: ["65270"], especificacao: "HPC" },
+        { especialidade_destino: "2102", ato_codigo: "23" },
+      ],
+    },
+  );
   const doente100107 = await get<{ timeline: ItemTimeline[] }>("/api/doente/100107", "U03");
-  for (const p of grupoCarlos.pedidos) resultado[`carlos_${p.tipo_pedido}`] = dataDaMarcacao(doente100107.timeline, p.pedido_id);
+  for (const p of respCarlos.pedidos) resultado[`carlos_${p.tipo_pedido}`] = dataDaMarcacao(doente100107.timeline, p.pedido_id);
 
   // 5. Luísa (100103)
   interface ItemFila {
@@ -189,9 +205,9 @@ describe("Guião da demo pela API (Fase 9)", () => {
     expect(primeiraPassagem.jose_tc).toBe("02/10/2026 10:00");
     expect(primeiraPassagem.rosa_cvc).toBe("24/09/2026 09:00");
     expect(primeiraPassagem.rosa_analises).toBe("24/09/2026 07:30");
-    expect(primeiraPassagem.rosa_consulta).toBe("14/10/2026 09:30");
+    expect(primeiraPassagem.rosa_consulta).toBe("28/09/2026 09:10");
     expect(primeiraPassagem.carlos_tratamento).toBe("24/09/2026 09:30");
-    expect(primeiraPassagem.carlos_consulta).toBe("14/10/2026 09:50");
+    expect(primeiraPassagem.carlos_consulta).toBe("24/09/2026 09:30");
     expect(primeiraPassagem.luisa_rt).toBe("30/09/2026 09:00");
     expect(primeiraPassagem.fernando_hd).toBe("25/09/2026 08:30");
     expect(primeiraPassagem.fernando_colheita).toBe("24/09/2026 07:40");
