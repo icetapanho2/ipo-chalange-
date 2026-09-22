@@ -52,6 +52,13 @@ export interface Utilizador {
   e_medico: boolean;
 }
 
+/**
+ * As 4 fases grandes do percurso oncológico do doente no hospital (não confundir com o
+ * "estadiamento" TNM/clínico). Usadas para agrupar e filtrar "Os Meus Pedidos" do médico e,
+ * mais tarde, as estatísticas por serviço.
+ */
+export type EstadioCuidado = "NOVO" | "PRE_TRATAMENTO" | "EM_TRATAMENTO" | "FOLLOW_UP" | "";
+
 export interface Doente {
   doente_id: string;
   n_utente: string;
@@ -64,6 +71,7 @@ export interface Doente {
   alergias?: string[];
   contacto?: string;
   notas_clinicas?: string;
+  estadio_cuidado?: EstadioCuidado;
 }
 
 export interface Vaga {
@@ -176,6 +184,9 @@ export interface Pedido {
   score_prioridade?: number;
   equacao_prioridade_detalhe?: string;
   prioridade_calculada_sistema?: boolean;
+  /** true quando a administração pediu ao médico para decidir manter/cancelar um pedido SEM_VAGA
+   * sem solução interna (nem vaga extra, nem outsourcing) — ver server/motor/fluxo.ts. */
+  decisao_pendente?: boolean;
 }
 
 export interface Dependencia {
@@ -205,7 +216,9 @@ export type TipoEvento =
   | "FALTA"
   | "REALIZACAO"
   | "CANCELAMENTO"
-  | "ALERTA";
+  | "ALERTA"
+  | "OUTSOURCING"
+  | "DECISAO_MEDICO";
 
 export interface Evento {
   evento_id: string;
@@ -227,7 +240,8 @@ export type TipoNotificacao =
   | "PEDIDO_DEVOLVIDO"
   | "PEDIDO_RECUSADO"
   | "AVARIA_SERVICO"
-  | "AVARIA_RESOLVIDA";
+  | "AVARIA_RESOLVIDA"
+  | "PEDIDO_DECISAO_NECESSARIA";
 
 /** Notificação dirigida a um utilizador, gerada pelo motor em cada transição relevante do fluxo (secção 5/N2). */
 export interface Notificacao {

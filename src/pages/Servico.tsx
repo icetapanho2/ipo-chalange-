@@ -13,6 +13,13 @@ import {
   Wrench,
   CalendarClock,
   Users,
+  ClipboardList,
+  Inbox,
+  Building2,
+  HelpCircle,
+  Settings2,
+  RotateCcw,
+  BarChart3,
 } from "lucide-react";
 
 interface ResumoPedido {
@@ -27,6 +34,7 @@ interface ResumoPedido {
   estado: string;
   estado_legivel: string;
   n_remarcacoes: number;
+  decisao_pendente?: boolean;
 }
 
 interface RespostaPedidos {
@@ -98,6 +106,47 @@ interface ParaRever {
   emRisco: ItemParaRever[];
 }
 
+interface Pesos {
+  urgencia: number;
+  tipo: number;
+  paciente: number;
+}
+
+interface RespostaPrioridade {
+  especialidade_legivel: string;
+  personalizado: boolean;
+  pesos: Pesos;
+  pesosOmissao: Pesos;
+}
+
+interface ResumoEstatistica {
+  total: number;
+  medianaDias: number | null;
+  percentDentroPrazo: number | null;
+}
+
+interface EstatisticaPorEstadio extends ResumoEstatistica {
+  chave: string;
+  legivel: string;
+}
+
+interface OutlierEstatistica {
+  pedido_id: string;
+  doente_nome: string;
+  descricao: string;
+  dias: number;
+  dentro_prazo: boolean;
+  estadio_cuidado_legivel: string;
+}
+
+interface RespostaEstatisticas {
+  especialidade_legivel: string;
+  periodo: string;
+  geral: ResumoEstatistica;
+  porEstadio: EstatisticaPorEstadio[];
+  outliers: OutlierEstatistica[];
+}
+
 const ORDEM_ESTADOS = [
   { chave: "SEM_VAGA", titulo: "Sem Vaga", cor: "bg-amber-100 text-amber-800" },
   { chave: "EM_TRIAGEM", titulo: "Em Triagem", cor: "bg-sky-100 text-sky-800" },
@@ -122,6 +171,19 @@ export function Servico() {
   const [doenteModalId, setDoenteModalId] = useState<string | null>(null);
   const [estadoAtivo, setEstadoAtivo] = useState<string>("SEM_VAGA");
   const [aResolverAvaria, setAResolverAvaria] = useState<string | null>(null);
+  const [abaAtiva, setAbaAtiva] = useState<"risco" | "pendencias" | "carteira" | "estatisticas" | "definicoes">("risco");
+  const [notasOutsourcing, setNotasOutsourcing] = useState<Record<string, string>>({});
+  const [motivosDecisao, setMotivosDecisao] = useState<Record<string, string>>({});
+  const [aProcessarPedido, setAProcessarPedido] = useState<string | null>(null);
+  const [formSemVagaAberto, setFormSemVagaAberto] = useState<{ pedidoId: string; tipo: "outsourcing" | "decisao" } | null>(
+    null,
+  );
+  const [prioridade, setPrioridade] = useState<RespostaPrioridade | null>(null);
+  const [pesosForm, setPesosForm] = useState<Pesos | null>(null);
+  const [aGuardarPesos, setAGuardarPesos] = useState(false);
+  const [estatisticas, setEstatisticas] = useState<RespostaEstatisticas | null>(null);
+  const [filtroPeriodoEstatisticas, setFiltroPeriodoEstatisticas] = useState<"semana" | "mes" | "todos">("mes");
+  const [filtroEstadiosEstatisticas, setFiltroEstadiosEstatisticas] = useState<Set<string>>(new Set());
 
   function recarregar() {
     apiGet<RespostaPedidos>("/servico/pedidos")
@@ -133,9 +195,22 @@ export function Servico() {
     apiGet<SinalOverbooking[]>("/servico/overbooking").then(setOverbooking);
     apiGet<AvariaServico[]>("/servico/avarias").then(setAvarias);
     apiGet<ParaRever>("/servico/para-rever").then(setParaRever);
+    apiGet<RespostaPrioridade>("/servico/prioridade").then((r) => {
+      setPrioridade(r);
+      setPesosForm(r.pesos);
+    });
   }
 
   useEffect(recarregar, []);
+
+  function recarregarEstatisticas() {
+    const params = new URLSearchParams({ periodo: filtroPeriodoEstatisticas });
+    if (filtroEstadiosEstatisticas.size > 0) params.set("estadio", [...filtroEstadiosEstatisticas].join(","));
+    apiGet<RespostaEstatisticas>(`/servico/estatisticas?${params.toString()}`).then(setEstatisticas);
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(recarregarEstatisticas, [filtroPeriodoEstatisticas, filtroEstadiosEstatisticas]);
 
   async function fecharAlerta(id: string) {
     setErro(null);
@@ -190,6 +265,75 @@ export function Servico() {
     }
   }
 
+  async function confirmarOutsourcing(pedidoId: string) {
+    setErro(null);
+    setAProcessarPedido(pedidoId);
+    try {
+      await apiPost(`/servico/pedidos/${pedidoId}/outsourcing`, { nota: notasOutsourcing[pedidoId] ?? "" });
+      setMensagemSucesso("Pedido resolvido por capacidade externa (outsourcing).");
+      setFormSemVagaAberto(null);
+      recarregar();
+      setTimeout(() => setMensagemSucesso(null), 4000);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAProcessarPedido(null);
+    }
+  }
+
+  async function confirmarPedirDecisao(pedidoId: string) {
+    setErro(null);
+    const motivo = motivosDecisao[pedidoId] ?? "";
+    if (!motivo.trim()) {
+      setErro("Descreva porque não há solução interna nem externa.");
+      return;
+    }
+    setAProcessarPedido(pedidoId);
+    try {
+      await apiPost(`/servico/pedidos/${pedidoId}/pedir-decisao`, { motivo });
+      setMensagemSucesso("O médico requisitante foi notificado para decidir.");
+      setFormSemVagaAberto(null);
+      recarregar();
+      setTimeout(() => setMensagemSucesso(null), 4000);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAProcessarPedido(null);
+    }
+  }
+
+  async function guardarPesos() {
+    if (!pesosForm) return;
+    setErro(null);
+    setAGuardarPesos(true);
+    try {
+      const r = await apiPost<{ pesos: Pesos }>("/servico/prioridade/pesos", pesosForm);
+      setMensagemSucesso("Pesos da equação de prioridade actualizados para este serviço.");
+      setPrioridade((p) => (p ? { ...p, pesos: r.pesos, personalizado: true } : p));
+      setTimeout(() => setMensagemSucesso(null), 4000);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAGuardarPesos(false);
+    }
+  }
+
+  async function reporPesos() {
+    setErro(null);
+    setAGuardarPesos(true);
+    try {
+      const r = await apiPost<{ pesos: Pesos }>("/servico/prioridade/repor", {});
+      setPesosForm(r.pesos);
+      setPrioridade((p) => (p ? { ...p, pesos: r.pesos, personalizado: false } : p));
+      setMensagemSucesso("Pesos repostos para os valores por omissão.");
+      setTimeout(() => setMensagemSucesso(null), 4000);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAGuardarPesos(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
       {/* Cabeçalho do Painel do Serviço */}
@@ -233,8 +377,71 @@ export function Servico() {
         </div>
       )}
 
+      {/* Separadores para não misturar tudo numa só lista longa */}
+      <div className="mt-5 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        {[
+          {
+            chave: "risco" as const,
+            titulo: "Consultas em Risco",
+            icone: AlertTriangle,
+            contagem: (overbooking?.length ?? 0) + (emRisco?.length ?? 0),
+          },
+          {
+            chave: "pendencias" as const,
+            titulo: "Alertas e Pendências",
+            icone: Inbox,
+            contagem:
+              (avarias?.filter((a) => a.estado === "ABERTA").length ?? 0) +
+              (paraRever ? paraRever.faltas.length + paraRever.emRisco.length : 0) +
+              (propostas?.length ?? 0) +
+              (alertas?.length ?? 0),
+          },
+          {
+            chave: "carteira" as const,
+            titulo: "Carteira de Pedidos",
+            icone: ClipboardList,
+            contagem: pedidos ? Object.values(pedidos.porEstado).reduce((soma, l) => soma + l.length, 0) : 0,
+          },
+          {
+            chave: "estatisticas" as const,
+            titulo: "Estatísticas",
+            icone: BarChart3,
+            contagem: 0,
+          },
+          {
+            chave: "definicoes" as const,
+            titulo: "Definições",
+            icone: Settings2,
+            contagem: 0,
+          },
+        ].map((aba) => (
+          <button
+            key={aba.chave}
+            type="button"
+            onClick={() => setAbaAtiva(aba.chave)}
+            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-colors flex items-center gap-1.5 ${
+              abaAtiva === aba.chave
+                ? "bg-oasis-header text-white shadow-2xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <aba.icone className="h-3.5 w-3.5" />
+            <span>{aba.titulo}</span>
+            {aba.contagem > 0 && (
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                  abaAtiva === aba.chave ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                }`}
+              >
+                {aba.contagem}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* SECÇÃO 0A: SOBRELOTAÇÃO — MESMA PRIORIDADE/PRAZO, SEM VAGAS SUFICIENTES */}
-      {overbooking && overbooking.length > 0 && (
+      {abaAtiva === "risco" && overbooking && overbooking.length > 0 && (
         <div className="mt-5 rounded-xl border border-rose-300 bg-rose-50/60 p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-rose-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-rose-900 flex items-center gap-1.5">
@@ -271,7 +478,7 @@ export function Servico() {
       )}
 
       {/* SECÇÃO 0B: AVARIAS REPORTADAS PELOS TÉCNICOS */}
-      {avarias && avarias.some((a) => a.estado === "ABERTA") && (
+      {abaAtiva === "pendencias" && avarias && avarias.some((a) => a.estado === "ABERTA") && (
         <div className="mt-5 rounded-xl border border-orange-300 bg-orange-50/60 p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-orange-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-orange-900 flex items-center gap-1.5">
@@ -317,7 +524,7 @@ export function Servico() {
       )}
 
       {/* SECÇÃO 0C: FALTAS E RISCOS PARA REVER (O SISTEMA SUGERE, A ADMIN DECIDE) */}
-      {paraRever && (paraRever.faltas.length > 0 || paraRever.emRisco.length > 0) && (
+      {abaAtiva === "pendencias" && paraRever && (paraRever.faltas.length > 0 || paraRever.emRisco.length > 0) && (
         <div className="mt-5 rounded-xl border border-sky-200 bg-sky-50/50 p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-sky-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-sky-900 flex items-center gap-1.5">
@@ -350,7 +557,7 @@ export function Servico() {
       )}
 
       {/* SECÇÃO 1: CONSULTAS EM RISCO (PRÓXIMOS 14 DIAS) */}
-      {emRisco && emRisco.length > 0 && (
+      {abaAtiva === "risco" && emRisco && emRisco.length > 0 && (
         <div className="mt-5 rounded-xl border border-red-200 bg-red-50/50 p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-red-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-red-900 flex items-center gap-1.5">
@@ -408,7 +615,7 @@ export function Servico() {
       )}
 
       {/* SECÇÃO 2: PROPOSTAS DE TROCA INTELIGENTE DE VAGAS */}
-      {propostas && propostas.length > 0 && (
+      {abaAtiva === "pendencias" && propostas && propostas.length > 0 && (
         <div className="mt-5 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-indigo-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
@@ -455,8 +662,17 @@ export function Servico() {
         </div>
       )}
 
+      {/* Nada a mostrar nesta aba */}
+      {abaAtiva === "risco" &&
+        (!overbooking || overbooking.length === 0) &&
+        (!emRisco || emRisco.length === 0) && (
+          <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+            Sem consultas em risco de momento.
+          </div>
+        )}
+
       {/* SECÇÃO 3: ALERTAS DO SERVIÇO */}
-      {alertas && alertas.length > 0 && (
+      {abaAtiva === "pendencias" && alertas && alertas.length > 0 && (
         <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50/40 p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-amber-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
@@ -499,7 +715,19 @@ export function Servico() {
         </div>
       )}
 
+      {/* Nada a mostrar nesta aba */}
+      {abaAtiva === "pendencias" &&
+        (!avarias || !avarias.some((a) => a.estado === "ABERTA")) &&
+        (!paraRever || (paraRever.faltas.length === 0 && paraRever.emRisco.length === 0)) &&
+        (!propostas || propostas.length === 0) &&
+        (!alertas || alertas.length === 0) && (
+          <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+            Sem alertas ou pendências de momento.
+          </div>
+        )}
+
       {/* SECÇÃO 4: QUADRO DE PEDIDOS POR ESTADO */}
+      {abaAtiva === "carteira" && (
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-3 flex items-center gap-1.5">
           <Layers className="h-4 w-4 text-oasis-accent" />
@@ -545,47 +773,362 @@ export function Servico() {
               {pedidos?.porEstado[estadoAtivo]?.map((p) => (
                 <div
                   key={p.pedido_id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-slate-300 transition-colors"
+                  className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-slate-300 transition-colors"
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => p.doente_id && setDoenteModalId(p.doente_id)}
-                        className="font-bold text-sm text-slate-900 hover:text-oasis-accent flex items-center gap-1 text-left"
-                      >
-                        <span>{p.doente_nome}</span>
-                        <Activity className="h-3 w-3 text-sky-600" />
-                      </button>
-                      <span className="text-slate-300">·</span>
-                      <span className="text-xs font-semibold text-slate-600">{p.tipo_pedido_legivel}</span>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => p.doente_id && setDoenteModalId(p.doente_id)}
+                          className="font-bold text-sm text-slate-900 hover:text-oasis-accent flex items-center gap-1 text-left"
+                        >
+                          <span>{p.doente_nome}</span>
+                          <Activity className="h-3 w-3 text-sky-600" />
+                        </button>
+                        <span className="text-slate-300">·</span>
+                        <span className="text-xs font-semibold text-slate-600">{p.tipo_pedido_legivel}</span>
+                      </div>
+                      <h4 className="text-xs font-semibold text-slate-800 mt-0.5">{p.descricao}</h4>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Requisitante: {p.medico_requisitante_nome} · Prazo limite: <span className="font-mono">{p.prazo_limite}</span>
+                      </p>
                     </div>
-                    <h4 className="text-xs font-semibold text-slate-800 mt-0.5">{p.descricao}</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Requisitante: {p.medico_requisitante_nome} · Prazo limite: <span className="font-mono">{p.prazo_limite}</span>
-                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                        {p.prioridade_legivel}
+                      </span>
+                      {p.doente_id && (
+                        <button
+                          type="button"
+                          onClick={() => setDoenteModalId(p.doente_id!)}
+                          className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
+                        >
+                          Ver Perfil
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
-                      {p.prioridade_legivel}
-                    </span>
-                    {p.doente_id && (
-                      <button
-                        type="button"
-                        onClick={() => setDoenteModalId(p.doente_id!)}
-                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
-                      >
-                        Ver Perfil
-                      </button>
-                    )}
-                  </div>
+                  {/* Sem vaga: vaga extra/outsourcing, ou pedir decisão ao médico se não houver solução */}
+                  {p.estado === "SEM_VAGA" && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      {p.decisao_pendente ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
+                          <HelpCircle className="h-3.5 w-3.5" />
+                          <span>Aguarda decisão do médico requisitante</span>
+                        </span>
+                      ) : formSemVagaAberto?.pedidoId === p.pedido_id ? (
+                        formSemVagaAberto.tipo === "outsourcing" ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="Ex: Marcado em clínica convencionada, resultado até dd/mm…"
+                              className="min-w-[240px] flex-1 rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                              value={notasOutsourcing[p.pedido_id] ?? ""}
+                              onChange={(e) => setNotasOutsourcing((n) => ({ ...n, [p.pedido_id]: e.target.value }))}
+                            />
+                            <button
+                              type="button"
+                              disabled={aProcessarPedido === p.pedido_id}
+                              onClick={() => confirmarOutsourcing(p.pedido_id)}
+                              className="rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-800 disabled:opacity-50"
+                            >
+                              Confirmar outsourcing
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFormSemVagaAberto(null)}
+                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="Porque não há vaga interna nem outsourcing…"
+                              className="min-w-[240px] flex-1 rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                              value={motivosDecisao[p.pedido_id] ?? ""}
+                              onChange={(e) => setMotivosDecisao((m) => ({ ...m, [p.pedido_id]: e.target.value }))}
+                            />
+                            <button
+                              type="button"
+                              disabled={aProcessarPedido === p.pedido_id}
+                              onClick={() => confirmarPedirDecisao(p.pedido_id)}
+                              className="rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-800 disabled:opacity-50"
+                            >
+                              Notificar médico
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFormSemVagaAberto(null)}
+                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        )
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] text-slate-500">Sem vaga interna dentro do prazo:</span>
+                          <button
+                            type="button"
+                            onClick={() => setFormSemVagaAberto({ pedidoId: p.pedido_id, tipo: "outsourcing" })}
+                            className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100"
+                          >
+                            <Building2 className="h-3 w-3" />
+                            <span>Marcar outsourcing</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormSemVagaAberto({ pedidoId: p.pedido_id, tipo: "decisao" })}
+                            className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                          >
+                            <HelpCircle className="h-3 w-3" />
+                            <span>Pedir decisão ao médico</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+      )}
+
+      {/* ABA: ESTATÍSTICAS DO SERVIÇO */}
+      {abaAtiva === "estatisticas" && (
+        <div className="mt-6 space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                <BarChart3 className="h-4 w-4 text-oasis-accent" />
+                <span>Estatísticas — {estatisticas?.especialidade_legivel ?? ""}</span>
+              </h2>
+            </div>
+
+            {/* Filtros */}
+            <div className="flex flex-wrap items-start gap-x-6 gap-y-3 mb-4">
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Período</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { valor: "semana" as const, legivel: "Última semana" },
+                    { valor: "mes" as const, legivel: "Último mês" },
+                    { valor: "todos" as const, legivel: "Todo o histórico" },
+                  ].map((op) => (
+                    <button
+                      key={op.valor}
+                      type="button"
+                      onClick={() => setFiltroPeriodoEstatisticas(op.valor)}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                        filtroPeriodoEstatisticas === op.valor
+                          ? "border-oasis-header bg-oasis-header text-white"
+                          : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      {op.legivel}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Estádio do doente</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { valor: "NOVO", legivel: "Novo" },
+                    { valor: "PRE_TRATAMENTO", legivel: "Pré-tratamento" },
+                    { valor: "EM_TRATAMENTO", legivel: "Em tratamento" },
+                    { valor: "FOLLOW_UP", legivel: "Follow-up" },
+                  ].map((op) => (
+                    <button
+                      key={op.valor}
+                      type="button"
+                      onClick={() =>
+                        setFiltroEstadiosEstatisticas((s) => {
+                          const novo = new Set(s);
+                          if (novo.has(op.valor)) novo.delete(op.valor);
+                          else novo.add(op.valor);
+                          return novo;
+                        })
+                      }
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                        filtroEstadiosEstatisticas.has(op.valor)
+                          ? "border-oasis-header bg-oasis-header text-white"
+                          : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      {op.legivel}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {estatisticas && (
+              <>
+                {/* Resumo geral */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center">
+                    <span className="block text-2xl font-bold text-slate-800">{estatisticas.geral.total}</span>
+                    <span className="text-[11px] text-slate-500">pedidos marcados no período</span>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center">
+                    <span className="block text-2xl font-bold text-slate-800">
+                      {estatisticas.geral.medianaDias ?? "—"}
+                    </span>
+                    <span className="text-[11px] text-slate-500">dias, mediana até à consulta/exame</span>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center">
+                    <span
+                      className={`block text-2xl font-bold ${
+                        (estatisticas.geral.percentDentroPrazo ?? 100) >= 85 ? "text-emerald-700" : "text-amber-700"
+                      }`}
+                    >
+                      {estatisticas.geral.percentDentroPrazo ?? "—"}%
+                    </span>
+                    <span className="text-[11px] text-slate-500">agendados dentro do prazo</span>
+                  </div>
+                </div>
+
+                {/* Comparação por estádio: medianas lado a lado */}
+                <div className="mb-4">
+                  <h3 className="text-[11px] font-bold uppercase text-slate-400 mb-2">
+                    Mediana de dias até agendamento, por estádio do doente
+                  </h3>
+                  <div className="space-y-2">
+                    {estatisticas.porEstadio
+                      .filter((e) => e.total > 0)
+                      .map((e) => {
+                        const maiorMediana = Math.max(1, ...estatisticas.porEstadio.map((x) => x.medianaDias ?? 0));
+                        const largura = Math.round(((e.medianaDias ?? 0) / maiorMediana) * 100);
+                        return (
+                          <div key={e.chave} className="flex items-center gap-2">
+                            <span className="w-28 shrink-0 text-xs font-semibold text-slate-700">{e.legivel}</span>
+                            <div className="flex-1 h-5 rounded bg-slate-100 overflow-hidden">
+                              <div className="h-full bg-oasis-accent rounded" style={{ width: `${largura}%` }} />
+                            </div>
+                            <span className="w-24 shrink-0 text-right text-xs font-mono text-slate-600">
+                              {e.medianaDias ?? "—"} dias · {e.total}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    {estatisticas.porEstadio.every((e) => e.total === 0) && (
+                      <p className="text-xs text-slate-400">Sem pedidos marcados no período para comparar.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Outliers */}
+                <div>
+                  <h3 className="text-[11px] font-bold uppercase text-slate-400 mb-2">
+                    Outliers — casos mais demorados a agendar
+                  </h3>
+                  {estatisticas.outliers.length === 0 ? (
+                    <p className="text-xs text-slate-400">Sem casos a destacar.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {estatisticas.outliers.map((o) => (
+                        <div
+                          key={o.pedido_id}
+                          className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs ${
+                            o.dentro_prazo ? "border-slate-200 bg-white" : "border-red-200 bg-red-50"
+                          }`}
+                        >
+                          <span>
+                            <strong className="text-slate-800">{o.doente_nome}</strong>
+                            <span className="text-slate-500"> — {o.descricao} · {o.estadio_cuidado_legivel}</span>
+                          </span>
+                          <span className={`font-mono font-bold ${o.dentro_prazo ? "text-slate-600" : "text-red-700"}`}>
+                            {o.dias} dias{!o.dentro_prazo ? " · fora do prazo" : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ABA: DEFINIÇÕES (pesos da equação de prioridade deste serviço) */}
+      {abaAtiva === "definicoes" && prioridade && pesosForm && (
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+              <Settings2 className="h-4 w-4 text-oasis-accent" />
+              <span>Pesos da Equação de Prioridade — {prioridade.especialidade_legivel}</span>
+            </h2>
+            {prioridade.personalizado && (
+              <span className="rounded-full bg-oasis-accent/20 px-2 py-0.5 text-[10px] font-bold text-oasis-header">
+                personalizado
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 mb-3">
+            A prioridade automática de cada pedido combina 3 factores. Ajuste o peso de cada um consoante o que
+            importa mais neste serviço (ex.: dar mais valor ao prazo/urgência do que ao tipo de pedido). Os valores
+            são normalizados para somar 100%. Só afecta este serviço; os restantes mantêm os pesos por omissão.
+          </p>
+          <div className="space-y-3">
+            {(
+              [
+                { chave: "urgencia" as const, titulo: "Urgência clínica / prazo" },
+                { chave: "tipo" as const, titulo: "Tipo de pedido" },
+                { chave: "paciente" as const, titulo: "Perfil clínico do doente" },
+              ]
+            ).map((f) => (
+              <div key={f.chave}>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="font-semibold text-slate-700">{f.titulo}</span>
+                  <span className="font-mono font-bold text-oasis-header">
+                    {Math.round(
+                      (pesosForm[f.chave] / (pesosForm.urgencia + pesosForm.tipo + pesosForm.paciente || 1)) * 100,
+                    )}
+                    %
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round(pesosForm[f.chave] * 100)}
+                  onChange={(e) => setPesosForm((p) => (p ? { ...p, [f.chave]: Number(e.target.value) / 100 } : p))}
+                  className="w-full"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex items-center gap-2 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              disabled={aGuardarPesos}
+              onClick={guardarPesos}
+              className="rounded-lg bg-oasis-header px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-700 disabled:opacity-50"
+            >
+              {aGuardarPesos ? "A guardar…" : "Guardar pesos deste serviço"}
+            </button>
+            <button
+              type="button"
+              disabled={aGuardarPesos || !prioridade.personalizado}
+              onClick={reporPesos}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Repor por omissão</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal Universal de Feedback do Doente */}
       {doenteModalId && (

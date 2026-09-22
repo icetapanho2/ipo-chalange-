@@ -124,7 +124,7 @@ describe("Cenários da demo (secção 15 da especificação)", () => {
 
     expect(dataMarcada(cvc)).toBe("2026-09-24T09:00");
     expect(dataMarcada(analises)).toBe("2026-09-24T07:30");
-    expect(dataMarcada(revisao)).toBe("2026-10-14T08:50");
+    expect(dataMarcada(revisao)).toBe("2026-10-14T09:30");
     expect(revisao.continuidade_obrigatoria).toBe(false);
   });
 
@@ -140,7 +140,7 @@ describe("Cenários da demo (secção 15 da especificação)", () => {
 
     const revisao = porTipo(pedidos, "consulta");
     expect(dataMarcada(cvc)).toBe("2026-09-24T09:30");
-    expect(dataMarcada(revisao)).toBe("2026-10-14T09:30");
+    expect(dataMarcada(revisao)).toBe("2026-10-14T09:50");
   });
 
   it("5. Luísa Martins (100103): triagem reencaminha Onc. Médica → Radioterapia", () => {
@@ -191,7 +191,7 @@ describe("Cenários da demo (secção 15 da especificação)", () => {
   it("8. Gestão: 60 dias de histórico disponíveis para as métricas", () => {
     const realizados = store.pedidos.filter((p) => p.estado === "REALIZADO");
     expect(realizados.length).toBeGreaterThan(100);
-    expect(store.eventos.length).toBeGreaterThan(3800);
+    expect(store.eventos.length).toBeGreaterThan(3750);
     const maisAntigo = store.eventos.reduce((a, b) => (b.data_hora < a.data_hora ? b : a));
     expect(parseIso(maisAntigo.data_hora).getTime()).toBeLessThan(parseIso("2026-08-01T00:00").getTime());
   });

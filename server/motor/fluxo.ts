@@ -176,6 +176,70 @@ export function remarcarPedido(pedido: Pedido, utilizadorId: string, quando: Dat
 }
 
 /**
+ * SEM_VAGA sem solução interna: a administração conseguiu capacidade externa (outsourcing) para
+ * este pedido. Não há vaga/gabinete interno associado — fica directamente por realizado, com a
+ * justificação em linguagem simples (regra de ouro #6).
+ */
+export function marcarOutsourcing(pedido: Pedido, utilizadorId: string, nota: string, quando: Date = agora()): void {
+  const detalhe = nota.trim() || "Capacidade externa (outsourcing)";
+  registarEvento(pedido, "OUTSOURCING", "MARCADO", utilizadorId, { motivo: "Outsourcing", detalhe, dataHora: quando });
+  registarEvento(pedido, "REALIZACAO", "REALIZADO", utilizadorId, { motivo: "Realizado em outsourcing", detalhe, dataHora: quando });
+  notificar({
+    tipo: "PEDIDO_MARCADO",
+    destinatarios: [pedido.medico_requisitante_id, ...utilizadoresPorPerfil("ADMINISTRATIVO", pedido.especialidade_origem)],
+    titulo: `Resolvido por capacidade externa: ${descreverPedido(pedido)}`,
+    mensagem: `${descreverDoente(pedido.doente_id)} · ${detalhe}.`,
+    pedidoId: pedido.pedido_id,
+    doenteId: pedido.doente_id,
+    consultaAtoId: pedido.consulta_origem_ato_id,
+    quando,
+  });
+  recalcularAlertas(quando);
+}
+
+/**
+ * SEM_VAGA sem solução (nem vaga extra, nem outsourcing): a administração pede ao médico
+ * requisitante para decidir se mantém o pedido em espera ou cancela. O pedido continua SEM_VAGA
+ * até o médico responder (secção "Os Meus Pedidos" do médico).
+ */
+export function pedirDecisaoMedico(pedido: Pedido, utilizadorId: string, motivo: string, quando: Date = agora()): void {
+  pedido.decisao_pendente = true;
+  registarEvento(pedido, "DECISAO_MEDICO", "", utilizadorId, { motivo, dataHora: quando });
+  notificar({
+    tipo: "PEDIDO_DECISAO_NECESSARIA",
+    destinatarios: [pedido.medico_requisitante_id],
+    titulo: `Decisão necessária — sem vaga: ${descreverPedido(pedido)}`,
+    mensagem: `${descreverDoente(pedido.doente_id)} · ${motivo}. Quer manter o pedido em espera ou cancelá-lo?`,
+    pedidoId: pedido.pedido_id,
+    doenteId: pedido.doente_id,
+    consultaAtoId: pedido.consulta_origem_ato_id,
+    quando,
+  });
+}
+
+/** O médico decide o desfecho de um pedido SEM_VAGA para o qual a administração pediu decisão. */
+export function decidirSemVaga(
+  pedido: Pedido,
+  utilizadorId: string,
+  decisao: "MANTER" | "CANCELAR",
+  quando: Date = agora(),
+): void {
+  pedido.decisao_pendente = false;
+  if (decisao === "CANCELAR") {
+    registarEvento(pedido, "CANCELAMENTO", "CANCELADO", utilizadorId, {
+      motivo: "O médico decidiu cancelar: sem vaga disponível dentro do prazo",
+      dataHora: quando,
+    });
+  } else {
+    registarEvento(pedido, "DECISAO_MEDICO", "", utilizadorId, {
+      motivo: "O médico decidiu manter o pedido em espera",
+      dataHora: quando,
+    });
+  }
+  recalcularAlertas(quando);
+}
+
+/**
  * "Adiar consulta" no semáforo vermelho: liberta a marcação actual e volta a agendar,
  * respeitando de novo a janela (incluindo as dependências, que entretanto podem ter mudado).
  */

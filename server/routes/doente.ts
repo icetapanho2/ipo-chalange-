@@ -43,6 +43,7 @@ export function criarRotasDoente(store: typeof StoreType) {
       alergias = [],
       contacto = "",
       notas_clinicas = "",
+      estadio_cuidado = "NOVO",
     } = req.body ?? {};
 
     if (!nome || !nome.trim()) {
@@ -68,6 +69,7 @@ export function criarRotasDoente(store: typeof StoreType) {
         : [],
       contacto: contacto ? String(contacto).trim() : "910 000 000",
       notas_clinicas,
+      estadio_cuidado,
     };
 
     store.doentes.push(novoDoente);
@@ -92,6 +94,7 @@ export function criarRotasDoente(store: typeof StoreType) {
       alergias,
       contacto,
       notas_clinicas,
+      estadio_cuidado,
     } = req.body ?? {};
 
     if (nome) doente.nome = String(nome).trim();
@@ -109,6 +112,7 @@ export function criarRotasDoente(store: typeof StoreType) {
     }
     if (contacto !== undefined) doente.contacto = String(contacto).trim();
     if (notas_clinicas !== undefined) doente.notas_clinicas = notas_clinicas;
+    if (estadio_cuidado !== undefined) doente.estadio_cuidado = estadio_cuidado;
 
     res.json({ ok: true, doente });
   });

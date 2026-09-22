@@ -272,6 +272,8 @@ function construirPedido(
       prioridade_sugerida: base.prioridade ?? null,
     },
     doente,
+    undefined,
+    base.especialidade_destino,
   );
   const prioridade: Prioridade = base.prioridade ?? resultadoEquacao.prioridade;
   const prazoExplicito = base.prazo_dias != null ? somarDias(quando, base.prazo_dias) : null;
