@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { apiPost } from "../lib/api";
+import { usePerfil } from "../lib/PerfilContext";
 import { TrocadorUtilizador } from "./TrocadorUtilizador";
 import {
   Stethoscope,
@@ -37,9 +38,29 @@ const ICONES_NAV: Record<string, React.ElementType> = {
   "/guiao": HelpCircle,
 };
 
-export function Cabecalho({ itens }: { itens: ItemNav[] }) {
+const INICIO: ItemNav = { caminho: "/", etiqueta: "Início" };
+
+/**
+ * O que cada perfil vê no cabeçalho — não é suposto dar para "passar por todas as páginas":
+ * cada user só tem acesso ao que lhe compete, tal como aconteceria já integrado num sistema
+ * hospitalar real. O Guião fica de fora deste mapa: é sempre visível, para quem apresenta a
+ * demo poder orquestrar a troca de perfis e mostrar o sistema todo.
+ */
+const NAV_POR_PERFIL: Record<string, ItemNav[]> = {
+  MEDICO: [INICIO, { caminho: "/oasis/medico", etiqueta: "Oasis · Médico" }, { caminho: "/meus-pedidos", etiqueta: "Meus Pedidos" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }],
+  ADMINISTRATIVO: [INICIO, { caminho: "/validacao", etiqueta: "Validação" }, { caminho: "/servico", etiqueta: "Serviço" }, { caminho: "/dicionario", etiqueta: "Dicionário" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }],
+  TRIADOR: [INICIO, { caminho: "/triagem", etiqueta: "Triagem" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }],
+  GESTAO: [INICIO, { caminho: "/gestao", etiqueta: "Gestão" }],
+  TECNICO: [INICIO, { caminho: "/tecnico", etiqueta: "Técnico" }],
+};
+
+const ITEM_GUIAO: ItemNav = { caminho: "/guiao", etiqueta: "Guião" };
+
+export function Cabecalho() {
+  const { utilizador } = usePerfil();
   const [aRepor, setARepor] = useState(false);
   const [mensagem, setMensagem] = useState<string | null>(null);
+  const itens = utilizador ? NAV_POR_PERFIL[utilizador.perfil] ?? [INICIO] : [INICIO];
 
   async function reporDemo() {
     setARepor(true);
@@ -74,7 +95,7 @@ export function Cabecalho({ itens }: { itens: ItemNav[] }) {
           </div>
         </div>
 
-        {/* Navegação Principal */}
+        {/* Navegação — específica do perfil activo (o Guião fica sempre visível, à parte) */}
         <nav className="flex flex-1 flex-wrap items-center justify-center gap-1 px-2">
           {itens.map((item) => {
             const Icone = ICONES_NAV[item.caminho] || Activity;
@@ -95,6 +116,23 @@ export function Cabecalho({ itens }: { itens: ItemNav[] }) {
               </NavLink>
             );
           })}
+
+          <span className="mx-1.5 h-4 w-px bg-slate-200" aria-hidden="true" />
+
+          <NavLink
+            to={ITEM_GUIAO.caminho}
+            title="Guião da demonstração — orquestra a troca de perfis para apresentar o sistema todo"
+            className={({ isActive }) =>
+              `inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                isActive
+                  ? "border-amber-400 bg-amber-500 text-white shadow-2xs"
+                  : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+              }`
+            }
+          >
+            <HelpCircle className="h-3.5 w-3.5" />
+            <span>{ITEM_GUIAO.etiqueta}</span>
+          </NavLink>
         </nav>
 
         {/* Perfil Ativo, Notificações & Ações */}

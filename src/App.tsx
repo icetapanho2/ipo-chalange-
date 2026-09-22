@@ -1,6 +1,6 @@
 import { Suspense, lazy } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { Cabecalho, type ItemNav } from "./components/Cabecalho";
+import { Cabecalho } from "./components/Cabecalho";
 import { Inicio } from "./pages/Inicio";
 import { OasisMedico } from "./pages/oasis/Medico";
 import { OasisConsulta } from "./pages/oasis/Consulta";
@@ -20,24 +20,10 @@ import { GestaoPrioridade } from "./pages/GestaoPrioridade";
 // as outras páginas, que a maioria dos perfis usa muito mais vezes na demo.
 const Gestao = lazy(() => import("./pages/Gestao").then((m) => ({ default: m.Gestao })));
 
-const ITENS_NAV: ItemNav[] = [
-  { caminho: "/", etiqueta: "Início" },
-  { caminho: "/oasis/medico", etiqueta: "Oasis · Médico" },
-  { caminho: "/oasis/agendas", etiqueta: "Oasis · Agendas" },
-  { caminho: "/validacao", etiqueta: "Validação" },
-  { caminho: "/dicionario", etiqueta: "Dicionário" },
-  { caminho: "/triagem", etiqueta: "Triagem" },
-  { caminho: "/meus-pedidos", etiqueta: "Meus pedidos" },
-  { caminho: "/servico", etiqueta: "Serviço" },
-  { caminho: "/tecnico", etiqueta: "Técnico" },
-  { caminho: "/gestao", etiqueta: "Gestão" },
-  { caminho: "/guiao", etiqueta: "Guião & Testes" },
-];
-
 export function App() {
   return (
     <BrowserRouter>
-      <Cabecalho itens={ITENS_NAV} />
+      <Cabecalho />
       <Routes>
         <Route path="/" element={<Inicio />} />
         <Route path="/oasis/medico" element={<OasisMedico />} />

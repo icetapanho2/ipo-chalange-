@@ -16,6 +16,8 @@ import {
   ShieldAlert,
   Search,
   BookOpen,
+  Copy,
+  ClipboardCheck,
 } from "lucide-react";
 
 interface AcaoPasso {
@@ -31,6 +33,7 @@ interface Passo {
   descricao: string;
   resultado: string;
   acoes: AcaoPasso[];
+  textoPlano?: string;
 }
 
 const PASSOS: Passo[] = [
@@ -38,12 +41,18 @@ const PASSOS: Passo[] = [
     numero: 1,
     titulo: "Maria Fernandes — circuito completo",
     doente: "100101",
-    descricao: "O médico escreve o plano A na consulta de hoje (09:30) e guarda; a administrativa aprova tudo.",
+    descricao:
+      "Abrir a consulta de hoje (09:30) e colar o texto abaixo no campo P — Plano. Guardar: o Agente Oasis " +
+      "extrai os pedidos e aparece o ecrã de confirmação (fundo escurecido, só o modal em foco). Ao confirmar " +
+      "\"Avançar, sim\", volta à agenda já com a consulta marcada como \"Guardada\" — e a administrativa (Joana " +
+      "Moreira) recebe de imediato uma notificação de fim de consulta. Trocar para o perfil dela (sino no " +
+      "cabeçalho → \"Trocar utilizador\") mostra a notificação e o badge na fila de Validação; ela revê e aprova.",
     resultado: "Colheita 24/09 07:30 → TC 14/10 08:00 (depende da colheita) → Revisão 21/10 08:30 (Dr. Pedro).",
     acoes: [
       { etiqueta: "1a. Escrever o plano", utilizadorId: "U01", caminho: "/oasis/medico" },
       { etiqueta: "1b. Validar", utilizadorId: "U03", caminho: "/validacao" },
     ],
+    textoPlano: "TC TAP c/ contraste + colheita c/ jejum (hemog, bioq c/ creat, CEA, CA 19.9). Rev c/ exames 1/12 comigo.",
   },
   {
     numero: 2,
@@ -66,6 +75,7 @@ const PASSOS: Passo[] = [
       { etiqueta: "3a. Escrever o plano", utilizadorId: "U01", caminho: "/oasis/medico" },
       { etiqueta: "3b. Corrigir e validar", utilizadorId: "U03", caminho: "/validacao" },
     ],
+    textoPlano: "HPC 4/4s. Colheita s/ jejum (hemog, CEA). Rev c/ resultados 1/12.",
   },
   {
     numero: 4,
@@ -77,6 +87,7 @@ const PASSOS: Passo[] = [
       { etiqueta: "4a. Escrever o plano", utilizadorId: "U01", caminho: "/oasis/medico" },
       { etiqueta: "4b. Validar", utilizadorId: "U03", caminho: "/validacao" },
     ],
+    textoPlano: "Mantém vigilância. HPC 4/4s. Rev 1/12 comigo.",
   },
   {
     numero: 5,
@@ -198,6 +209,17 @@ export function Guiao() {
 
   // Separador ativo: 'guiao' | 'tradutor' | 'perfil'
   const [separador, setSeparador] = useState<"guiao" | "tradutor" | "perfil">("guiao");
+  const [textoCopiado, setTextoCopiado] = useState<number | null>(null);
+
+  async function copiarTexto(numero: number, texto: string) {
+    try {
+      await navigator.clipboard.writeText(texto);
+    } catch {
+      // clipboard indisponível (ex.: contexto não seguro) — o texto continua seleccionável à mão
+    }
+    setTextoCopiado(numero);
+    setTimeout(() => setTextoCopiado((atual) => (atual === numero ? null : atual)), 2500);
+  }
 
   // Estado do Testador de Tradução
   const [textoTradutor, setTextoTradutor] = useState(EXEMPLOS_TRADUTOR[0].texto);
@@ -420,6 +442,35 @@ export function Guiao() {
                 </div>
 
                 <p className="mt-2 text-xs text-slate-600 leading-relaxed">{passo.descricao}</p>
+
+                {passo.textoPlano && (
+                  <div className="mt-2.5 rounded-lg border border-sky-200 bg-sky-50/60 p-2.5">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-sky-800">
+                        Texto pronto a colar no campo P — Plano
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => copiarTexto(passo.numero, passo.textoPlano!)}
+                        className="inline-flex items-center gap-1 rounded border border-sky-300 bg-white px-2 py-1 text-[11px] font-semibold text-sky-800 hover:bg-sky-100 shrink-0"
+                      >
+                        {textoCopiado === passo.numero ? (
+                          <>
+                            <ClipboardCheck className="h-3 w-3 text-emerald-600" />
+                            <span className="text-emerald-700">Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            <span>Copiar</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="font-mono text-xs text-slate-800 select-all">{passo.textoPlano}</p>
+                  </div>
+                )}
+
                 <div className="mt-2 rounded-lg bg-emerald-50/70 border border-emerald-100 px-3 py-1.5 text-xs font-medium text-emerald-800">
                   <strong className="text-emerald-900">Resultado esperado:</strong> {passo.resultado}
                 </div>
