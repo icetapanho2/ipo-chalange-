@@ -152,3 +152,48 @@ passou a ser automática. O pedido guarda sempre `score_prioridade` e
 visíveis onde o pedido for mostrado. Verificado que isto não muda nenhuma data dos 8 cenários
 da demo (os textos são todos electivos/rotina, ficam classificados como N tal como antes).
 
+## 2026-09-22 — Revisão final pré-demo: prioridade, notificações, pontos cegos
+
+Pedido explícito: rever todos os workflows, procurar pontos cegos e deixar tudo pronto para
+apresentar. Ponto mais crítico encontrado: o **factor clínico da equação de prioridade nunca
+tinha onde ser preenchido**. `doentes.csv` não tinha colunas para diagnóstico/estadiamento e
+nenhuma página da app os expunha — por isso, apesar de `calcularPrioridadeSistema` já estar
+ligada (decisão de 2026-09-21), o terço "perfil clínico do doente" do score era sempre 10/25
+(o valor neutro) para todos os doentes da demo. Corrigido em duas frentes:
+1. `gerar_dados.py` passa a gerar `diagnostico_principal`/`estadiamento`/`alergias`/
+   `contacto`/`notas_clinicas` (novas colunas em `doentes.csv`); os 8 doentes-cenário (D1-D8)
+   ficam com um perfil coerente com o texto dos próprios pedidos já gerados (ex.: Luísa =
+   "Adenocarcinoma do recto médio, cT3N1" → Estádio III). Os ~450 doentes de fundo ficam vazios
+   de propósito — sem sinal clínico, o sistema usa correctamente o valor neutro, não inventa.
+2. Nova aba "Perfil Clínico" na ficha do doente (`Doente.tsx`) para ver/editar estes campos
+   (o backend, `PUT /doente/:id`, já existia — tinha sido adicionado pelo AI Studio mas só era
+   usado pelo formulário "Gerir Perfis" do Guião, nunca pela ficha real do paciente) — mostra
+   também uma pré-visualização de quantos pontos isso vale na equação.
+
+Outras decisões desta revisão:
+- Os limiares MP/P da equação (antes fixos no código: 70 e 42) passam a vir de
+  `parametros.csv` (`limiar_prioridade_mp`/`_p`) e são editáveis em runtime numa nova página
+  `/gestao/prioridade`, que também lista os desfechos recentes (score + justificação) de todos
+  os pedidos calculados pelo sistema — "Repor demo" volta a carregar os valores do CSV.
+- O cabeçalho tinha um select de perfil + um sino de notificações separados, a ocupar bastante
+  largura. Substituídos por um único botão compacto (avatar com iniciais + primeiro nome, sem
+  o honorífico "Dr./Dra./Enf." no rótulo) cujo painel tem dois separadores: as notificações do
+  perfil activo, e uma lista de todos os utilizadores agrupados por perfil com a contagem de
+  notificações por ler de cada um — dá para ver quem tem notificações pendentes e trocar de
+  perfil no mesmo sítio.
+- Consulta.tsx tinha dois botões "Guardar" (um em cima, sem qualquer diferença do que está
+  em baixo junto ao formulário) — removido o de cima. Removidos também os campos de "consulta
+  de grupo"/"Hospital de Dia" (o pedido original do utilizador pediu para captar a opção "só
+  para pensar melhor depois"; ficam de fora até haver uma decisão de desenho, em vez de UI sem
+  função). O toast de confirmação pós-gravação passou a modal centrado com fundo escurecido e
+  desfocado (antes era um toast no canto, fácil de ignorar); confirmar leva de volta à agenda
+  do médico já actualizada (usa `?data=` para mostrar o dia certo, mesmo que a consulta não
+  fosse a de hoje).
+- Ponto cego encontrado a testar: uma avaria resolvida nunca informava o técnico que a
+  reportou. Adicionada notificação `AVARIA_RESOLVIDA` para fechar esse ciclo.
+
+Verificado com testes novos (`tests/prioridade.test.ts`, 5 testes) e ao vivo por browser em
+cada fluxo (perfil clínico a alimentar o score, limiares a mudar a classificação, trocador de
+utilizador a mostrar badges por perfil, modal de confirmação, regresso à agenda actualizada).
+36/36 testes, `tsc`/`build` limpos.
+
