@@ -19,6 +19,7 @@ import {
   HelpCircle,
   Settings2,
   RotateCcw,
+  BarChart3,
 } from "lucide-react";
 
 interface ResumoPedido {
@@ -118,6 +119,34 @@ interface RespostaPrioridade {
   pesosOmissao: Pesos;
 }
 
+interface ResumoEstatistica {
+  total: number;
+  medianaDias: number | null;
+  percentDentroPrazo: number | null;
+}
+
+interface EstatisticaPorEstadio extends ResumoEstatistica {
+  chave: string;
+  legivel: string;
+}
+
+interface OutlierEstatistica {
+  pedido_id: string;
+  doente_nome: string;
+  descricao: string;
+  dias: number;
+  dentro_prazo: boolean;
+  estadio_cuidado_legivel: string;
+}
+
+interface RespostaEstatisticas {
+  especialidade_legivel: string;
+  periodo: string;
+  geral: ResumoEstatistica;
+  porEstadio: EstatisticaPorEstadio[];
+  outliers: OutlierEstatistica[];
+}
+
 const ORDEM_ESTADOS = [
   { chave: "SEM_VAGA", titulo: "Sem Vaga", cor: "bg-amber-100 text-amber-800" },
   { chave: "EM_TRIAGEM", titulo: "Em Triagem", cor: "bg-sky-100 text-sky-800" },
@@ -142,7 +171,7 @@ export function Servico() {
   const [doenteModalId, setDoenteModalId] = useState<string | null>(null);
   const [estadoAtivo, setEstadoAtivo] = useState<string>("SEM_VAGA");
   const [aResolverAvaria, setAResolverAvaria] = useState<string | null>(null);
-  const [abaAtiva, setAbaAtiva] = useState<"risco" | "pendencias" | "carteira">("risco");
+  const [abaAtiva, setAbaAtiva] = useState<"risco" | "pendencias" | "carteira" | "estatisticas" | "definicoes">("risco");
   const [notasOutsourcing, setNotasOutsourcing] = useState<Record<string, string>>({});
   const [motivosDecisao, setMotivosDecisao] = useState<Record<string, string>>({});
   const [aProcessarPedido, setAProcessarPedido] = useState<string | null>(null);
@@ -151,8 +180,10 @@ export function Servico() {
   );
   const [prioridade, setPrioridade] = useState<RespostaPrioridade | null>(null);
   const [pesosForm, setPesosForm] = useState<Pesos | null>(null);
-  const [definicoesAbertas, setDefinicoesAbertas] = useState(false);
   const [aGuardarPesos, setAGuardarPesos] = useState(false);
+  const [estatisticas, setEstatisticas] = useState<RespostaEstatisticas | null>(null);
+  const [filtroPeriodoEstatisticas, setFiltroPeriodoEstatisticas] = useState<"semana" | "mes" | "todos">("mes");
+  const [filtroEstadiosEstatisticas, setFiltroEstadiosEstatisticas] = useState<Set<string>>(new Set());
 
   function recarregar() {
     apiGet<RespostaPedidos>("/servico/pedidos")
@@ -171,6 +202,15 @@ export function Servico() {
   }
 
   useEffect(recarregar, []);
+
+  function recarregarEstatisticas() {
+    const params = new URLSearchParams({ periodo: filtroPeriodoEstatisticas });
+    if (filtroEstadiosEstatisticas.size > 0) params.set("estadio", [...filtroEstadiosEstatisticas].join(","));
+    apiGet<RespostaEstatisticas>(`/servico/estatisticas?${params.toString()}`).then(setEstatisticas);
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(recarregarEstatisticas, [filtroPeriodoEstatisticas, filtroEstadiosEstatisticas]);
 
   async function fecharAlerta(id: string) {
     setErro(null);
@@ -321,89 +361,8 @@ export function Servico() {
               <span>{emRisco.length} Consulta(s) em Risco</span>
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => setDefinicoesAbertas((a) => !a)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-2xs flex items-center gap-1.5"
-          >
-            <Settings2 className="h-4 w-4 text-slate-500" />
-            <span>Definições de Prioridade</span>
-            {prioridade?.personalizado && (
-              <span className="rounded-full bg-oasis-accent/20 px-1.5 py-0.2 text-[10px] font-bold text-oasis-header">
-                personalizado
-              </span>
-            )}
-          </button>
         </div>
       </div>
-
-      {/* Definições de Prioridade: pesos dos 3 factores da equação, personalizáveis por serviço */}
-      {definicoesAbertas && prioridade && pesosForm && (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-              <Settings2 className="h-4 w-4 text-oasis-accent" />
-              <span>Pesos da Equação de Prioridade — {prioridade.especialidade_legivel}</span>
-            </h2>
-            <span className="text-[11px] text-slate-400">
-              Só afecta este serviço; os restantes mantêm os pesos por omissão
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 mb-3">
-            A prioridade automática de cada pedido combina 3 factores. Ajuste o peso de cada um consoante o que
-            importa mais neste serviço (ex.: dar mais valor ao prazo/urgência do que ao tipo de pedido). Os valores
-            são normalizados para somar 100%.
-          </p>
-          <div className="space-y-3">
-            {(
-              [
-                { chave: "urgencia" as const, titulo: "Urgência clínica / prazo" },
-                { chave: "tipo" as const, titulo: "Tipo de pedido" },
-                { chave: "paciente" as const, titulo: "Perfil clínico do doente" },
-              ]
-            ).map((f) => (
-              <div key={f.chave}>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="font-semibold text-slate-700">{f.titulo}</span>
-                  <span className="font-mono font-bold text-oasis-header">
-                    {Math.round(
-                      (pesosForm[f.chave] / (pesosForm.urgencia + pesosForm.tipo + pesosForm.paciente || 1)) * 100,
-                    )}
-                    %
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={Math.round(pesosForm[f.chave] * 100)}
-                  onChange={(e) => setPesosForm((p) => (p ? { ...p, [f.chave]: Number(e.target.value) / 100 } : p))}
-                  className="w-full"
-                />
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 flex items-center gap-2 pt-3 border-t border-slate-100">
-            <button
-              type="button"
-              disabled={aGuardarPesos}
-              onClick={guardarPesos}
-              className="rounded-lg bg-oasis-header px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-700 disabled:opacity-50"
-            >
-              {aGuardarPesos ? "A guardar…" : "Guardar pesos deste serviço"}
-            </button>
-            <button
-              type="button"
-              disabled={aGuardarPesos || !prioridade.personalizado}
-              onClick={reporPesos}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>Repor por omissão</span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {erro && (
         <div className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
@@ -442,6 +401,18 @@ export function Servico() {
             titulo: "Carteira de Pedidos",
             icone: ClipboardList,
             contagem: pedidos ? Object.values(pedidos.porEstado).reduce((soma, l) => soma + l.length, 0) : 0,
+          },
+          {
+            chave: "estatisticas" as const,
+            titulo: "Estatísticas",
+            icone: BarChart3,
+            contagem: 0,
+          },
+          {
+            chave: "definicoes" as const,
+            titulo: "Definições",
+            icone: Settings2,
+            contagem: 0,
           },
         ].map((aba) => (
           <button
@@ -929,6 +900,234 @@ export function Servico() {
           )}
         </div>
       </div>
+      )}
+
+      {/* ABA: ESTATÍSTICAS DO SERVIÇO */}
+      {abaAtiva === "estatisticas" && (
+        <div className="mt-6 space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                <BarChart3 className="h-4 w-4 text-oasis-accent" />
+                <span>Estatísticas — {estatisticas?.especialidade_legivel ?? ""}</span>
+              </h2>
+            </div>
+
+            {/* Filtros */}
+            <div className="flex flex-wrap items-start gap-x-6 gap-y-3 mb-4">
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Período</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { valor: "semana" as const, legivel: "Última semana" },
+                    { valor: "mes" as const, legivel: "Último mês" },
+                    { valor: "todos" as const, legivel: "Todo o histórico" },
+                  ].map((op) => (
+                    <button
+                      key={op.valor}
+                      type="button"
+                      onClick={() => setFiltroPeriodoEstatisticas(op.valor)}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                        filtroPeriodoEstatisticas === op.valor
+                          ? "border-oasis-header bg-oasis-header text-white"
+                          : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      {op.legivel}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Estádio do doente</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { valor: "NOVO", legivel: "Novo" },
+                    { valor: "PRE_TRATAMENTO", legivel: "Pré-tratamento" },
+                    { valor: "EM_TRATAMENTO", legivel: "Em tratamento" },
+                    { valor: "FOLLOW_UP", legivel: "Follow-up" },
+                  ].map((op) => (
+                    <button
+                      key={op.valor}
+                      type="button"
+                      onClick={() =>
+                        setFiltroEstadiosEstatisticas((s) => {
+                          const novo = new Set(s);
+                          if (novo.has(op.valor)) novo.delete(op.valor);
+                          else novo.add(op.valor);
+                          return novo;
+                        })
+                      }
+                      className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                        filtroEstadiosEstatisticas.has(op.valor)
+                          ? "border-oasis-header bg-oasis-header text-white"
+                          : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      {op.legivel}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {estatisticas && (
+              <>
+                {/* Resumo geral */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center">
+                    <span className="block text-2xl font-bold text-slate-800">{estatisticas.geral.total}</span>
+                    <span className="text-[11px] text-slate-500">pedidos marcados no período</span>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center">
+                    <span className="block text-2xl font-bold text-slate-800">
+                      {estatisticas.geral.medianaDias ?? "—"}
+                    </span>
+                    <span className="text-[11px] text-slate-500">dias, mediana até à consulta/exame</span>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center">
+                    <span
+                      className={`block text-2xl font-bold ${
+                        (estatisticas.geral.percentDentroPrazo ?? 100) >= 85 ? "text-emerald-700" : "text-amber-700"
+                      }`}
+                    >
+                      {estatisticas.geral.percentDentroPrazo ?? "—"}%
+                    </span>
+                    <span className="text-[11px] text-slate-500">agendados dentro do prazo</span>
+                  </div>
+                </div>
+
+                {/* Comparação por estádio: medianas lado a lado */}
+                <div className="mb-4">
+                  <h3 className="text-[11px] font-bold uppercase text-slate-400 mb-2">
+                    Mediana de dias até agendamento, por estádio do doente
+                  </h3>
+                  <div className="space-y-2">
+                    {estatisticas.porEstadio
+                      .filter((e) => e.total > 0)
+                      .map((e) => {
+                        const maiorMediana = Math.max(1, ...estatisticas.porEstadio.map((x) => x.medianaDias ?? 0));
+                        const largura = Math.round(((e.medianaDias ?? 0) / maiorMediana) * 100);
+                        return (
+                          <div key={e.chave} className="flex items-center gap-2">
+                            <span className="w-28 shrink-0 text-xs font-semibold text-slate-700">{e.legivel}</span>
+                            <div className="flex-1 h-5 rounded bg-slate-100 overflow-hidden">
+                              <div className="h-full bg-oasis-accent rounded" style={{ width: `${largura}%` }} />
+                            </div>
+                            <span className="w-24 shrink-0 text-right text-xs font-mono text-slate-600">
+                              {e.medianaDias ?? "—"} dias · {e.total}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    {estatisticas.porEstadio.every((e) => e.total === 0) && (
+                      <p className="text-xs text-slate-400">Sem pedidos marcados no período para comparar.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Outliers */}
+                <div>
+                  <h3 className="text-[11px] font-bold uppercase text-slate-400 mb-2">
+                    Outliers — casos mais demorados a agendar
+                  </h3>
+                  {estatisticas.outliers.length === 0 ? (
+                    <p className="text-xs text-slate-400">Sem casos a destacar.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {estatisticas.outliers.map((o) => (
+                        <div
+                          key={o.pedido_id}
+                          className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs ${
+                            o.dentro_prazo ? "border-slate-200 bg-white" : "border-red-200 bg-red-50"
+                          }`}
+                        >
+                          <span>
+                            <strong className="text-slate-800">{o.doente_nome}</strong>
+                            <span className="text-slate-500"> — {o.descricao} · {o.estadio_cuidado_legivel}</span>
+                          </span>
+                          <span className={`font-mono font-bold ${o.dentro_prazo ? "text-slate-600" : "text-red-700"}`}>
+                            {o.dias} dias{!o.dentro_prazo ? " · fora do prazo" : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ABA: DEFINIÇÕES (pesos da equação de prioridade deste serviço) */}
+      {abaAtiva === "definicoes" && prioridade && pesosForm && (
+        <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+              <Settings2 className="h-4 w-4 text-oasis-accent" />
+              <span>Pesos da Equação de Prioridade — {prioridade.especialidade_legivel}</span>
+            </h2>
+            {prioridade.personalizado && (
+              <span className="rounded-full bg-oasis-accent/20 px-2 py-0.5 text-[10px] font-bold text-oasis-header">
+                personalizado
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 mb-3">
+            A prioridade automática de cada pedido combina 3 factores. Ajuste o peso de cada um consoante o que
+            importa mais neste serviço (ex.: dar mais valor ao prazo/urgência do que ao tipo de pedido). Os valores
+            são normalizados para somar 100%. Só afecta este serviço; os restantes mantêm os pesos por omissão.
+          </p>
+          <div className="space-y-3">
+            {(
+              [
+                { chave: "urgencia" as const, titulo: "Urgência clínica / prazo" },
+                { chave: "tipo" as const, titulo: "Tipo de pedido" },
+                { chave: "paciente" as const, titulo: "Perfil clínico do doente" },
+              ]
+            ).map((f) => (
+              <div key={f.chave}>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="font-semibold text-slate-700">{f.titulo}</span>
+                  <span className="font-mono font-bold text-oasis-header">
+                    {Math.round(
+                      (pesosForm[f.chave] / (pesosForm.urgencia + pesosForm.tipo + pesosForm.paciente || 1)) * 100,
+                    )}
+                    %
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round(pesosForm[f.chave] * 100)}
+                  onChange={(e) => setPesosForm((p) => (p ? { ...p, [f.chave]: Number(e.target.value) / 100 } : p))}
+                  className="w-full"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex items-center gap-2 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              disabled={aGuardarPesos}
+              onClick={guardarPesos}
+              className="rounded-lg bg-oasis-header px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-700 disabled:opacity-50"
+            >
+              {aGuardarPesos ? "A guardar…" : "Guardar pesos deste serviço"}
+            </button>
+            <button
+              type="button"
+              disabled={aGuardarPesos || !prioridade.personalizado}
+              onClick={reporPesos}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Repor por omissão</span>
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Modal Universal de Feedback do Doente */}

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
-import { apenasData } from "../util.ts";
+import { apenasData, diferencaDias, parseIso, somarDias } from "../util.ts";
 import { aprovarPropostaTroca, rejeitarPropostaTroca, contarVagasLivres, janelaAgendamento } from "../motor/agendamento.ts";
 import { resolverAlerta } from "../motor/alertas.ts";
 import { calcularSemaforo } from "../motor/semaforo.ts";
@@ -11,6 +11,7 @@ import { PESOS_PRIORIDADE_OMISSAO, pesosPrioridadeDoServico } from "../motor/pri
 import {
   descreverDoente,
   descreverEspecialidade,
+  descreverEstadioCuidado,
   descreverEstado,
   descreverPedido,
   descreverPrioridade,
@@ -19,6 +20,14 @@ import {
   descreverAto,
 } from "../apresentacao.ts";
 import type { Avaria, Pedido } from "../types.ts";
+
+/** Mediana de uma lista de números (não altera o array original). */
+function mediana(valores: number[]): number | null {
+  if (valores.length === 0) return null;
+  const ord = [...valores].sort((a, b) => a - b);
+  const meio = Math.floor(ord.length / 2);
+  return ord.length % 2 === 0 ? Math.round((ord[meio - 1] + ord[meio]) / 2) : ord[meio];
+}
 
 export function criarRotasServico(store: typeof StoreType) {
   const router = Router();
@@ -364,6 +373,92 @@ export function criarRotasServico(store: typeof StoreType) {
     }
     delete store.pesosPrioridadePorServico[especialidade];
     res.json({ ok: true, pesos: PESOS_PRIORIDADE_OMISSAO });
+  });
+
+  // Estatísticas do serviço: tempo até agendamento (mediana + outliers), filtrável por estádio
+  // do percurso oncológico do doente e por período (última semana/mês/todos).
+  router.get("/estatisticas", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    if (!especialidade) {
+      res.status(400).json({ erro: "O perfil seleccionado não tem especialidade associada." });
+      return;
+    }
+    const hoje = apenasData(agora());
+    const periodo = String(req.query.periodo ?? "mes"); // "semana" | "mes" | "todos"
+    const desde = periodo === "semana" ? somarDias(hoje, -7) : periodo === "mes" ? somarDias(hoje, -30) : null;
+    const estadiosFiltro = String(req.query.estadio ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    let pedidos = store.pedidos.filter((p) => p.especialidade_destino === especialidade);
+    if (desde) pedidos = pedidos.filter((p) => apenasData(parseIso(p.criado_em)).getTime() >= desde.getTime());
+    if (estadiosFiltro.length > 0) {
+      pedidos = pedidos.filter((p) => {
+        const doente = store.doentes.find((d) => d.doente_id === p.doente_id);
+        return doente && estadiosFiltro.includes(doente.estadio_cuidado || "");
+      });
+    }
+
+    interface Amostra {
+      pedido: Pedido;
+      dias: number;
+      dentroPrazo: boolean;
+      estadioCuidado: string;
+    }
+    // Tempo de espera real = da criação do pedido até à data da consulta/exame marcado (não até
+    // ao instante em que o sistema processou a marcação, que é quase sempre no mesmo dia).
+    const amostras: Amostra[] = [];
+    for (const p of pedidos) {
+      if (!p.ato_id) continue;
+      const ato = store.atosMedicos.find((a) => a.mvp_ato_id === p.ato_id);
+      if (!ato) continue;
+      const doente = store.doentes.find((d) => d.doente_id === p.doente_id);
+      amostras.push({
+        pedido: p,
+        dias: diferencaDias(parseIso(ato.data_hora), parseIso(p.criado_em)),
+        dentroPrazo: parseIso(ato.data_hora).getTime() <= parseIso(p.prazo_limite).getTime(),
+        estadioCuidado: doente?.estadio_cuidado || "",
+      });
+    }
+
+    function resumoDe(lista: Amostra[]) {
+      const dias = lista.map((a) => a.dias);
+      return {
+        total: lista.length,
+        medianaDias: mediana(dias),
+        percentDentroPrazo: lista.length > 0 ? Math.round((lista.filter((a) => a.dentroPrazo).length / lista.length) * 100) : null,
+      };
+    }
+
+    const porEstadio = ["NOVO", "PRE_TRATAMENTO", "EM_TRATAMENTO", "FOLLOW_UP"].map((chave) => ({
+      chave,
+      legivel: descreverEstadioCuidado(chave),
+      ...resumoDe(amostras.filter((a) => a.estadioCuidado === chave)),
+    }));
+
+    // Outliers: os casos mais demorados a agendar (mediana + desvio grande é menos legível numa
+    // demo do que simplesmente mostrar os piores casos concretos, com nome e justificação).
+    const outliers = [...amostras]
+      .sort((a, b) => b.dias - a.dias)
+      .slice(0, 5)
+      .map((a) => ({
+        pedido_id: a.pedido.pedido_id,
+        doente_nome: descreverDoente(a.pedido.doente_id),
+        descricao: descreverPedido(a.pedido),
+        dias: a.dias,
+        dentro_prazo: a.dentroPrazo,
+        estadio_cuidado_legivel: descreverEstadioCuidado(a.estadioCuidado),
+      }));
+
+    res.json({
+      especialidade,
+      especialidade_legivel: descreverEspecialidade(especialidade),
+      periodo,
+      geral: resumoDe(amostras),
+      porEstadio,
+      outliers,
+    });
   });
 
   return router;
