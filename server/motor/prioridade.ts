@@ -129,9 +129,9 @@ export function calcularPrioridadeSistema(
   const scoreCalculado = Math.min(100, Math.max(10, Math.round(pontosUrgencia * 0.5 + pontosTipo * 0.3 + pontosPaciente * 0.2)));
 
   let prioridade: Prioridade = "N";
-  if (scoreCalculado >= 70 || pontosUrgencia >= 85) {
+  if (scoreCalculado >= store.parametros.limiar_prioridade_mp || pontosUrgencia >= 85) {
     prioridade = "MP";
-  } else if (scoreCalculado >= 42 || pontosUrgencia >= 60) {
+  } else if (scoreCalculado >= store.parametros.limiar_prioridade_p || pontosUrgencia >= 60) {
     prioridade = "P";
   } else {
     prioridade = "N";

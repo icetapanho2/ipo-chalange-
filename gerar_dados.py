@@ -145,7 +145,10 @@ def novo_doente(pid=None, nome=None, sexo=None, idade=None):
     idade = idade or random.randint(38, 86)
     nasc = date(DEMO_DATE.year - idade, random.randint(1, 12), random.randint(1, 28))
     doentes[pid] = dict(doente_id=pid, n_utente=str(random.randint(100000000, 399999999)), nome=nome,
-                        sexo=sexo, data_nascimento=nasc.isoformat(), demo_cenario="")
+                        sexo=sexo, data_nascimento=nasc.isoformat(), demo_cenario="",
+                        # Perfil clínico usado no factor 3 da equação de prioridade (server/motor/prioridade.ts);
+                        # vazio por omissão — só os doentes-cenário da demo têm isto preenchido abaixo.
+                        diagnostico_principal="", estadiamento="", alergias=[], contacto="", notas_clinicas="")
     return pid
 
 for _ in range(450):
@@ -291,6 +294,34 @@ D5 = demo_doente("100105", "Rosa Teixeira Lopes", "F", 71, "5a - abreviatura des
 D6 = demo_doente("100106", "Manuel Costa Ferreira", "M", 69, "4 - doente com maior folga (candidato à troca)")
 D7 = demo_doente("100107", "Carlos Mendes Rocha", "M", 60, "5b - abreviatura aprendida")
 D8 = demo_doente("100108", "Fernando Lopes Gomes", "M", 55, "6 - pedido Hospital de Dia + dependência automática")
+
+# Perfil clínico dos doentes-cenário (factor 3 da equação de prioridade) — coerente com o texto
+# dos pedidos de cada um, gerados mais abaixo (secção "CENÁRIOS DEMO").
+PERFIL_CLINICO = {
+    D1: dict(diagnostico_principal="Adenocarcinoma do cólon, sob vigilância pós-adjuvante",
+             estadiamento="Estádio III", alergias=[], contacto="912 345 001",
+             notas_clinicas="Consulta de vigilância; sem queixas de novo até à última avaliação."),
+    D2: dict(diagnostico_principal="Neoplasia esófago-gástrica, pós-tratamento",
+             estadiamento="Estádio II", alergias=["Penicilina"], contacto="912 345 002",
+             notas_clinicas="Reestadiamento periódico com TC TAP e marcadores tumorais."),
+    D3: dict(diagnostico_principal="Adenocarcinoma do recto médio, cT3N1",
+             estadiamento="Estádio III", alergias=[], contacto="912 345 003",
+             notas_clinicas="Referenciado para avaliação de radioterapia neoadjuvante."),
+    D4: dict(diagnostico_principal="Neoplasia cólon-recto, suspeita de recidiva",
+             estadiamento="Estádio III (suspeita de recidiva)", alergias=["Contraste iodado — pré-medicar"],
+             contacto="912 345 004", notas_clinicas="TC TAP urgente para reestadiamento."),
+    D5: dict(diagnostico_principal="Neoplasia cólon-recto, sob vigilância", estadiamento="Estádio II",
+             alergias=[], contacto="912 345 005", notas_clinicas=""),
+    D6: dict(diagnostico_principal="Neoplasia esófago-gástrica, em remissão", estadiamento="Estádio I",
+             alergias=[], contacto="912 345 006", notas_clinicas="Controlo anual de rotina."),
+    D7: dict(diagnostico_principal="Neoplasia cólon-recto, sob vigilância", estadiamento="Estádio II",
+             alergias=[], contacto="912 345 007", notas_clinicas=""),
+    D8: dict(diagnostico_principal="Neoplasia cólon-recto, quimioterapia adjuvante em curso (FOLFOX)",
+             estadiamento="Estádio III", alergias=["Oxaliplatina — vigiar neuropatia"], contacto="912 345 008",
+             notas_clinicas="Ciclo 1 de QT adjuvante FOLFOX em Hospital de Dia."),
+}
+for _pid, _perfil in PERFIL_CLINICO.items():
+    doentes[_pid].update(_perfil)
 
 # Agenda de hoje do Dr. Pedro (Oasis 2.0 - ecrã do médico)
 for pid, hh, ato in [(D1, "09:30", "22"), (D5, "09:50", "23"), (D7, "10:10", "23")]:
@@ -630,9 +661,12 @@ wcsv("exames.csv", EXAMES, ["codigo_exame", "descricao_exame", "especialidade_co
 wcsv("analises.csv", ANALISES, ["codigo", "descricao"])
 wcsv("gabinetes.csv", GABINETES, ["codigo", "descricao", "especialidade_codigo", "tipo_recurso"])
 wcsv("utilizadores.csv", UTILIZADORES, ["utilizador_id", "nome", "perfil", "especialidade_codigo", "e_medico"])
-wcsv("doentes.csv", [(x["doente_id"], x["n_utente"], x["nome"], x["sexo"], x["data_nascimento"], x["demo_cenario"])
+wcsv("doentes.csv", [(x["doente_id"], x["n_utente"], x["nome"], x["sexo"], x["data_nascimento"], x["demo_cenario"],
+                      x["diagnostico_principal"], x["estadiamento"], "|".join(x["alergias"]), x["contacto"],
+                      x["notas_clinicas"])
                      for x in doentes.values()],
-     ["doente_id", "n_utente", "nome", "sexo", "data_nascimento", "demo_cenario"])
+     ["doente_id", "n_utente", "nome", "sexo", "data_nascimento", "demo_cenario",
+      "diagnostico_principal", "estadiamento", "alergias", "contacto", "notas_clinicas"])
 wcsv("vagas.csv", [(v["vaga_id"], v["especialidade_codigo"], v["gabinete_codigo"], v["medico_id"], iso(v["data_hora"]),
                     v["duracao_min"], v["atos_permitidos"], v["ato_id"] or "") for v in vagas],
      ["vaga_id", "especialidade_codigo", "gabinete_codigo", "medico_id", "data_hora", "duracao_min", "atos_permitidos", "ato_id"])
@@ -692,6 +726,8 @@ wcsv("parametros.csv", [
     ("copias_por_cromo", 3, "Pressuposto (a validar)"),
     ("minutos_admin_por_cromo", 5, "Pressuposto (a validar)"),
     ("dias_uteis_mes", 22, ""),
+    ("limiar_prioridade_mp", 70, "Score da equação (0-100) a partir do qual a prioridade calculada é Muito Prioritário"),
+    ("limiar_prioridade_p", 42, "Score da equação (0-100) a partir do qual a prioridade calculada é Prioritário"),
 ], ["parametro", "valor", "descricao"])
 
 print("doentes", len(doentes), "vagas", len(vagas), "atos", len(atos), "pedidos", len(pedidos),

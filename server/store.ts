@@ -138,6 +138,13 @@ class Store {
       sexo: r.sexo,
       data_nascimento: r.data_nascimento,
       demo_cenario: r.demo_cenario,
+      // Perfil clínico usado no factor 3 da equação de prioridade (secção calcularPrioridadeSistema);
+      // pode não existir em exports antigos do CSV, daí os valores por omissão.
+      diagnostico_principal: r.diagnostico_principal || "",
+      estadiamento: r.estadiamento || "",
+      alergias: list(r.alergias),
+      contacto: r.contacto || "",
+      notas_clinicas: r.notas_clinicas || "",
     }));
 
     this.vagas = readCsv<Record<string, string>>(p("vagas.csv")).map((r) => ({
@@ -255,6 +262,8 @@ class Store {
       copias_por_cromo: num(paramMap.copias_por_cromo),
       minutos_admin_por_cromo: num(paramMap.minutos_admin_por_cromo),
       dias_uteis_mes: num(paramMap.dias_uteis_mes),
+      limiar_prioridade_mp: num(paramMap.limiar_prioridade_mp, 70),
+      limiar_prioridade_p: num(paramMap.limiar_prioridade_p, 42),
     };
     definirDataDemo(this.parametros.DEMO_DATE);
 

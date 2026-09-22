@@ -10,3 +10,5 @@ cromos_dia;300;Estimativa do utilizador (a validar)
 copias_por_cromo;3;Pressuposto (a validar)
 minutos_admin_por_cromo;5;Pressuposto (a validar)
 dias_uteis_mes;22;
+limiar_prioridade_mp;70;Score da equação (0-100) a partir do qual a prioridade calculada é Muito Prioritário
+limiar_prioridade_p;42;Score da equação (0-100) a partir do qual a prioridade calculada é Prioritário

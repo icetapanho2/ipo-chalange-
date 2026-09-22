@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Gauge } from "lucide-react";
 import { apiGet } from "../lib/api";
 import { CATEGORIAS, ESTADO, SEQUENCIAL } from "../lib/paleta";
 
@@ -79,18 +81,27 @@ export function Gestao() {
           <h1 className="text-lg font-semibold text-slate-800">Gestão</h1>
           <span className="mt-1 inline-block rounded bg-slate-700 px-2 py-0.5 text-xs font-medium text-white">Dados simulados</span>
         </div>
-        <select
-          className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
-          value={filtro}
-          onChange={(e) => setFiltro(e.target.value)}
-        >
-          <option value="">Todos os serviços</option>
-          {especialidades.map((e) => (
-            <option key={e.codigo} value={e.codigo}>
-              {e.descricao}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/gestao/prioridade"
+            className="inline-flex items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
+          >
+            <Gauge className="h-3.5 w-3.5 text-oasis-accent" />
+            <span>Definições da Prioridade</span>
+          </Link>
+          <select
+            className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value)}
+          >
+            <option value="">Todos os serviços</option>
+            {especialidades.map((e) => (
+              <option key={e.codigo} value={e.codigo}>
+                {e.descricao}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       {erro && <p className="mt-3 text-red-600">{erro}</p>}
       {!metricas && !erro && <p className="mt-4 text-slate-500">A carregar métricas…</p>}

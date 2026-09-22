@@ -16,8 +16,6 @@ import {
   ExternalLink,
   ChevronRight,
   Info,
-  Users,
-  Sun,
 } from "lucide-react";
 
 interface Ato {
@@ -120,11 +118,6 @@ export function OasisConsulta() {
   const [modalDoenteAberto, setModalDoenteAberto] = useState(false);
   const [modoFormulario, setModoFormulario] = useState<"soap" | "interativo">("soap");
   const [confirmacaoPendente, setConfirmacaoPendente] = useState(false);
-  const [opcoesExtra, setOpcoesExtra] = useState({
-    consultaGrupo: false,
-    grupoComDoente: true,
-    hospitalDia: false,
-  });
 
   useEffect(() => {
     if (!atoId) return;
@@ -160,6 +153,12 @@ export function OasisConsulta() {
     } finally {
       setAGuardar(false);
     }
+  }
+
+  function avancarParaAgenda() {
+    setConfirmacaoPendente(false);
+    const dia = dados?.ato.data_hora.slice(0, 10);
+    navigate(dia ? `/oasis/medico?data=${dia}` : "/oasis/medico");
   }
 
   return (
@@ -300,83 +299,10 @@ export function OasisConsulta() {
                 </button>
               </div>
             </div>
-
-            {/* Campos adicionais (captação apenas — sem lógica associada ainda) */}
-            <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-2xs space-y-2">
-              <h4 className="font-bold text-slate-700 flex items-center gap-1.5">
-                <Users className="h-3.5 w-3.5 text-oasis-accent" />
-                <span>Modalidades da Consulta</span>
-              </h4>
-              <label className="flex items-center gap-2 text-slate-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={opcoesExtra.consultaGrupo}
-                  onChange={(e) => setOpcoesExtra((o) => ({ ...o, consultaGrupo: e.target.checked }))}
-                  className="h-3.5 w-3.5 rounded border-slate-300 text-oasis-header"
-                />
-                <span>Consulta de grupo</span>
-              </label>
-              {opcoesExtra.consultaGrupo && (
-                <div className="ml-5 flex items-center gap-3 text-[11px] text-slate-500">
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="consulta-grupo-doente"
-                      checked={opcoesExtra.grupoComDoente}
-                      onChange={() => setOpcoesExtra((o) => ({ ...o, grupoComDoente: true }))}
-                    />
-                    <span>Com doente</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="consulta-grupo-doente"
-                      checked={!opcoesExtra.grupoComDoente}
-                      onChange={() => setOpcoesExtra((o) => ({ ...o, grupoComDoente: false }))}
-                    />
-                    <span>Sem doente (revisão de caso)</span>
-                  </label>
-                </div>
-              )}
-              <label className="flex items-center gap-2 text-slate-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={opcoesExtra.hospitalDia}
-                  onChange={(e) => setOpcoesExtra((o) => ({ ...o, hospitalDia: e.target.checked }))}
-                  className="h-3.5 w-3.5 rounded border-slate-300 text-oasis-header"
-                />
-                <Sun className="h-3.5 w-3.5 text-amber-500" />
-                <span>Hospital de Dia</span>
-              </label>
-            </div>
           </div>
 
           {/* PAINEL DIREITO: REGISTO CLÍNICO & CONSTRUTOR */}
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-end gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-2xs">
-              <div className="flex items-center gap-2">
-                <button
-                  id="btn-guardar-consulta"
-                  type="button"
-                  onClick={guardar}
-                  disabled={aGuardar}
-                  className="rounded-lg bg-oasis-header px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 transition-transform active:scale-95"
-                >
-                  {aGuardar ? (
-                    <>
-                      <Clock className="h-4 w-4 animate-spin" />
-                      <span>Agente a processar plano…</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 text-sky-300" />
-                      <span>Guardar Consulta & Extrair com IA</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
             {/* SEPARADOR: CONSTRUTOR DE PEDIDOS ASSISTIDO — em desenvolvimento, fica em stand-by */}
             {modoFormulario === "interativo" && (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
@@ -435,12 +361,23 @@ export function OasisConsulta() {
                     O formulário cumpre as normas de documentação clínica hospitalar do SNS.
                   </div>
                   <button
+                    id="btn-guardar-consulta"
                     type="button"
                     onClick={guardar}
                     disabled={aGuardar}
-                    className="rounded bg-oasis-header px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-slate-700 disabled:opacity-50 flex items-center gap-1.5"
+                    className="rounded-lg bg-oasis-header px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 transition-transform active:scale-95"
                   >
-                    {aGuardar ? "A processar…" : "Guardar & Extrair Pedidos"}
+                    {aGuardar ? (
+                      <>
+                        <Clock className="h-4 w-4 animate-spin" />
+                        <span>Agente a processar plano…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 text-sky-300" />
+                        <span>Guardar Consulta & Extrair com IA</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </OasisPainel>
@@ -566,40 +503,38 @@ export function OasisConsulta() {
         </div>
       )}
 
-      {/* Toast de confirmação pós-gravação: exige confirmação explícita do médico */}
+      {/* Modal de confirmação pós-gravação: exige confirmação explícita do médico antes de sair */}
       {confirmacaoPendente && resultado && (
         <div
           id="toast-confirmacao-submissao"
-          className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4 animate-in fade-in slide-in-from-bottom-4 duration-300"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200"
         >
-          <div className="flex w-full max-w-xl items-start gap-3 rounded-xl border border-emerald-300 bg-white p-4 shadow-2xl">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
-              <CheckCircle2 className="h-4.5 w-4.5" />
+          <div className="w-full max-w-md rounded-2xl border border-emerald-200 bg-white p-6 text-center shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-2 duration-300">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
+              <CheckCircle2 className="h-8 w-8 text-emerald-600" />
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-slate-800">Consulta guardada — confirme antes de avançar</p>
-              <p className="mt-0.5 text-xs text-slate-600">
-                {resultado.pedidosCriados > 0
-                  ? `Foram gerados ${resultado.pedidosCriados} pedido(s) a partir do plano. Confirme que submeteu todas as requisições necessárias para o que foi prescrito nesta consulta.`
-                  : "Não foram identificados pedidos no plano. Confirme que não há requisições pendentes para esta consulta."}
-              </p>
-              <div className="mt-3 flex items-center gap-2">
-                <button
-                  id="btn-confirmar-submissao"
-                  type="button"
-                  onClick={() => setConfirmacaoPendente(false)}
-                  className="rounded-lg bg-oasis-header px-4 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-slate-700"
-                >
-                  Avançar, sim
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirmacaoPendente(false)}
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                >
-                  Rever plano primeiro
-                </button>
-              </div>
+            <p className="mt-4 text-base font-bold text-slate-900">Consulta guardada com sucesso</p>
+            <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+              {resultado.pedidosCriados > 0
+                ? `O Agente Oasis gerou ${resultado.pedidosCriados} pedido(s) a partir do plano. Confirme que submeteu todas as requisições necessárias para o que foi prescrito nesta consulta.`
+                : "Não foram identificados pedidos no plano. Confirme que não há requisições pendentes para esta consulta."}
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                id="btn-confirmar-submissao"
+                type="button"
+                onClick={avancarParaAgenda}
+                className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 transition-colors"
+              >
+                Avançar, sim — voltar à agenda
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmacaoPendente(false)}
+                className="rounded-lg px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50"
+              >
+                Rever plano primeiro
+              </button>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { OasisPainel, OasisShell } from "../../oasis/OasisShell";
 import { apiGet } from "../../lib/api";
 import { usePerfil } from "../../lib/PerfilContext";
@@ -51,14 +51,22 @@ function deslocarDia(isoData: string, dias: number): string {
 export function OasisMedico() {
   const { utilizador, definirUtilizadorId, utilizadores } = usePerfil();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [resposta, setResposta] = useState<RespostaAgenda | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [aCarregar, setACarregar] = useState(true);
   const [doenteModalId, setDoenteModalId] = useState<string | null>(null);
-  const [dataVista, setDataVista] = useState<string | null>(null);
+  // Uma consulta guardada pode devolver o médico a um dia específico (ex.: a revisão marcada
+  // para daqui a 3 semanas); ?data=aaaa-mm-dd na URL define o dia inicial mostrado.
+  const [dataVista, setDataVista] = useState<string | null>(() => searchParams.get("data"));
+  const primeiraVez = useRef(true);
 
-  // Ao trocar de médico, volta sempre a mostrar "hoje" desse médico.
+  // Ao trocar de médico (não na primeira montagem), volta sempre a mostrar "hoje" desse médico.
   useEffect(() => {
+    if (primeiraVez.current) {
+      primeiraVez.current = false;
+      return;
+    }
     setDataVista(null);
   }, [utilizador?.utilizador_id]);
 

@@ -366,4 +366,8 @@ export interface Parametros {
   copias_por_cromo: number;
   minutos_admin_por_cromo: number;
   dias_uteis_mes: number;
+  /** Limiares (score 0-100, secção "Definições da Prioridade") a partir dos quais a equação do
+   * sistema atribui MP/P — editáveis pela Gestão, repostos ao valor do CSV em "Repor demo". */
+  limiar_prioridade_mp: number;
+  limiar_prioridade_p: number;
 }

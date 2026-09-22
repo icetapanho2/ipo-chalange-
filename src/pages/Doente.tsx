@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { apiGet, apiPost } from "../lib/api";
+import { apiGet, apiPost, apiPut } from "../lib/api";
 import {
   User,
   Activity,
@@ -12,6 +12,9 @@ import {
   ArrowLeft,
   FileText,
   Check,
+  Stethoscope,
+  Pencil,
+  Gauge,
 } from "lucide-react";
 
 interface DoenteInfo {
@@ -20,6 +23,26 @@ interface DoenteInfo {
   n_utente: string;
   sexo: string;
   data_nascimento: string;
+  diagnostico_principal?: string;
+  estadiamento?: string;
+  alergias?: string[];
+  contacto?: string;
+  notas_clinicas?: string;
+}
+
+const OPCOES_ESTADIAMENTO = ["", "Estádio I", "Estádio II", "Estádio III", "Estádio IV", "Metastático"];
+
+/** Espelha (só para pré-visualização) o factor clínico de calcularPrioridadeSistema em server/motor/prioridade.ts. */
+function pontosClinicosPreview(estadiamento: string, diagnostico: string): { pontos: number; motivo: string } {
+  const e = estadiamento.toLowerCase();
+  const d = diagnostico.toLowerCase();
+  if (e.includes("iv") || e.includes("iii") || e.includes("metast") || d.includes("metast")) {
+    return { pontos: 25, motivo: "Doente oncológico avançado (Estádio III/IV ou metastático)" };
+  }
+  if (e.includes("ii") || d.includes("neoplasia") || d.includes("carcinoma") || d.includes("tumor")) {
+    return { pontos: 18, motivo: "Neoplasia ativa / Estadiamento intermédio" };
+  }
+  return { pontos: 10, motivo: "Perfil clínico geral (sem sinal de gravidade reconhecido)" };
 }
 
 interface ItemTimeline {
@@ -95,16 +118,57 @@ export function Doente() {
   const [sucesso, setSucesso] = useState<string | null>(null);
   const [confirmar, setConfirmar] = useState<{ tipo: "remarcar" | "adiar"; pedidoId: string; texto: string } | null>(null);
   const [aProcessar, setAProcessar] = useState(false);
-  const [abaAtiva, setAbaAtiva] = useState<"prontidao" | "pedidos" | "timeline">("prontidao");
+  const [abaAtiva, setAbaAtiva] = useState<"prontidao" | "clinico" | "pedidos" | "timeline">("prontidao");
+  const [aEditarClinico, setAEditarClinico] = useState(false);
+  const [formClinico, setFormClinico] = useState({
+    diagnostico_principal: "",
+    estadiamento: "",
+    alergias: "",
+    contacto: "",
+    notas_clinicas: "",
+  });
+  const [aGuardarClinico, setAGuardarClinico] = useState(false);
 
   function recarregar() {
     if (!id) return;
     apiGet<RespostaDoente>(`/doente/${id}`)
-      .then(setDados)
+      .then((r) => {
+        setDados(r);
+        setFormClinico({
+          diagnostico_principal: r.doente.diagnostico_principal ?? "",
+          estadiamento: r.doente.estadiamento ?? "",
+          alergias: (r.doente.alergias ?? []).join(", "),
+          contacto: r.doente.contacto ?? "",
+          notas_clinicas: r.doente.notas_clinicas ?? "",
+        });
+      })
       .catch((e) => setErro(String(e)));
   }
 
   useEffect(recarregar, [id]);
+
+  async function guardarClinico() {
+    if (!id) return;
+    setErro(null);
+    setAGuardarClinico(true);
+    try {
+      await apiPut(`/doente/${id}`, {
+        diagnostico_principal: formClinico.diagnostico_principal,
+        estadiamento: formClinico.estadiamento,
+        alergias: formClinico.alergias,
+        contacto: formClinico.contacto,
+        notas_clinicas: formClinico.notas_clinicas,
+      });
+      setSucesso("Perfil clínico actualizado — já é usado nos próximos cálculos de prioridade.");
+      setAEditarClinico(false);
+      recarregar();
+      setTimeout(() => setSucesso(null), 5000);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAGuardarClinico(false);
+    }
+  }
 
   async function executar() {
     if (!confirmar) return;
@@ -226,6 +290,18 @@ export function Doente() {
                 {dados.oQueFalta.length}
               </span>
             )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAbaAtiva("clinico")}
+            className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-colors flex items-center gap-1.5 ${
+              abaAtiva === "clinico"
+                ? "bg-oasis-header text-white shadow-2xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Stethoscope className="h-3.5 w-3.5" />
+            <span>Perfil Clínico</span>
           </button>
           <button
             type="button"
@@ -446,6 +522,166 @@ export function Doente() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* CONTEÚDO DA ABA: PERFIL CLÍNICO (usado na equação de prioridade) */}
+      {abaAtiva === "clinico" && (
+        <div className="mt-4 space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-4">
+              <div>
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <Stethoscope className="h-4 w-4 text-oasis-accent" />
+                  <span>Perfil Clínico</span>
+                </h2>
+                <p className="mt-1 text-[11px] text-slate-500 max-w-xl">
+                  Diagnóstico e estadiamento são guardados na ficha do doente e usados directamente pelo sistema
+                  no factor clínico da equação de prioridade (secção "Definições da Prioridade", em Gestão).
+                </p>
+              </div>
+              {!aEditarClinico && (
+                <button
+                  type="button"
+                  onClick={() => setAEditarClinico(true)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs shrink-0"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  <span>Editar</span>
+                </button>
+              )}
+            </div>
+
+            {!aEditarClinico ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Diagnóstico principal</span>
+                  <p className="text-slate-800 mt-0.5">{dados.doente.diagnostico_principal || "— Não registado"}</p>
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Estadiamento</span>
+                  <p className="text-slate-800 mt-0.5">{dados.doente.estadiamento || "— Não registado"}</p>
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Alergias</span>
+                  <p className="text-slate-800 mt-0.5">
+                    {dados.doente.alergias && dados.doente.alergias.length > 0 ? dados.doente.alergias.join(", ") : "— Nenhuma registada"}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Contacto</span>
+                  <p className="text-slate-800 mt-0.5">{dados.doente.contacto || "— Não registado"}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Notas clínicas</span>
+                  <p className="text-slate-700 mt-0.5 leading-relaxed">{dados.doente.notas_clinicas || "— Sem notas"}</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Diagnóstico principal</label>
+                    <input
+                      type="text"
+                      value={formClinico.diagnostico_principal}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, diagnostico_principal: e.target.value }))}
+                      placeholder="Ex: Adenocarcinoma do cólon"
+                      className="w-full rounded border border-slate-300 px-2.5 py-2 text-sm text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Estadiamento</label>
+                    <select
+                      value={formClinico.estadiamento}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, estadiamento: e.target.value }))}
+                      className="w-full rounded border border-slate-300 px-2.5 py-2 text-sm text-slate-800"
+                    >
+                      {OPCOES_ESTADIAMENTO.map((op) => (
+                        <option key={op} value={op}>
+                          {op || "— Não registado"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Alergias (separadas por vírgula)</label>
+                    <input
+                      type="text"
+                      value={formClinico.alergias}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, alergias: e.target.value }))}
+                      placeholder="Ex: Penicilina, Contraste iodado"
+                      className="w-full rounded border border-slate-300 px-2.5 py-2 text-sm text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Contacto</label>
+                    <input
+                      type="text"
+                      value={formClinico.contacto}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, contacto: e.target.value }))}
+                      placeholder="912 345 678"
+                      className="w-full rounded border border-slate-300 px-2.5 py-2 text-sm text-slate-800"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Notas clínicas</label>
+                  <textarea
+                    value={formClinico.notas_clinicas}
+                    onChange={(e) => setFormClinico((f) => ({ ...f, notas_clinicas: e.target.value }))}
+                    rows={3}
+                    className="w-full rounded border border-slate-300 px-2.5 py-2 text-sm text-slate-800"
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={guardarClinico}
+                    disabled={aGuardarClinico}
+                    className="rounded-lg bg-oasis-header px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-700 disabled:opacity-50"
+                  >
+                    {aGuardarClinico ? "A guardar…" : "Guardar perfil clínico"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAEditarClinico(false);
+                      recarregar();
+                    }}
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Transparência: como este perfil entra na equação de prioridade */}
+          <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-4 shadow-sm">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-sky-900 flex items-center gap-1.5 mb-2">
+              <Gauge className="h-3.5 w-3.5" />
+              <span>Como isto entra na equação de prioridade</span>
+            </h3>
+            {(() => {
+              const preview = pontosClinicosPreview(
+                aEditarClinico ? formClinico.estadiamento : dados.doente.estadiamento ?? "",
+                aEditarClinico ? formClinico.diagnostico_principal : dados.doente.diagnostico_principal ?? "",
+              );
+              return (
+                <p className="text-xs text-sky-900">
+                  Com este perfil, o factor clínico contribui com <strong>{preview.pontos} pontos</strong> (em 25) para o
+                  score do doente: <em>{preview.motivo}</em>. Este factor pesa 20% do score final — ver os restantes
+                  80% (urgência do prazo e tipo de pedido) em{" "}
+                  <Link to="/gestao/prioridade" className="font-semibold underline hover:text-sky-700">
+                    Definições da Prioridade
+                  </Link>
+                  .
+                </p>
+              );
+            })()}
+          </div>
         </div>
       )}
 

@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
 import { parseIso } from "../util.ts";
-import { descreverEspecialidade, descreverPrioridade, descreverTipoPedido } from "../apresentacao.ts";
+import { descreverDoente, descreverEspecialidade, descreverPedido, descreverPrioridade, descreverTipoPedido } from "../apresentacao.ts";
 import type { Pedido } from "../types.ts";
 
 function minutosEntre(a: string, b: string): number | null {
@@ -151,6 +151,58 @@ export function criarRotasGestao(store: typeof StoreType) {
       triagem,
       impactoEstimado,
     });
+  });
+
+  // Definições da equação de prioridade do sistema + os desfechos recentes que produziu,
+  // para a Gestão auditar e, dentro de limites seguros, afinar os limiares MP/P.
+  router.get("/prioridade", (_req, res) => {
+    const calculados = store.pedidos
+      .filter((p) => p.prioridade_calculada_sistema && p.equacao_prioridade_detalhe)
+      .sort((a, b) => (b.score_prioridade ?? 0) - (a.score_prioridade ?? 0))
+      .slice(0, 200)
+      .map((p) => ({
+        pedido_id: p.pedido_id,
+        doente_nome: descreverDoente(p.doente_id),
+        tipo_pedido_legivel: descreverTipoPedido(p.tipo_pedido),
+        descricao: descreverPedido(p),
+        especialidade_destino_legivel: descreverEspecialidade(p.especialidade_destino),
+        score: p.score_prioridade ?? 0,
+        prioridade: p.prioridade,
+        prioridade_legivel: descreverPrioridade(p.prioridade),
+        detalhe: p.equacao_prioridade_detalhe,
+        criado_em: p.criado_em,
+        prazo_limite: p.prazo_limite,
+      }));
+
+    res.json({
+      limiares: {
+        mp: store.parametros.limiar_prioridade_mp,
+        p: store.parametros.limiar_prioridade_p,
+      },
+      pesos: [
+        { chave: "urgencia", legivel: "Urgência clínica / prazo", peso: 0.5 },
+        { chave: "tipo", legivel: "Tipo de pedido", peso: 0.3 },
+        { chave: "paciente", legivel: "Perfil clínico do doente", peso: 0.2 },
+      ],
+      totalCalculados: store.pedidos.filter((p) => p.prioridade_calculada_sistema).length,
+      outcomes: calculados,
+    });
+  });
+
+  router.post("/prioridade/limiares", (req, res) => {
+    const mp = Number(req.body?.mp);
+    const p = Number(req.body?.p);
+    if (!Number.isFinite(mp) || !Number.isFinite(p) || mp < 0 || mp > 100 || p < 0 || p > 100) {
+      res.status(400).json({ erro: "Os limiares têm de ser números entre 0 e 100." });
+      return;
+    }
+    if (p >= mp) {
+      res.status(400).json({ erro: "O limiar de Prioritário tem de ser menor do que o de Muito Prioritário." });
+      return;
+    }
+    store.parametros.limiar_prioridade_mp = mp;
+    store.parametros.limiar_prioridade_p = p;
+    res.json({ ok: true, limiares: { mp, p } });
   });
 
   return router;
