@@ -12,6 +12,7 @@ import { MeusPedidos } from "./pages/MeusPedidos";
 import { Servico } from "./pages/Servico";
 import { Doente } from "./pages/Doente";
 import { Guiao } from "./pages/Guiao";
+import { Tecnico } from "./pages/Tecnico";
 
 // Carregado à parte: é a única página que usa a biblioteca de gráficos (recharts),
 // de longe a maior dependência do bundle — não vale a pena pagar esse custo em todas
@@ -27,6 +28,7 @@ const ITENS_NAV: ItemNav[] = [
   { caminho: "/triagem", etiqueta: "Triagem" },
   { caminho: "/meus-pedidos", etiqueta: "Meus pedidos" },
   { caminho: "/servico", etiqueta: "Serviço" },
+  { caminho: "/tecnico", etiqueta: "Técnico" },
   { caminho: "/gestao", etiqueta: "Gestão" },
   { caminho: "/guiao", etiqueta: "Guião & Testes" },
 ];
@@ -46,6 +48,7 @@ export function App() {
         <Route path="/meus-pedidos" element={<MeusPedidos />} />
         <Route path="/servico" element={<Servico />} />
         <Route path="/doente/:id" element={<Doente />} />
+        <Route path="/tecnico" element={<Tecnico />} />
         <Route
           path="/gestao"
           element={

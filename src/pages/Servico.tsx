@@ -10,6 +10,9 @@ import {
   Check,
   X,
   AlertCircle,
+  Wrench,
+  CalendarClock,
+  Users,
 } from "lucide-react";
 
 interface ResumoPedido {
@@ -57,6 +60,44 @@ interface ConsultaEmRisco {
   porque: string;
 }
 
+interface SinalOverbooking {
+  prioridade_legivel: string;
+  ato_legivel: string;
+  prazo_limite: string;
+  n_pedidos: number;
+  vagas_livres_estimadas: number;
+  deficit: number;
+  pedidos: { pedido_id: string; doente_nome: string }[];
+}
+
+interface AvariaServico {
+  avaria_id: string;
+  ato_legivel: string;
+  descricao: string;
+  duracao_dias: number;
+  reportado_por_nome: string;
+  criado_em: string;
+  estado: "ABERTA" | "RESOLVIDA";
+  decisao: string;
+  pedidos_afetados: number;
+}
+
+interface ItemParaRever {
+  pedido_id: string;
+  doente_nome: string;
+  descricao: string;
+  prioridade_legivel: string;
+  prazo_limite: string;
+  n_remarcacoes: number;
+  sugestao: string;
+  accao: "remarcar" | "adiar";
+}
+
+interface ParaRever {
+  faltas: ItemParaRever[];
+  emRisco: ItemParaRever[];
+}
+
 const ORDEM_ESTADOS = [
   { chave: "SEM_VAGA", titulo: "Sem Vaga", cor: "bg-amber-100 text-amber-800" },
   { chave: "EM_TRIAGEM", titulo: "Em Triagem", cor: "bg-sky-100 text-sky-800" },
@@ -72,11 +113,15 @@ export function Servico() {
   const [alertas, setAlertas] = useState<AlertaServico[] | null>(null);
   const [propostas, setPropostas] = useState<PropostaServico[] | null>(null);
   const [emRisco, setEmRisco] = useState<ConsultaEmRisco[] | null>(null);
+  const [overbooking, setOverbooking] = useState<SinalOverbooking[] | null>(null);
+  const [avarias, setAvarias] = useState<AvariaServico[] | null>(null);
+  const [paraRever, setParaRever] = useState<ParaRever | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
   const [accoes, setAccoes] = useState<Record<string, string>>({});
   const [doenteModalId, setDoenteModalId] = useState<string | null>(null);
   const [estadoAtivo, setEstadoAtivo] = useState<string>("SEM_VAGA");
+  const [aResolverAvaria, setAResolverAvaria] = useState<string | null>(null);
 
   function recarregar() {
     apiGet<RespostaPedidos>("/servico/pedidos")
@@ -85,6 +130,9 @@ export function Servico() {
     apiGet<AlertaServico[]>("/servico/alertas").then(setAlertas);
     apiGet<PropostaServico[]>("/servico/propostas").then(setPropostas);
     apiGet<ConsultaEmRisco[]>("/servico/consultas-em-risco").then(setEmRisco);
+    apiGet<SinalOverbooking[]>("/servico/overbooking").then(setOverbooking);
+    apiGet<AvariaServico[]>("/servico/avarias").then(setAvarias);
+    apiGet<ParaRever>("/servico/para-rever").then(setParaRever);
   }
 
   useEffect(recarregar, []);
@@ -106,6 +154,35 @@ export function Servico() {
     try {
       await apiPost(`/servico/propostas/${id}/${decisao}`);
       setMensagemSucesso(`Proposta ${decisao === "aprovar" ? "aprovada" : "rejeitada"} com sucesso.`);
+      recarregar();
+      setTimeout(() => setMensagemSucesso(null), 4000);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function resolverAvaria(id: string, decisao: "REMARCACAO_TOTAL" | "REMARCACAO_PARCIAL") {
+    setErro(null);
+    setAResolverAvaria(id);
+    try {
+      const r = await apiPost<{ avaria: AvariaServico }>(`/servico/avarias/${id}/resolver`, { decisao });
+      setMensagemSucesso(
+        `Avaria resolvida: ${r.avaria.pedidos_afetados} marcação(ões) reagendada(s) automaticamente.`,
+      );
+      recarregar();
+      setTimeout(() => setMensagemSucesso(null), 5000);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAResolverAvaria(null);
+    }
+  }
+
+  async function actuarParaRever(item: ItemParaRever) {
+    setErro(null);
+    try {
+      await apiPost(`/servico/pedidos/${item.pedido_id}/${item.accao === "remarcar" ? "remarcar" : "adiar"}`);
+      setMensagemSucesso(item.accao === "remarcar" ? "Pedido remarcado." : "Consulta adiada; vaga libertada.");
       recarregar();
       setTimeout(() => setMensagemSucesso(null), 4000);
     } catch (e) {
@@ -153,6 +230,122 @@ export function Servico() {
         <div className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 animate-in fade-in">
           <Check className="h-4 w-4 text-emerald-600" />
           <span>{mensagemSucesso}</span>
+        </div>
+      )}
+
+      {/* SECÇÃO 0A: SOBRELOTAÇÃO — MESMA PRIORIDADE/PRAZO, SEM VAGAS SUFICIENTES */}
+      {overbooking && overbooking.length > 0 && (
+        <div className="mt-5 rounded-xl border border-rose-300 bg-rose-50/60 p-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-rose-200 pb-2 mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-rose-900 flex items-center gap-1.5">
+              <Users className="h-4 w-4 text-rose-600" />
+              <span>Sobrelotação Detectada — Vagas Extra ou Outsourcing Necessários</span>
+            </h2>
+            <span className="text-[11px] text-rose-700 font-semibold">Antes de cair em "Sem Vaga"</span>
+          </div>
+          <div className="space-y-2.5">
+            {overbooking.map((s, i) => (
+              <div key={i} className="rounded-lg border border-rose-200 bg-white p-3.5 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800">
+                      {s.ato_legivel} · {s.prioridade_legivel} · prazo {s.prazo_limite}
+                    </h4>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      {s.n_pedidos} pedido(s) a competir por {s.vagas_livres_estimadas} vaga(s) livre(s) estimada(s) —
+                      faltam <strong className="text-rose-700">{s.deficit}</strong>.
+                    </p>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      {s.pedidos.slice(0, 4).map((p) => p.doente_nome).join(", ")}
+                      {s.pedidos.length > 4 ? ` +${s.pedidos.length - 4}` : ""}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-bold text-rose-800 shrink-0">
+                    Défice de {s.deficit}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* SECÇÃO 0B: AVARIAS REPORTADAS PELOS TÉCNICOS */}
+      {avarias && avarias.some((a) => a.estado === "ABERTA") && (
+        <div className="mt-5 rounded-xl border border-orange-300 bg-orange-50/60 p-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-orange-200 pb-2 mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-orange-900 flex items-center gap-1.5">
+              <Wrench className="h-4 w-4 text-orange-600" />
+              <span>Avarias Reportadas — Decida a Remarcação</span>
+            </h2>
+          </div>
+          <div className="space-y-2.5">
+            {avarias
+              .filter((a) => a.estado === "ABERTA")
+              .map((a) => (
+                <div key={a.avaria_id} className="rounded-lg border border-orange-200 bg-white p-3.5 shadow-2xs">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-800">{a.ato_legivel}</h4>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        {a.descricao} · ~{a.duracao_dias} dia(s) · reportado por {a.reportado_por_nome}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={aResolverAvaria === a.avaria_id}
+                        onClick={() => resolverAvaria(a.avaria_id, "REMARCACAO_PARCIAL")}
+                        className="rounded-lg border border-orange-300 bg-white px-3 py-1.5 text-xs font-semibold text-orange-800 hover:bg-orange-50 disabled:opacity-50"
+                      >
+                        Remarcação parcial
+                      </button>
+                      <button
+                        type="button"
+                        disabled={aResolverAvaria === a.avaria_id}
+                        onClick={() => resolverAvaria(a.avaria_id, "REMARCACAO_TOTAL")}
+                        className="rounded-lg bg-orange-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-800 disabled:opacity-50"
+                      >
+                        Remarcação total
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* SECÇÃO 0C: FALTAS E RISCOS PARA REVER (O SISTEMA SUGERE, A ADMIN DECIDE) */}
+      {paraRever && (paraRever.faltas.length > 0 || paraRever.emRisco.length > 0) && (
+        <div className="mt-5 rounded-xl border border-sky-200 bg-sky-50/50 p-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-sky-200 pb-2 mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-sky-900 flex items-center gap-1.5">
+              <CalendarClock className="h-4 w-4 text-sky-600" />
+              <span>Faltas e Remarcações Para Rever</span>
+            </h2>
+          </div>
+          <div className="space-y-2.5">
+            {[...paraRever.faltas, ...paraRever.emRisco].map((item) => (
+              <div key={item.pedido_id} className="rounded-lg border border-sky-200 bg-white p-3.5 shadow-2xs">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800">
+                      {item.doente_nome} · {item.descricao}
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">{item.sugestao}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => actuarParaRever(item)}
+                    className="rounded-lg bg-sky-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-800 shrink-0"
+                  >
+                    {item.accao === "remarcar" ? "Remarcar agora" : "Adiar e libertar vaga"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

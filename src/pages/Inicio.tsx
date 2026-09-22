@@ -14,7 +14,42 @@ import {
   User,
   ChevronRight,
   UserCheck,
+  Wrench,
+  AlertTriangle,
+  Calendar,
+  Layers,
 } from "lucide-react";
+
+interface CartaoDoenteMedico {
+  doente_id: string;
+  doente_nome: string;
+  proxima_marcacao: string;
+  total_pedidos: number;
+  total_respondidos: number;
+  luz: "verde" | "amarelo" | "vermelho" | "cinza";
+}
+
+interface ConsultaValidacaoResumo {
+  chave: string;
+  doente_nome: string;
+  medico_nome: string;
+  confianca_minima: number;
+  pedidos: unknown[];
+}
+
+interface ItemFilaTriagem {
+  pedido_id: string;
+  doente_nome: string;
+  descricao: string;
+  prioridade_legivel: string;
+}
+
+const COR_LUZ: Record<CartaoDoenteMedico["luz"], string> = {
+  verde: "bg-emerald-500",
+  amarelo: "bg-amber-500",
+  vermelho: "bg-red-500",
+  cinza: "bg-slate-300",
+};
 
 interface Estado {
   demoDate: string;
@@ -32,12 +67,20 @@ interface DoenteSumario {
 }
 
 export function Inicio() {
-  const { definirUtilizadorId } = usePerfil();
+  const { definirUtilizadorId, utilizador } = usePerfil();
   const navigate = useNavigate();
   const [estado, setEstado] = useState<Estado | null>(null);
   const [doentes, setDoentes] = useState<DoenteSumario[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [modalDoenteId, setModalDoenteId] = useState<string | null>(null);
+
+  const [cartoesMedico, setCartoesMedico] = useState<CartaoDoenteMedico[] | null>(null);
+  const [filaValidacao, setFilaValidacao] = useState<ConsultaValidacaoResumo[] | null>(null);
+  const [overbookingN, setOverbookingN] = useState<number | null>(null);
+  const [avariasAbertasN, setAvariasAbertasN] = useState<number | null>(null);
+  const [paraReverN, setParaReverN] = useState<number | null>(null);
+  const [filaTriagem, setFilaTriagem] = useState<ItemFilaTriagem[] | null>(null);
+  const [minhasAvariasN, setMinhasAvariasN] = useState<number | null>(null);
 
   useEffect(() => {
     apiGet<Estado>("/estado")
@@ -48,6 +91,24 @@ export function Inicio() {
       .then(setDoentes)
       .catch((e) => console.error("Erro ao carregar doentes no início:", e));
   }, []);
+
+  useEffect(() => {
+    if (!utilizador) return;
+    if (utilizador.perfil === "MEDICO") {
+      apiGet<CartaoDoenteMedico[]>("/meus-pedidos/painel").then(setCartoesMedico).catch(() => {});
+    } else if (utilizador.perfil === "ADMINISTRATIVO") {
+      apiGet<ConsultaValidacaoResumo[]>("/validacao/consultas").then(setFilaValidacao).catch(() => {});
+      apiGet<unknown[]>("/servico/overbooking").then((l) => setOverbookingN(l.length)).catch(() => {});
+      apiGet<{ estado: string }[]>("/servico/avarias").then((l) => setAvariasAbertasN(l.filter((a) => a.estado === "ABERTA").length)).catch(() => {});
+      apiGet<{ faltas: unknown[]; emRisco: unknown[] }>("/servico/para-rever")
+        .then((r) => setParaReverN(r.faltas.length + r.emRisco.length))
+        .catch(() => {});
+    } else if (utilizador.perfil === "TRIADOR") {
+      apiGet<{ fila: ItemFilaTriagem[] }>("/triagem/fila").then((r) => setFilaTriagem(r.fila)).catch(() => {});
+    } else if (utilizador.perfil === "TECNICO") {
+      apiGet<{ estado: string }[]>("/tecnico/avarias").then((l) => setMinhasAvariasN(l.filter((a) => a.estado === "ABERTA").length)).catch(() => {});
+    }
+  }, [utilizador?.utilizador_id, utilizador?.perfil]);
 
   function iniciarComo(utilizadorId: string, rota: string) {
     definirUtilizadorId(utilizadorId);
@@ -138,13 +199,189 @@ export function Inicio() {
         </div>
       )}
 
+      {/* PAINEL DO PERFIL ACTIVO — a experiência principal para quem já está identificado */}
+      {utilizador && (
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+              O Meu Painel — {utilizador.nome}
+            </h2>
+          </div>
+
+          {/* MÉDICO: cartões por doente, com próxima marcação e luz de estado */}
+          {utilizador.perfil === "MEDICO" && (
+            <div>
+              {!cartoesMedico ? (
+                <p className="text-xs text-slate-400">A carregar os seus doentes…</p>
+              ) : cartoesMedico.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs text-slate-400">
+                  Ainda não tem pedidos registados. Comece uma consulta no Oasis · Médico.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {cartoesMedico.map((c) => (
+                    <button
+                      key={c.doente_id}
+                      type="button"
+                      onClick={() => setModalDoenteId(c.doente_id)}
+                      className="text-left rounded-xl border border-slate-200 bg-white p-4 shadow-2xs hover:border-slate-300 hover:shadow-sm transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-sm text-slate-900">{c.doente_nome}</h3>
+                        <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${COR_LUZ[c.luz]}`} title={`Estado: ${c.luz}`} />
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {c.proxima_marcacao ? `Próxima marcação: ${c.proxima_marcacao.replace("T", " ")}` : "Sem marcação futura"}
+                      </p>
+                      <p className="text-xs text-slate-600 mt-1">
+                        {c.total_respondidos}/{c.total_pedidos} pedido(s) com desfecho
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => iniciarComo(utilizador.utilizador_id, "/oasis/medico")}
+                  className="text-xs font-semibold text-slate-500 hover:text-slate-800 inline-flex items-center gap-1"
+                >
+                  <Calendar className="h-3.5 w-3.5" />
+                  <span>Ver agenda geral</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ADMINISTRATIVO: os 3 sectores (Validação / Serviço / Agendas) */}
+          {utilizador.perfil === "ADMINISTRATIVO" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Link
+                to="/validacao"
+                className="rounded-xl border border-emerald-200 bg-white p-4 shadow-2xs hover:border-emerald-400 hover:shadow-sm transition-all"
+              >
+                <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                  <FileCheck2 className="h-3.5 w-3.5" />
+                  <span>Validação</span>
+                </h3>
+                <p className="mt-2 text-2xl font-bold text-slate-900">{filaValidacao?.length ?? "…"}</p>
+                <p className="text-xs text-slate-500">consulta(s) por validar</p>
+              </Link>
+              <Link
+                to="/servico"
+                className="rounded-xl border border-amber-200 bg-white p-4 shadow-2xs hover:border-amber-400 hover:shadow-sm transition-all"
+              >
+                <h3 className="text-xs font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5" />
+                  <span>Serviço</span>
+                </h3>
+                <div className="mt-2 space-y-0.5 text-xs text-slate-700">
+                  <p>
+                    <strong>{overbookingN ?? "…"}</strong> sinal(is) de sobrelotação
+                  </p>
+                  <p>
+                    <strong>{avariasAbertasN ?? "…"}</strong> avaria(s) por decidir
+                  </p>
+                  <p>
+                    <strong>{paraReverN ?? "…"}</strong> falta(s)/risco(s) para rever
+                  </p>
+                </div>
+              </Link>
+              <Link
+                to="/oasis/agendas"
+                className="rounded-xl border border-sky-200 bg-white p-4 shadow-2xs hover:border-sky-400 hover:shadow-sm transition-all"
+              >
+                <h3 className="text-xs font-bold uppercase tracking-wider text-sky-800 flex items-center gap-1.5">
+                  <Layers className="h-3.5 w-3.5" />
+                  <span>Agendas</span>
+                </h3>
+                <p className="mt-2 text-xs text-slate-500">
+                  Ver agenda do serviço e das agendas de outros serviços (informativo).
+                </p>
+              </Link>
+            </div>
+          )}
+
+          {/* TRIADOR: versão simplificada do painel de admin, focada na fila de triagem */}
+          {utilizador.perfil === "TRIADOR" && (
+            <div className="rounded-xl border border-purple-200 bg-white p-4 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-purple-800 flex items-center gap-1.5">
+                  <Filter className="h-3.5 w-3.5" />
+                  <span>Pedidos para Validar</span>
+                </h3>
+                <Link to="/triagem" className="text-xs font-semibold text-purple-700 hover:underline">
+                  Ir para a mesa de triagem →
+                </Link>
+              </div>
+              {!filaTriagem ? (
+                <p className="mt-2 text-xs text-slate-400">A carregar…</p>
+              ) : filaTriagem.length === 0 ? (
+                <p className="mt-2 text-xs text-slate-400">Sem pedidos pendentes de momento.</p>
+              ) : (
+                <div className="mt-2 space-y-1.5">
+                  {filaTriagem.slice(0, 4).map((f) => (
+                    <div key={f.pedido_id} className="text-xs text-slate-700 flex items-center justify-between">
+                      <span>
+                        {f.doente_nome} · {f.descricao}
+                      </span>
+                      <span className="text-slate-400">{f.prioridade_legivel}</span>
+                    </div>
+                  ))}
+                  {filaTriagem.length > 4 && (
+                    <p className="text-[11px] text-slate-400">+{filaTriagem.length - 4} pedido(s)</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* GESTAO: acesso rápido às contas/estatísticas completas */}
+          {utilizador.perfil === "GESTAO" && (
+            <Link
+              to="/gestao"
+              className="block rounded-xl border border-slate-200 bg-white p-4 shadow-2xs hover:border-slate-400 hover:shadow-sm transition-all max-w-md"
+            >
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">Dashboard de Gestão</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Acesso a todas as contas e métricas operacionais do circuito Oasis 2.0.
+              </p>
+              <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-oasis-accent">
+                <span>Abrir Gestão</span>
+                <ArrowRight className="h-3 w-3" />
+              </span>
+            </Link>
+          )}
+
+          {/* TECNICO: acesso rápido ao reporte de avarias */}
+          {utilizador.perfil === "TECNICO" && (
+            <Link
+              to="/tecnico"
+              className="block rounded-xl border border-orange-200 bg-white p-4 shadow-2xs hover:border-orange-400 hover:shadow-sm transition-all max-w-md"
+            >
+              <h3 className="text-xs font-bold uppercase tracking-wider text-orange-800 flex items-center gap-1.5">
+                <Wrench className="h-3.5 w-3.5" />
+                <span>Avarias</span>
+              </h3>
+              <p className="mt-1 text-xs text-slate-600">
+                {minhasAvariasN ?? "…"} avaria(s) reportada(s) ainda a aguardar decisão da administração.
+              </p>
+              <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-orange-700">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                <span>Reportar nova avaria</span>
+              </span>
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* Grid Principal em Duas Colunas */}
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1.6fr_1fr]">
-        {/* COLUNA ESQUERDA: As 4 Estações do Circuito Clínico */}
+        {/* COLUNA ESQUERDA: As 4 Estações do Circuito Clínico (picker de perfis para a demo) */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-              Estações do Fluxo Clínico Integrado
+              Trocar de Perfil — Estações da Demo
             </h2>
             <span className="text-xs text-slate-500">Selecione uma estação para operar</span>
           </div>

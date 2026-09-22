@@ -17,6 +17,7 @@ import {
   BarChart3,
   HelpCircle,
   UserCheck,
+  Wrench,
 } from "lucide-react";
 
 export interface ItemNav {
@@ -33,6 +34,7 @@ const ICONES_NAV: Record<string, React.ElementType> = {
   "/triagem": Filter,
   "/meus-pedidos": Inbox,
   "/servico": Building2,
+  "/tecnico": Wrench,
   "/gestao": BarChart3,
   "/guiao": HelpCircle,
 };
