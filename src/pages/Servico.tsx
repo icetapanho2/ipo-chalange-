@@ -17,6 +17,8 @@ import {
   Inbox,
   Building2,
   HelpCircle,
+  Settings2,
+  RotateCcw,
 } from "lucide-react";
 
 interface ResumoPedido {
@@ -103,6 +105,19 @@ interface ParaRever {
   emRisco: ItemParaRever[];
 }
 
+interface Pesos {
+  urgencia: number;
+  tipo: number;
+  paciente: number;
+}
+
+interface RespostaPrioridade {
+  especialidade_legivel: string;
+  personalizado: boolean;
+  pesos: Pesos;
+  pesosOmissao: Pesos;
+}
+
 const ORDEM_ESTADOS = [
   { chave: "SEM_VAGA", titulo: "Sem Vaga", cor: "bg-amber-100 text-amber-800" },
   { chave: "EM_TRIAGEM", titulo: "Em Triagem", cor: "bg-sky-100 text-sky-800" },
@@ -134,6 +149,10 @@ export function Servico() {
   const [formSemVagaAberto, setFormSemVagaAberto] = useState<{ pedidoId: string; tipo: "outsourcing" | "decisao" } | null>(
     null,
   );
+  const [prioridade, setPrioridade] = useState<RespostaPrioridade | null>(null);
+  const [pesosForm, setPesosForm] = useState<Pesos | null>(null);
+  const [definicoesAbertas, setDefinicoesAbertas] = useState(false);
+  const [aGuardarPesos, setAGuardarPesos] = useState(false);
 
   function recarregar() {
     apiGet<RespostaPedidos>("/servico/pedidos")
@@ -145,6 +164,10 @@ export function Servico() {
     apiGet<SinalOverbooking[]>("/servico/overbooking").then(setOverbooking);
     apiGet<AvariaServico[]>("/servico/avarias").then(setAvarias);
     apiGet<ParaRever>("/servico/para-rever").then(setParaRever);
+    apiGet<RespostaPrioridade>("/servico/prioridade").then((r) => {
+      setPrioridade(r);
+      setPesosForm(r.pesos);
+    });
   }
 
   useEffect(recarregar, []);
@@ -239,6 +262,38 @@ export function Servico() {
     }
   }
 
+  async function guardarPesos() {
+    if (!pesosForm) return;
+    setErro(null);
+    setAGuardarPesos(true);
+    try {
+      const r = await apiPost<{ pesos: Pesos }>("/servico/prioridade/pesos", pesosForm);
+      setMensagemSucesso("Pesos da equação de prioridade actualizados para este serviço.");
+      setPrioridade((p) => (p ? { ...p, pesos: r.pesos, personalizado: true } : p));
+      setTimeout(() => setMensagemSucesso(null), 4000);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAGuardarPesos(false);
+    }
+  }
+
+  async function reporPesos() {
+    setErro(null);
+    setAGuardarPesos(true);
+    try {
+      const r = await apiPost<{ pesos: Pesos }>("/servico/prioridade/repor", {});
+      setPesosForm(r.pesos);
+      setPrioridade((p) => (p ? { ...p, pesos: r.pesos, personalizado: false } : p));
+      setMensagemSucesso("Pesos repostos para os valores por omissão.");
+      setTimeout(() => setMensagemSucesso(null), 4000);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAGuardarPesos(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
       {/* Cabeçalho do Painel do Serviço */}
@@ -266,8 +321,89 @@ export function Servico() {
               <span>{emRisco.length} Consulta(s) em Risco</span>
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => setDefinicoesAbertas((a) => !a)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-2xs flex items-center gap-1.5"
+          >
+            <Settings2 className="h-4 w-4 text-slate-500" />
+            <span>Definições de Prioridade</span>
+            {prioridade?.personalizado && (
+              <span className="rounded-full bg-oasis-accent/20 px-1.5 py-0.2 text-[10px] font-bold text-oasis-header">
+                personalizado
+              </span>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* Definições de Prioridade: pesos dos 3 factores da equação, personalizáveis por serviço */}
+      {definicoesAbertas && prioridade && pesosForm && (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+              <Settings2 className="h-4 w-4 text-oasis-accent" />
+              <span>Pesos da Equação de Prioridade — {prioridade.especialidade_legivel}</span>
+            </h2>
+            <span className="text-[11px] text-slate-400">
+              Só afecta este serviço; os restantes mantêm os pesos por omissão
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mb-3">
+            A prioridade automática de cada pedido combina 3 factores. Ajuste o peso de cada um consoante o que
+            importa mais neste serviço (ex.: dar mais valor ao prazo/urgência do que ao tipo de pedido). Os valores
+            são normalizados para somar 100%.
+          </p>
+          <div className="space-y-3">
+            {(
+              [
+                { chave: "urgencia" as const, titulo: "Urgência clínica / prazo" },
+                { chave: "tipo" as const, titulo: "Tipo de pedido" },
+                { chave: "paciente" as const, titulo: "Perfil clínico do doente" },
+              ]
+            ).map((f) => (
+              <div key={f.chave}>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="font-semibold text-slate-700">{f.titulo}</span>
+                  <span className="font-mono font-bold text-oasis-header">
+                    {Math.round(
+                      (pesosForm[f.chave] / (pesosForm.urgencia + pesosForm.tipo + pesosForm.paciente || 1)) * 100,
+                    )}
+                    %
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={Math.round(pesosForm[f.chave] * 100)}
+                  onChange={(e) => setPesosForm((p) => (p ? { ...p, [f.chave]: Number(e.target.value) / 100 } : p))}
+                  className="w-full"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex items-center gap-2 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              disabled={aGuardarPesos}
+              onClick={guardarPesos}
+              className="rounded-lg bg-oasis-header px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-700 disabled:opacity-50"
+            >
+              {aGuardarPesos ? "A guardar…" : "Guardar pesos deste serviço"}
+            </button>
+            <button
+              type="button"
+              disabled={aGuardarPesos || !prioridade.personalizado}
+              onClick={reporPesos}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span>Repor por omissão</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {erro && (
         <div className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">

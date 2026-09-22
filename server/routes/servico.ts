@@ -7,6 +7,7 @@ import { resolverAlerta } from "../motor/alertas.ts";
 import { calcularSemaforo } from "../motor/semaforo.ts";
 import { resolverAvaria } from "../motor/avarias.ts";
 import { remarcarPedido, adiarConsulta, marcarOutsourcing, pedirDecisaoMedico } from "../motor/fluxo.ts";
+import { PESOS_PRIORIDADE_OMISSAO, pesosPrioridadeDoServico } from "../motor/prioridade.ts";
 import {
   descreverDoente,
   descreverEspecialidade,
@@ -309,6 +310,60 @@ export function criarRotasServico(store: typeof StoreType) {
     }
     const resolvida = resolverAvaria(avaria.avaria_id, decisao, req.utilizadorId, agora());
     res.json({ ok: true, avaria: resolvida ? avariaResumo(resolvida) : null });
+  });
+
+  // Pesos da equação de prioridade deste serviço: personalizados, ou os por omissão do sistema.
+  router.get("/prioridade", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    if (!especialidade) {
+      res.status(400).json({ erro: "O perfil seleccionado não tem especialidade associada." });
+      return;
+    }
+    const pesos = pesosPrioridadeDoServico(store, especialidade);
+    res.json({
+      especialidade,
+      especialidade_legivel: descreverEspecialidade(especialidade),
+      personalizado: !!store.pesosPrioridadePorServico[especialidade],
+      pesos,
+      pesosOmissao: PESOS_PRIORIDADE_OMISSAO,
+    });
+  });
+
+  // Ajusta os pesos deste serviço (têm de somar 1; normalizamos para tolerar pequenos arredondamentos).
+  router.post("/prioridade/pesos", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    if (!especialidade) {
+      res.status(400).json({ erro: "O perfil seleccionado não tem especialidade associada." });
+      return;
+    }
+    const urgencia = Number(req.body?.urgencia);
+    const tipo = Number(req.body?.tipo);
+    const paciente = Number(req.body?.paciente);
+    if (![urgencia, tipo, paciente].every((n) => Number.isFinite(n) && n >= 0)) {
+      res.status(400).json({ erro: "Os três pesos têm de ser números não negativos." });
+      return;
+    }
+    const soma = urgencia + tipo + paciente;
+    if (soma <= 0) {
+      res.status(400).json({ erro: "Os pesos não podem ser todos zero." });
+      return;
+    }
+    store.pesosPrioridadePorServico[especialidade] = {
+      urgencia: urgencia / soma,
+      tipo: tipo / soma,
+      paciente: paciente / soma,
+    };
+    res.json({ ok: true, pesos: store.pesosPrioridadePorServico[especialidade] });
+  });
+
+  router.post("/prioridade/repor", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    if (!especialidade) {
+      res.status(400).json({ erro: "O perfil seleccionado não tem especialidade associada." });
+      return;
+    }
+    delete store.pesosPrioridadePorServico[especialidade];
+    res.json({ ok: true, pesos: PESOS_PRIORIDADE_OMISSAO });
   });
 
   return router;

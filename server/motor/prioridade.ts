@@ -4,6 +4,25 @@ import type { Pedido, Prioridade, TipoPedido } from "../types.ts";
 
 const PESO_NIVEL: Record<Prioridade, number> = { MP: 3, P: 2, N: 1 };
 
+/** Pesos por omissão dos 3 factores da equação (secção "Prioridade" do CLAUDE.md). Cada serviço
+ * pode substituir estes pesos pelos seus próprios (server/routes/servico.ts, store.pesosPrioridadePorServico). */
+export const PESOS_PRIORIDADE_OMISSAO = { urgencia: 0.5, tipo: 0.3, paciente: 0.2 };
+
+export interface PesosPrioridade {
+  urgencia: number;
+  tipo: number;
+  paciente: number;
+}
+
+/** Pesos efectivos de um serviço: os seus, se personalizados, senão os por omissão. */
+export function pesosPrioridadeDoServico(
+  store: { pesosPrioridadePorServico: Record<string, PesosPrioridade> },
+  especialidadeCodigo?: string,
+): PesosPrioridade {
+  const pesos = especialidadeCodigo ? store.pesosPrioridadePorServico[especialidadeCodigo] : undefined;
+  return pesos ?? PESOS_PRIORIDADE_OMISSAO;
+}
+
 export interface ResultadoCalculoPrioridade {
   prioridade: Prioridade;
   score: number;
@@ -32,6 +51,7 @@ export function calcularPrioridadeSistema(
     diagnostico_principal?: string;
   } | null,
   textoPlano?: string,
+  especialidadeCodigo?: string,
 ): ResultadoCalculoPrioridade {
   const textoCombinado = `${dados.texto_origem || ""} ${dados.especificacao || ""} ${textoPlano || ""}`.toLowerCase();
   
@@ -125,8 +145,13 @@ export function calcularPrioridadeSistema(
     motivoPaciente = "Neoplasia ativa / Estadiamento intermédio";
   }
 
-  // Equação Global do Sistema
-  const scoreCalculado = Math.min(100, Math.max(10, Math.round(pontosUrgencia * 0.5 + pontosTipo * 0.3 + pontosPaciente * 0.2)));
+  // Equação do Sistema — pesos por omissão, ou personalizados pelo serviço de destino (secção
+  // "Prioridade configurável por serviço"; cada serviço pode valorizar mais um factor que outro).
+  const pesos = pesosPrioridadeDoServico(store, especialidadeCodigo);
+  const scoreCalculado = Math.min(
+    100,
+    Math.max(10, Math.round(pontosUrgencia * pesos.urgencia + pontosTipo * pesos.tipo + pontosPaciente * pesos.paciente)),
+  );
 
   let prioridade: Prioridade = "N";
   if (scoreCalculado >= store.parametros.limiar_prioridade_mp || pontosUrgencia >= 85) {
@@ -137,7 +162,7 @@ export function calcularPrioridadeSistema(
     prioridade = "N";
   }
 
-  const detalheEquacao = `Equação do Sistema: Score ${scoreCalculado}/100 [${motivoUrgencia} (${pontosUrgencia}pts) + ${motivoTipo} (${pontosTipo}pts) + ${motivoPaciente} (${pontosPaciente}pts)] ⇒ Nível ${prioridade}`;
+  const detalheEquacao = `Equação do Sistema: Score ${scoreCalculado}/100 [${motivoUrgencia} (${pontosUrgencia}pts×${pesos.urgencia}) + ${motivoTipo} (${pontosTipo}pts×${pesos.tipo}) + ${motivoPaciente} (${pontosPaciente}pts×${pesos.paciente})] ⇒ Nível ${prioridade}`;
 
   return {
     prioridade,

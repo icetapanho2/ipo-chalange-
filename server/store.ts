@@ -72,6 +72,9 @@ class Store {
   silenciamentos: Silenciamento[] = [];
   /** Avarias reportadas pelos técnicos (N2); uma avaria ABERTA bloqueia vagas do serviço/acto na janela afectada. */
   avarias: Avaria[] = [];
+  /** Pesos da equação de prioridade personalizados por serviço (especialidade_codigo); um serviço
+   * sem entrada aqui usa os pesos por omissão. Estado só do MVP, não vem de CSV. */
+  pesosPrioridadePorServico: Record<string, { urgencia: number; tipo: number; paciente: number }> = {};
 
   private contadores: Record<string, number> = {
     pedido: 0,
@@ -275,6 +278,7 @@ class Store {
     this.notificacoes = [];
     this.silenciamentos = [];
     this.avarias = [];
+    this.pesosPrioridadePorServico = {};
 
     this.contadores = {
       pedido: maxSufixo(this.pedidos.map((x) => x.pedido_id), "P"),
