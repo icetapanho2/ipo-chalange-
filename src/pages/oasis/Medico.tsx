@@ -9,7 +9,9 @@ import {
   Activity,
   FileCheck,
   ChevronRight,
+  ChevronLeft,
   Stethoscope,
+  CalendarDays,
 } from "lucide-react";
 
 interface ItemAgenda {
@@ -27,11 +29,23 @@ interface ItemAgenda {
 interface RespostaAgenda {
   medico: { utilizador_id: string; nome: string };
   hoje: string;
+  data: string;
   atos: ItemAgenda[];
 }
 
 function hora(dataHoraIso: string): string {
   return dataHoraIso.slice(11, 16);
+}
+
+/** Aritmética de calendário pura (não lê o relógio do sistema — apenas desloca uma data dada). */
+function deslocarDia(isoData: string, dias: number): string {
+  const [ano, mes, dia] = isoData.split("-").map(Number);
+  const d = new Date(ano, mes - 1, dia);
+  d.setDate(d.getDate() + dias);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
 }
 
 export function OasisMedico() {
@@ -41,16 +55,26 @@ export function OasisMedico() {
   const [erro, setErro] = useState<string | null>(null);
   const [aCarregar, setACarregar] = useState(true);
   const [doenteModalId, setDoenteModalId] = useState<string | null>(null);
+  const [dataVista, setDataVista] = useState<string | null>(null);
+
+  // Ao trocar de médico, volta sempre a mostrar "hoje" desse médico.
+  useEffect(() => {
+    setDataVista(null);
+  }, [utilizador?.utilizador_id]);
 
   useEffect(() => {
     if (!utilizador) return;
     setACarregar(true);
     setErro(null);
-    apiGet<RespostaAgenda>("/oasis/medico/agenda")
-      .then(setResposta)
+    const caminho = dataVista ? `/oasis/medico/agenda?data=${dataVista}` : "/oasis/medico/agenda";
+    apiGet<RespostaAgenda>(caminho)
+      .then((r) => {
+        setResposta(r);
+        if (!dataVista) setDataVista(r.data);
+      })
       .catch((e) => setErro(e instanceof Error ? e.message : String(e)))
       .finally(() => setACarregar(false));
-  }, [utilizador?.utilizador_id]);
+  }, [utilizador?.utilizador_id, dataVista]);
 
   const medicosDisponiveis = utilizadores.filter((u) => u.e_medico);
 
@@ -96,10 +120,44 @@ export function OasisMedico() {
       )}
 
       {utilizador?.e_medico && resposta && (
-        <OasisPainel titulo={`${resposta.medico.nome} — ${formatarDataCabecalho(resposta.hoje)}`}>
+        <OasisPainel titulo={`${resposta.medico.nome} — ${formatarDataCabecalho(resposta.data)}`}>
+          <div className="flex items-center justify-between gap-2 border-b border-oasis-border bg-slate-50 px-3 py-2">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setDataVista(deslocarDia(resposta.data, -1))}
+                className="rounded border border-slate-300 bg-white p-1.5 text-slate-600 hover:bg-slate-100"
+                title="Dia anterior"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setDataVista(deslocarDia(resposta.data, 1))}
+                className="rounded border border-slate-300 bg-white p-1.5 text-slate-600 hover:bg-slate-100"
+                title="Dia seguinte"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+              {resposta.data !== resposta.hoje && (
+                <button
+                  type="button"
+                  onClick={() => setDataVista(resposta.hoje)}
+                  className="ml-1 inline-flex items-center gap-1 rounded border border-sky-300 bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-800 hover:bg-sky-100"
+                >
+                  <CalendarDays className="h-3 w-3" />
+                  <span>Voltar a hoje</span>
+                </button>
+              )}
+            </div>
+            <span className="text-[11px] text-slate-400">
+              Navegue para ver consultas de revisão já marcadas noutros dias.
+            </span>
+          </div>
+
           {resposta.atos.length === 0 ? (
             <div className="p-6 text-center text-xs text-slate-500">
-              Sem consultas marcadas para hoje nesta agenda médica.
+              Sem consultas marcadas neste dia para esta agenda médica.
             </div>
           ) : (
             <div className="overflow-x-auto">

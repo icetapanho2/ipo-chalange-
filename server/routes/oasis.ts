@@ -9,7 +9,9 @@ import { notificar, utilizadoresPorPerfil } from "../motor/notificacoes.ts";
 export function criarRotasOasis(store: typeof StoreType) {
   const router = Router();
 
-  // Agenda de hoje do médico seleccionado (perfil no cabeçalho).
+  // Agenda do médico seleccionado (perfil no cabeçalho) num dia; por omissão, hoje (DEMO_DATE).
+  // O médico pode navegar para um dia futuro (?data=aaaa-mm-dd) e encontrar lá uma consulta
+  // de revisão entretanto marcada, abrindo-a exactamente como faria "hoje".
   router.get("/medico/agenda", (req, res) => {
     const medicoId = req.utilizadorId;
     const medico = store.utilizadores.find((u) => u.utilizador_id === medicoId);
@@ -18,8 +20,9 @@ export function criarRotasOasis(store: typeof StoreType) {
       return;
     }
     const hoje = store.parametros.DEMO_DATE;
+    const dataPedida = typeof req.query.data === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.data) ? req.query.data : hoje;
     const atos = store.atosMedicos
-      .filter((a) => a.mvp_medico_id === medicoId && a.data_hora.startsWith(hoje))
+      .filter((a) => a.mvp_medico_id === medicoId && a.data_hora.startsWith(dataPedida))
       .sort((a, b) => a.data_hora.localeCompare(b.data_hora))
       .map((ato) => {
         const doente = store.doentes.find((d) => d.doente_id === ato.doente_id);
@@ -36,7 +39,7 @@ export function criarRotasOasis(store: typeof StoreType) {
           tem_nota: !!nota,
         };
       });
-    res.json({ medico, hoje, atos });
+    res.json({ medico, hoje, data: dataPedida, atos });
   });
 
   // Detalhe de uma consulta (para abrir o ecrã SOAP).
