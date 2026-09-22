@@ -842,6 +842,17 @@ for (pid, prio, prazo, cr_d, txt, med), v in zip([
            motivo="Médico indisponível", detalhe="de 14/09/2026 para 24/09/2026")
 book(get_vaga("2102", datetime.combine(date(2026, 10, 1), t("10:50")), "U02"), D18, "2102", "22",
      criado=datetime.combine(date(2026, 9, 4), t("10:30")), estado="MARCADA")
+# Diogo (o de menor prioridade): tem revisão com a Dra. Sofia a 29/09 que depende da ecografia de 24/09
+# (resultado em 3 dias). Depois da avaria não sobra vaga a tempo → alerta → vaga extra, outsourcing ou
+# decisão do médico (avançar com a consulta ou adiá-la).
+eco_diogo = next(p for p in pedidos if p["doente_id"] == D17 and p["especialidade_destino"] == "7000_3")
+cr = datetime.combine(date(2026, 9, 8), t("10:00"))
+rv_diogo = novo_pedido(D17, "", "U02", cr, "consulta", "2102", "22", "N", med_pref="U02", continuidade=1,
+                       nao_antes=date(2026, 9, 28), prazo=date(2026, 10, 15), especificacao="revisão com resultado da ecografia",
+                       texto="Rev c/ resultado da eco.", confianca=0.97)
+validar(rv_diogo, cr + timedelta(minutes=30))
+marcar(rv_diogo, get_vaga("2102", datetime.combine(date(2026, 9, 29), t("10:50")), "U02"), cr + timedelta(minutes=50))
+dep(rv_diogo, eco_diogo, INTERVALO_RESULTADO["7000_3"])
 
 # Preparação dos exames (texto PROVISÓRIO — a validar com cada serviço). requer_confirmacao = o
 # serviço quer confirmar por telefone quando há um factor de risco (ver server/motor/chamadas.ts).

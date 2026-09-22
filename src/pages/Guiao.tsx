@@ -199,44 +199,77 @@ const CASOS: Caso[] = [
     titulo: "Caso 5 — Avaria: 5 doentes para remarcar de uma vez",
     tipo: "problema",
     problema:
-      "O ecógrafo avariou e só fica reparado depois de amanhã: as 5 ecografias de 24/09 têm de ser remarcadas, e só há uma vaga livre antes de sexta. Hoje a administrativa pega no telefone e remarca pela ordem da lista — quem calha fica com a vaga.",
+      "O ecógrafo avariou e só fica reparado depois de amanhã: as 5 ecografias de 24/09 têm de ser remarcadas e só há uma vaga livre antes de sexta. Hoje a administrativa pega no telefone e remarca pela ordem da lista — quem calha fica com a vaga, e ninguém repara que um dos exames já não chega a tempo da consulta.",
     regras: [
-      "Cada pedido já tem o índice de prioridade calculado e guardado (nível, prazo, estádio, score clínico, remarcações já sofridas, tempo de espera): a ordem já está feita antes da avaria.",
+      "Cada pedido já tem o índice de prioridade calculado e guardado (nível, prazo, estádio, score clínico, remarcações já sofridas, espera): a ordem já está feita antes da avaria.",
       "Dois MP com o mesmo prazo não empatam: quem está em diagnóstico fica à frente.",
-      "Quem já foi remarcado é sinalizado (2.ª remarcação inevitável: ligar ao doente).",
-      "Dia único para quem mora longe; nunca se remarca sem a administrativa validar.",
+      "Se uma consulta depende do exame, a nova data tem de deixar tempo para o resultado. Se não houver, é um alerta — nunca uma remarcação às cegas.",
+      "Sem vaga a tempo: a administrativa resolve com vaga extra ou outsourcing; se não puder, decide o médico (avançar com a consulta ou adiá-la, e para que dia).",
     ],
     passos: [
       {
         titulo: "O técnico reporta a avaria",
         descricao:
-          "Perfil Técnico → Reportar avaria: serviço Radiologia-Geral (Ecografia), todo o serviço, \"Ecógrafo avariado (sonda); técnico da marca só amanhã ao fim do dia\", a partir de 24/09, 1 dia.",
+          "Perfil Técnico → Reportar avaria: Radiologia-Geral (Ecografia), todo o serviço, \"Ecógrafo avariado (sonda); técnico da marca só amanhã ao fim do dia\", a partir de 24/09, 1 dia.",
         resultado: "A administrativa da Ecografia (Tiago Neves) recebe logo: \"Avaria em Radiologia-Geral (Ecografia): 5 marcação(ões) a remarcar — plano pronto\".",
         acoes: [{ etiqueta: "Reportar avaria (Técnico)", utilizadorId: "U13", caminho: "/tecnico" }],
       },
       {
-        titulo: "A administrativa revê o plano e valida",
+        titulo: "A administrativa revê o plano e aceita",
         descricao:
-          "Serviço → Remarcações: as 5 propostas por ordem do índice, com a vaga sugerida, a justificação e os avisos. Carregar no índice mostra de onde vem cada ponto. \"Aceitar todas\".",
+          "Serviço → Remarcações: as 5 propostas por ordem do índice, com a vaga sugerida, o porquê e os avisos (carregar no índice mostra cada ponto). \"Aceitar todas\" aplica as 4 que têm solução.",
         resultado:
-          "1.º Sónia (MP, em diagnóstico, índice 717) → 25/09 10:40, a única vaga dentro do prazo. 2.º Artur (também MP, mesmo prazo, índice 621) → 28/09 11:00, 3 dias fora do prazo, com aviso para vaga extra. 3.º Fátima (em QT) → 28/09 12:00, com aviso \"2.ª remarcação — ligar à doente\". 4.º Olga (84 anos, Santarém) → 01/10 11:40, no dia da consulta dela. 5.º Diogo (rotina) → 28/09 12:40. Doentes e médicos avisados; o técnico recebe \"avaria resolvida\".",
+          "1.º Sónia (MP, em diagnóstico, 717) → 25/09 10:40, a única vaga no prazo. 2.º Artur (MP, 621) → 28/09 11:00, 3 dias fora do prazo, com aviso. 3.º Fátima (em QT) → 28/09 12:00, aviso \"2.ª remarcação — ligar\". 4.º Olga (84 anos, Santarém) → 01/10 11:40, no dia da consulta dela. 5.º Diogo (índice 134) → sem vaga a tempo (ver passo seguinte).",
         acoes: [{ etiqueta: "Remarcações (Ecografia)", utilizadorId: "U11", caminho: "/servico?aba=remarcacoes" }],
-        fala: "Cinco remarcações em segundos, cada uma com o porquê. A decisão continua a ser da administrativa — o sistema tira-lhe o trabalho de pensar a ordem e procurar vagas.",
+        fala: "Cinco remarcações em segundos, cada uma com o porquê. Quem decide continua a ser a administrativa.",
+      },
+      {
+        titulo: "Diogo: sem vaga a tempo — alerta",
+        descricao:
+          "O Diogo tem revisão com a Dra. Sofia a 29/09 que precisa do resultado da ecografia (3 dias): o exame teria de ser até 26/09 e a única vaga (25/09) ficou para a Sónia, com índice 717 contra 134. O cartão fica a vermelho, com um alerta, e três saídas: \"Resolvi com vaga extra\" (já sugere 25/09 13:30), \"Resolvi com outsourcing\", ou \"Não há solução — enviar ao médico\". Para a demo: enviar ao médico.",
+        resultado: "A Dra. Sofia recebe a notificação \"Decisão necessária: Diogo Almeida Reis — revisão de 29/09\". (Com vaga extra, o exame ficaria a 25/09 13:30 e a consulta mantinha-se.)",
+        acoes: [{ etiqueta: "Remarcações (Ecografia)", utilizadorId: "U11", caminho: "/servico?aba=remarcacoes" }],
+        fala: "Quem tem menos prioridade não fica esquecido: fica um alerta com as opções, e se a administração não resolve, decide o médico.",
+      },
+      {
+        titulo: "A médica decide: adiar a consulta",
+        descricao:
+          "Perfil Dra. Sofia Lemos → Os Meus Pedidos: \"Exame sem vaga a tempo da consulta — decida\". Opções: avançar com a consulta a 29/09 e ver a ecografia depois (28/09), ou adiar a consulta (data mínima sugerida 01/10). Escolher \"Adiar\" com 01/10.",
+        resultado: "Consulta adiada para 06/10 09:30 (primeiro dia livre da Dra. Sofia a partir de 01/10); ecografia a 28/09 12:40, a tempo do resultado. O doente e a administrativa são avisados; o técnico recebe \"avaria resolvida\".",
+        acoes: [
+          { etiqueta: "Os Meus Pedidos (Dra. Sofia)", utilizadorId: "U02", caminho: "/meus-pedidos" },
+          { etiqueta: "Ficha do Diogo", utilizadorId: "U02", caminho: "/doente/100117" },
+        ],
       },
     ],
   },
   {
     id: "6",
-    titulo: "Caso 6 — Faltou a uma análise antes da consulta",
+    titulo: "Caso 6 — A médica vai de férias",
+    tipo: "problema",
+    problema: "A Dra. Sofia Lemos falta a 08/10. As 7 consultas desse dia têm de mudar — e os doentes que ela segue devem continuar com ela.",
+    regras: ["Mesmo motor da avaria, só na agenda desse médico.", "Continuidade: primeiro a agenda do mesmo médico; ordem pelo índice."],
+    passos: [
+      {
+        titulo: "A administrativa regista a ausência",
+        descricao: "Perfil Joana Moreira → Serviço → Remarcações → \"Registar ausência de médico\": Dra. Sofia Lemos, 08/10, 1 dia, Férias. Rever o plano e \"Aceitar todas\".",
+        resultado: "7 consultas remarcadas pela ordem do índice, com a própria Dra. Sofia: o 1.º (MP, em diagnóstico) para 13/10 09:10 e os restantes a 13/10 e 15/10.",
+        acoes: [{ etiqueta: "Remarcações (Onc. Cirúrgica)", utilizadorId: "U03", caminho: "/servico?aba=remarcacoes" }],
+        fala: "Férias, doença, formação: a agenda de um médico inteiro muda em segundos, sem perder a continuidade.",
+      },
+    ],
+  },
+  {
+    id: "7",
+    titulo: "Caso 7 — Faltou a uma análise antes da consulta",
     tipo: "problema",
     problema: "António Ribeiro faltou ontem à colheita de que depende a revisão de 28/09. Sem o sistema, só se descobre no dia da consulta.",
     passos: [
       {
         titulo: "A administrativa recebe a sugestão e aceita",
         descricao:
-          "Perfil Rita Vieira (Patologia Clínica): a notificação da falta já traz a sugestão. Serviço → Remarcações → Faltas: ler a justificação e \"Aceitar\". Na ficha do António o semáforo está a vermelho antes e passa a amarelo depois.",
-        resultado:
-          "Sugerido e marcado 24/09 07:40 — a primeira vaga que ainda dá tempo ao resultado (2 dias) antes da consulta de 28/09. O semáforo passa de vermelho a amarelo; não conta como remarcação pelo hospital.",
+          "Perfil Rita Vieira (Patologia Clínica): a notificação da falta já traz a sugestão. Serviço → Remarcações → Faltas: ler o porquê e \"Aceitar\". Na ficha do António o semáforo passa de vermelho a amarelo.",
+        resultado: "Colheita a 24/09 07:40 — a primeira vaga que ainda dá tempo ao resultado (2 dias) antes da consulta de 28/09. Não conta como remarcação pelo hospital.",
         acoes: [
           { etiqueta: "Remarcações (Patologia Clínica)", utilizadorId: "U08", caminho: "/servico?aba=remarcacoes" },
           { etiqueta: "Ficha do António", utilizadorId: "U08", caminho: "/doente/100102" },
@@ -246,16 +279,27 @@ const CASOS: Caso[] = [
     ],
   },
   {
-    id: "7",
-    titulo: "Impacto em números",
+    id: "8",
+    titulo: "Gestão — antecipar em vez de apagar fogos",
     tipo: "impacto",
-    problema: "O que isto vale para a gestão: o antes (60 dias de histórico), o que o sistema fez nesta demonstração e a projecção mensal, com os pressupostos à vista.",
+    problema:
+      "O que isto vale para quem gere: ver os prazos que vão falhar antes de falharem, saber quem ganha com uma sessão extra antes de a pagar, e os números do antes e do depois.",
     passos: [
       {
-        titulo: "Dashboard de gestão",
-        descricao: "Abrir a Gestão: o painel \"Impacto das regras\" actualiza-se com o que foi feito nos casos anteriores.",
+        titulo: "Prazos em risco e sessão extra",
+        descricao:
+          "Gestão: \"Prazos em risco nas próximas 2 semanas\" — cada pedido com a solução já proposta (vaga livre, troca, antecipar, ou sessão/vaga extra). Ao lado, \"Sessão extra\": TAC no sábado 26/09 às 08:00, 6 vagas.",
         resultado:
-          "0 doentes remarcados uma 2.ª vez por troca (1 inevitável por avaria, sinalizada), 3 doentes vulneráveis protegidos, 5/5 remarcações por avaria justificadas e validadas, 1 vaga libertada reaproveitada (13 dias ganhos), 2 deslocações evitadas, ~23% das marcações a ligar.",
+          "Das 6 vagas, só 2 têm quem ganhe com elas (Paula Ribeiro Nunes e Helena Duarte Matos, em diagnóstico e fora do prazo): o sistema diz para abrir só 2. \"Abrir a sessão\" cria as vagas e envia as ofertas por SMS.",
+        acoes: [{ etiqueta: "Abrir Gestão", utilizadorId: "U12", caminho: "/gestao" }],
+        fala: "Antes de pagar horas extra, sabe-se quem ganha com elas — e quantas vagas chegam.",
+      },
+      {
+        titulo: "Impacto em números",
+        descricao:
+          "No topo da Gestão: antes das regras (60 dias), o que as regras fizeram nesta demonstração, espera por estádio, e a projecção mensal com os pressupostos à vista. Na lista de chamadas de cada serviço há também os encaixes sugeridos por dia (só sugestão).",
+        resultado:
+          "0 doentes remarcados uma 2.ª vez por troca (2 inevitáveis, sinalizadas), 3 doentes vulneráveis protegidos, 12/12 remarcações por avaria/ausência justificadas e validadas, 1 vaga libertada reaproveitada (13 dias ganhos), 2 deslocações evitadas (630 km), ~23% das marcações a ligar.",
         acoes: [{ etiqueta: "Abrir Gestão", utilizadorId: "U12", caminho: "/gestao" }],
       },
     ],
@@ -543,7 +587,7 @@ export function Guiao() {
         <div>
           <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600 shadow-2xs">
             <strong className="text-slate-800">Como apresentar:</strong> carregar em \"Repor demo\" e seguir os casos por esta ordem. O Caso 1
-            mostra o circuito normal; os Casos 2 a 6 mostram problemas reais em que as regras de prioridade decidem; o último mostra o impacto
+            mostra o circuito normal; os Casos 2 a 7 mostram problemas reais em que as regras de prioridade decidem; o último mostra o impacto
             em números. Cada botão já troca para o perfil certo.
           </div>
 

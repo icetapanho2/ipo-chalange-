@@ -156,7 +156,7 @@ export function TrocadorUtilizador() {
       carregarResumo();
     }
     setAberto(false);
-    if (n.doente_id && n.tipo !== "REMARCACAO_SUGERIDA") navigate(`/doente/${n.doente_id}`);
+    if (n.doente_id && n.tipo !== "REMARCACAO_SUGERIDA" && n.tipo !== "PEDIDO_DECISAO_NECESSARIA") navigate(`/doente/${n.doente_id}`);
     else navigate(ROTA_POR_TIPO[n.tipo] ?? "/");
   }
 

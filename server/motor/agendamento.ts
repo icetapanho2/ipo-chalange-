@@ -48,10 +48,13 @@ export function janelaAvaria(av: { data_inicio: string; criado_em: string; durac
   return { inicio, fim: somarDias(inicio, av.duracao_dias) };
 }
 
-/** Uma avaria ABERTA (N2) tira temporariamente do pool as vagas do serviço (ou só de um acto) na sua janela. */
+/** Uma avaria (N2) — ou a ausência de um médico — tira temporariamente do pool as vagas do serviço (ou só de um acto) na sua janela. */
 export function vagaBloqueadaPorAvaria(vaga: Vaga, atoCodigo: string): boolean {
   return store.avarias.some((av) => {
-    if (av.estado !== "ABERTA" || av.especialidade_codigo !== vaga.especialidade_codigo) return false;
+    // O bloqueio vale para toda a janela da avaria, mesmo depois de o plano de remarcação estar
+    // decidido (RESOLVIDA = marcações tratadas, não equipamento reparado antes do tempo).
+    if (av.especialidade_codigo !== vaga.especialidade_codigo) return false;
+    if (av.medico_id && vaga.medico_id !== av.medico_id) return false;
     if (av.ato_codigo && av.ato_codigo !== atoCodigo) return false;
     const { inicio, fim } = janelaAvaria(av);
     const dh = parseIso(vaga.data_hora);

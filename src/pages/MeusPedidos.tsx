@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiGet, apiPost } from "../lib/api";
+import { DecisoesRemarcacao } from "../components/DecisoesRemarcacao";
 import {
   ChevronDown,
   ChevronUp,
@@ -201,6 +202,13 @@ export function MeusPedidos() {
       </div>
 
       {erro && <p className="mt-3 text-sm text-red-600">{erro}</p>}
+
+      <DecisoesRemarcacao
+        aoMudar={() => {
+          recarregar();
+          recarregarPainel();
+        }}
+      />
 
       {/* Sem vaga (nem interna, nem outsourcing): a administração pede ao médico para decidir */}
       {dados && dados.semVagaDecisao.length > 0 && (

@@ -3,6 +3,7 @@ import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
 import { apenasData, parseIso, somarDias } from "../util.ts";
 import { decidirSemVaga, responderDevolucao } from "../motor/fluxo.ts";
+import { dataMinimaParaAdiar, decidirRemarcacaoMedico } from "../motor/propostasRemarcacao.ts";
 import {
   descreverDoente,
   descreverEspecialidade,
@@ -38,6 +39,46 @@ export function criarRotasMeusPedidos(store: typeof StoreType) {
       motivo_recusa: p.motivo_recusa ?? "",
     };
   }
+
+  // Exame sem vaga a tempo da consulta (avaria/falta), sem vaga extra nem outsourcing: o médico decide.
+  router.get("/decisoes-remarcacao", (req, res) => {
+    const pendentes = store.propostasRemarcacao
+      .filter((p) => p.estado === "AGUARDA_MEDICO" && p.consulta_dependente?.medico_id === req.utilizadorId)
+      .map((p) => {
+        const exame = store.pedidos.find((x) => x.pedido_id === p.pedido_id);
+        return {
+          proposta_id: p.proposta_id,
+          origem: p.origem,
+          doente_id: p.doente_id,
+          doente_nome: descreverDoente(p.doente_id),
+          exame: exame ? descreverPedido(exame) : "",
+          consulta: p.consulta_dependente,
+          alternativa_data_hora: p.alternativa_data_hora ?? "",
+          data_minima_adiar: dataMinimaParaAdiar(p),
+          justificacao: p.justificacao,
+        };
+      });
+    res.json(pendentes);
+  });
+
+  router.post("/decisoes-remarcacao/:id", (req, res) => {
+    const decisao = req.body?.decisao;
+    if (decisao !== "AVANCAR" && decisao !== "ADIAR") {
+      res.status(400).json({ erro: "Decisão inválida." });
+      return;
+    }
+    const novaData: string | null = req.body?.novaData || null;
+    if (novaData && !/^\d{4}-\d{2}-\d{2}$/.test(novaData)) {
+      res.status(400).json({ erro: "Data inválida (aaaa-mm-dd)." });
+      return;
+    }
+    const r = decidirRemarcacaoMedico(req.params.id, decisao, req.utilizadorId, novaData, agora());
+    if (!r) {
+      res.status(404).json({ erro: "Decisão já tomada, ou sem vaga para a consulta a partir dessa data." });
+      return;
+    }
+    res.json({ ok: true, consulta: r.consulta, exame: r.exame });
+  });
 
   router.get("/", (req, res) => {
     const meus = store.pedidos.filter((p) => p.medico_requisitante_id === req.utilizadorId);

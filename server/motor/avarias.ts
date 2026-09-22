@@ -4,7 +4,7 @@ import { formatarDataPt, isoData, isoDataHora, parseIso } from "../util.ts";
 import { recalcularAlertas } from "./alertas.ts";
 import { notificar, utilizadoresPorPerfil } from "./notificacoes.ts";
 import { aceitarPlanoAvaria, planearRemarcacoesAvaria } from "./propostasRemarcacao.ts";
-import { descreverEspecialidade, descreverAto } from "../apresentacao.ts";
+import { descreverEspecialidade, descreverAto, descreverUtilizador } from "../apresentacao.ts";
 import type { Avaria } from "../types.ts";
 
 /**
@@ -14,7 +14,7 @@ import type { Avaria } from "../types.ts";
  * sugerida e justificação — e avisa a administração do serviço, que só tem de validar.
  */
 export function reportarAvaria(
-  opts: { especialidadeCodigo: string; atoCodigo?: string; descricao: string; duracaoDias: number; dataInicio?: string },
+  opts: { especialidadeCodigo: string; atoCodigo?: string; descricao: string; duracaoDias: number; dataInicio?: string; medicoId?: string },
   utilizadorId: string,
   quando: Date = agora(),
 ): Avaria {
@@ -27,6 +27,7 @@ export function reportarAvaria(
     reportado_por: utilizadorId,
     criado_em: isoDataHora(quando),
     data_inicio: opts.dataInicio || isoData(quando),
+    medico_id: opts.medicoId ?? "",
     estado: "ABERTA",
     decisao: "",
     resolvido_por: "",
@@ -36,7 +37,11 @@ export function reportarAvaria(
   store.avarias.push(avaria);
   const plano = planearRemarcacoesAvaria(avaria, quando);
 
-  const alvo = opts.atoCodigo ? `${descreverAto(opts.especialidadeCodigo, opts.atoCodigo)}` : "todo o serviço";
+  const alvo = opts.medicoId
+    ? `Agenda de ${descreverUtilizador(opts.medicoId)}`
+    : opts.atoCodigo
+      ? `${descreverAto(opts.especialidadeCodigo, opts.atoCodigo)}`
+      : "todo o serviço";
   const inicio = parseIso(avaria.data_inicio);
   const periodo =
     avaria.duracao_dias === 1 ? `a ${formatarDataPt(inicio)}` : `${avaria.duracao_dias} dias a partir de ${formatarDataPt(inicio)}`;
@@ -44,7 +49,7 @@ export function reportarAvaria(
   notificar({
     tipo: "AVARIA_SERVICO",
     destinatarios: utilizadoresPorPerfil("ADMINISTRATIVO", opts.especialidadeCodigo),
-    titulo: `Avaria em ${descreverEspecialidade(opts.especialidadeCodigo)}: ${plano.length} marcação(ões) a remarcar`,
+    titulo: `${opts.medicoId ? `Ausência de ${descreverUtilizador(opts.medicoId)}` : `Avaria em ${descreverEspecialidade(opts.especialidadeCodigo)}`}: ${plano.length} marcação(ões) a remarcar`,
     mensagem:
       `${alvo} indisponível ${periodo}: ${opts.descricao}. ` +
       (plano.length

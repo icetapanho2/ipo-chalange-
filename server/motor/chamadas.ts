@@ -142,3 +142,48 @@ export function registarChamada(
   }
   return chamada;
 }
+
+/**
+ * R-O — Encaixes sugeridos (só sugestão, nada é marcado; a validar com cada serviço). Por dia, as
+ * faltas esperadas = soma da probabilidade de falta de cada marcação: a taxa histórica do serviço
+ * (60 dias), ×3 se o doente já faltou no último ano, ×2 se não tem contacto digital. Com 1 ou mais
+ * faltas esperadas, sugere-se aceitar esse número de encaixes.
+ */
+export function encaixesSugeridos(especialidadeCodigo: string | undefined, quando: Date = agora()) {
+  const hoje = apenasData(quando);
+  const desde = somarDias(hoje, -60).getTime();
+  const passados = store.atosMedicos.filter(
+    (a) =>
+      (!especialidadeCodigo || a.especialidade_codigo === especialidadeCodigo) &&
+      (a.estado === "REALIZADA" || a.estado === "FALTOU") &&
+      parseIso(a.data_hora).getTime() >= desde &&
+      parseIso(a.data_hora).getTime() < hoje.getTime(),
+  );
+  const taxa = passados.length ? passados.filter((a) => a.estado === "FALTOU").length / passados.length : 0.05;
+  const porDia = new Map<string, { marcacoes: number; esperadas: number }>();
+  for (const ato of store.atosMedicos) {
+    if (ato.estado !== "MARCADA" || (especialidadeCodigo && ato.especialidade_codigo !== especialidadeCodigo)) continue;
+    const dias = diferencaDias(apenasData(parseIso(ato.data_hora)), hoje);
+    if (dias < 1 || dias > store.parametros.lista_chamadas_dias) continue;
+    const doente = store.doentes.find((d) => d.doente_id === ato.doente_id);
+    let p = taxa;
+    if (faltasUltimoAno(ato.doente_id, quando) > 0) p *= 3;
+    if (doente?.contacto_digital === "NENHUM") p *= 2;
+    const dia = ato.data_hora.slice(0, 10);
+    const g = porDia.get(dia) ?? { marcacoes: 0, esperadas: 0 };
+    g.marcacoes += 1;
+    g.esperadas += Math.min(p, 0.9);
+    porDia.set(dia, g);
+  }
+  return {
+    taxa_historica: Math.round(taxa * 1000) / 10,
+    dias: [...porDia.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([dia, g]) => ({
+        dia,
+        marcacoes: g.marcacoes,
+        faltas_esperadas: Math.round(g.esperadas * 10) / 10,
+        encaixes_sugeridos: Math.floor(g.esperadas),
+      })),
+  };
+}

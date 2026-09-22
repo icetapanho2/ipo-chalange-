@@ -248,3 +248,24 @@ administrativa com a solução e a justificação, para ela validar.
 6. **2.ª remarcação na métrica**: separam-se as evitáveis (por troca — a regra impede, 0) das inevitáveis
    (avaria — sinalizadas para chamada), para o painel não se contradizer.
 
+## 2026-09-22 — Sem vaga a tempo, ausência de médico e gestão de capacidade
+
+1. **"Sem vaga a tempo" só existe quando uma consulta depende do exame.** Um exame de rotina sem
+   dependente tem sempre vaga (mais tarde); o que se perde é o resultado para a consulta. O Diogo
+   (índice mais baixo) tem revisão a 29/09 que depende da ecografia — é o caso da demo.
+2. **"Resolvi com vaga extra" cria mesmo uma vaga** (fora do horário, `extra`), para o exame aparecer
+   na agenda e na ficha do doente; não há lógica de capacidade por trás, é a administrativa que a abre.
+   **Outsourcing** reutiliza o comportamento que já existia (registado e realizado fora).
+3. **A decisão do médico** tem duas saídas: avançar (retira a dependência e marca o exame na primeira
+   vaga) ou adiar (consulta no primeiro dia livre a partir da data escolhida, com o mesmo médico; exame
+   a tempo do resultado). O adiamento conta como remarcação da consulta, sinalizada como inevitável.
+4. **O bloqueio de uma avaria vale para toda a janela**, mesmo depois de o plano ficar decidido (estava
+   a desbloquear o dia avariado quando a avaria passava a RESOLVIDA).
+5. **Ausência de médico** é uma avaria com `medico_id`. Marcações sem pedido no sistema nunca são
+   antecipadas (procura-se a partir da data original, mesmo médico primeiro).
+6. **2.ª remarcação evitável = só por troca** (é a que a regra R-A governa); avaria, ausência e
+   decisão médica contam como inevitáveis e ficam sinalizadas.
+7. **Sessão extra** usa as mesmas regras da vaga libertada e diz quantas vagas chegam — com os dados
+   da demo, de 6 vagas de TAC só 2 têm quem ganhe com elas; não se inventam doentes para as encher.
+8. **Encaixes** ficam como sugestão (número por dia), sem marcar nada, como combinado.
+

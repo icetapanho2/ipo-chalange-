@@ -46,6 +46,7 @@ interface Impacto {
     percentagem_marcacoes_a_ligar: number;
     pressupostos: string[];
   };
+  esperaPorEstadio: { estadio: string; legivel: string; pedidos: number; mediana_dias: number; percent_dentro_prazo: number }[];
 }
 
 function Numero({ valor, rotulo, destaque = false }: { valor: string | number; rotulo: string; destaque?: boolean }) {
@@ -98,7 +99,7 @@ export function PainelImpacto({ recarregarCada }: { recarregarCada?: number }) {
             destaque
             valor={s.doentes_remarcados_2_vezes}
             rotulo={`doentes remarcados uma 2.ª vez por troca (a regra impede)${
-              s.segundas_remarcacoes_inevitaveis ? ` — ${s.segundas_remarcacoes_inevitaveis} inevitável(eis) por avaria, sinalizada(s) para chamada` : ""
+              s.segundas_remarcacoes_inevitaveis ? ` — ${s.segundas_remarcacoes_inevitaveis} inevitável(eis) por avaria, ausência ou decisão médica — sinalizada(s)` : ""
             }`}
           />
           <Numero
@@ -142,6 +143,31 @@ export function PainelImpacto({ recarregarCada }: { recarregarCada?: number }) {
           <Numero valor={p.faltas_evitadas_mes} rotulo={`vagas recuperadas por mês em todos os serviços (de ${p.faltas_mes} faltas)`} />
           <Numero valor={`${p.percentagem_marcacoes_a_ligar}%`} rotulo="das marcações precisam de chamada (em vez de 100%)" />
         </div>
+        {dados.esperaPorEstadio.length > 0 && (
+          <div className="mt-3 rounded-lg border border-indigo-100 bg-white p-2">
+            <div className="mb-1 text-[10px] font-bold uppercase text-slate-500">Espera por estádio do percurso (pedido → marcação, histórico)</div>
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="text-[10px] text-slate-400">
+                  <th>Estádio</th>
+                  <th>Pedidos</th>
+                  <th>Mediana de espera</th>
+                  <th>Dentro do prazo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dados.esperaPorEstadio.map((e) => (
+                  <tr key={e.estadio} className="border-t border-slate-100">
+                    <td className="py-0.5 font-semibold text-slate-700">{e.legivel}</td>
+                    <td>{e.pedidos}</td>
+                    <td>{e.mediana_dias} dias</td>
+                    <td className={e.percent_dentro_prazo < 90 ? "font-bold text-rose-700" : "text-emerald-700"}>{e.percent_dentro_prazo}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
         <ul className="mt-2 list-disc pl-4 text-[10px] text-indigo-800">
           {p.pressupostos.map((x) => (
             <li key={x}>{x}</li>

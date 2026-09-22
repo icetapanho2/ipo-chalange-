@@ -4,9 +4,9 @@ import { store } from "../server/store.ts";
 describe("store (Fase 1 — carregamento em memória)", () => {
   it("carrega contagens iguais às dos CSV de dados/", () => {
     expect(store.doentes.length).toBe(468);
-    expect(store.pedidos.length).toBe(740);
-    expect(store.eventos.length).toBe(3764);
-    expect(store.dependencias.length).toBe(495);
+    expect(store.pedidos.length).toBe(741);
+    expect(store.eventos.length).toBe(3768);
+    expect(store.dependencias.length).toBe(496);
     expect(store.especialidades.length).toBeGreaterThan(0);
     expect(store.catalogoAtos.length).toBeGreaterThan(0);
     expect(store.vagas.length).toBeGreaterThan(0);
@@ -34,8 +34,8 @@ describe("store (Fase 1 — carregamento em memória)", () => {
   it("repor demo recarrega o estado a partir dos CSV", () => {
     store.pedidos.pop();
     const antes = store.pedidos.length;
-    expect(antes).toBe(739);
+    expect(antes).toBe(740);
     store.carregar();
-    expect(store.pedidos.length).toBe(740);
+    expect(store.pedidos.length).toBe(741);
   });
 });

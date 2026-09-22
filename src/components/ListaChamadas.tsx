@@ -25,6 +25,7 @@ interface RespostaChamadas {
   itens: ItemChamada[];
   marcacoesNoHorizonte: number;
   horizonteDias: number;
+  encaixes: { taxa_historica: number; dias: { dia: string; marcacoes: number; faltas_esperadas: number; encaixes_sugeridos: number }[] };
 }
 
 const COR_MOTIVO: Record<string, string> = {
@@ -148,6 +149,29 @@ export function ListaChamadas({ aoMudar }: { aoMudar?: (mensagem: string) => voi
           {porFazer.length === 0 && <p className="px-4 py-3 text-xs text-slate-500">Nada por ligar.</p>}
         </div>
       </div>
+
+      {dados.encaixes.dias.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-700">Encaixes sugeridos (só sugestão)</h3>
+          <p className="mb-2 text-[11px] text-slate-500">
+            Faltas esperadas por dia = taxa histórica do serviço ({dados.encaixes.taxa_historica}%), ×3 para quem já faltou e ×2 para quem não tem contacto
+            digital. Nada é marcado: é um número para o serviço decidir (a validar).
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {dados.encaixes.dias.map((d) => (
+              <div key={d.dia} className="rounded border border-slate-200 px-2 py-1 text-[11px]">
+                <div className="font-semibold text-slate-800">{dataHoraCurta(d.dia)}</div>
+                <div className="text-slate-500">
+                  {d.marcacoes} marc. · {d.faltas_esperadas} faltas esp.
+                </div>
+                <div className={d.encaixes_sugeridos > 0 ? "font-bold text-indigo-700" : "text-slate-400"}>
+                  {d.encaixes_sugeridos > 0 ? `+${d.encaixes_sugeridos} encaixe(s)` : "sem encaixe"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {feitas.length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

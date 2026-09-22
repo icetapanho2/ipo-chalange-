@@ -5,6 +5,7 @@ import { apenasData, parseIso, somarDias } from "../util.ts";
 import { avaliarCandidatosTroca, janelaAgendamento } from "../motor/agendamento.ts";
 import { avaliarFactos, pesosCusto, type PesosCusto, type SobreposicaoFactos } from "../motor/remarcacao.ts";
 import { listaChamadas } from "../motor/chamadas.ts";
+import { abrirSessaoExtra, esperaPorEstadio, prazosEmRisco, previsaoSessaoExtra, type OpcoesSessaoExtra } from "../motor/capacidade.ts";
 import { descreverDoente, descreverEspecialidade, descreverPedido } from "../apresentacao.ts";
 import type { CandidatoTroca, FactosCandidato } from "../types.ts";
 
@@ -67,6 +68,52 @@ export function criarRotasPrioridades(store: typeof StoreType) {
       escolhido_original: nome(original, "escolhido"),
       escolhido_regra_antiga: nome(simulado, "escolhido_regra_antiga"),
     });
+  });
+
+  // R-L — alerta antecipado: prazos que vão falhar nas próximas 2 semanas, com a solução proposta.
+  router.get("/prazos-em-risco", (_req, res) => {
+    const itens = prazosEmRisco(agora(), 14);
+    const porServico = new Map<string, number>();
+    for (const i of itens) porServico.set(i.especialidade_legivel, (porServico.get(i.especialidade_legivel) ?? 0) + 1);
+    res.json({
+      total: itens.length,
+      porServico: [...porServico.entries()].map(([servico, n]) => ({ servico, n })),
+      porSolucao: {
+        vaga_livre: itens.filter((i) => i.solucao === "VAGA_LIVRE").length,
+        troca: itens.filter((i) => i.solucao === "TROCA").length,
+        antecipar: itens.filter((i) => i.solucao === "ANTECIPAR").length,
+        vaga_extra: itens.filter((i) => i.solucao === "VAGA_EXTRA").length,
+      },
+      itens,
+    });
+  });
+
+  // R-M — sessão extra: pré-visualização (não altera nada) e abertura (cria vagas + ofertas por SMS).
+  function opcoesSessao(body: Record<string, unknown>): OpcoesSessaoExtra | null {
+    const o = {
+      especialidade: String(body?.especialidade ?? "7000_2"),
+      data: String(body?.data ?? ""),
+      horaInicio: String(body?.horaInicio ?? "08:00"),
+      nVagas: Number(body?.nVagas ?? 6),
+    };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(o.data) || !/^\d{2}:\d{2}$/.test(o.horaInicio) || !(o.nVagas > 0 && o.nVagas <= 30)) return null;
+    return o;
+  }
+  router.post("/sessao-extra/previsao", (req, res) => {
+    const o = opcoesSessao(req.body);
+    if (!o) {
+      res.status(400).json({ erro: "Indique serviço, data, hora e número de vagas (1–30)." });
+      return;
+    }
+    res.json(previsaoSessaoExtra(o, agora()));
+  });
+  router.post("/sessao-extra", (req, res) => {
+    const o = opcoesSessao(req.body);
+    if (!o) {
+      res.status(400).json({ erro: "Indique serviço, data, hora e número de vagas (1–30)." });
+      return;
+    }
+    res.json({ ok: true, ...abrirSessaoExtra(o, agora()) });
   });
 
   /**
@@ -142,8 +189,11 @@ export function criarRotasPrioridades(store: typeof StoreType) {
       const d = pedidoDoente.get(e.pedido_id);
       return !!d && (remTotal.get(d) ?? 0) >= 2;
     });
-    const segundasEvitaveis = new Set(segundasHoje.filter((e) => !e.motivo.startsWith("Avaria")).map((e) => pedidoDoente.get(e.pedido_id)));
-    const segundasInevitaveis = new Set(segundasHoje.filter((e) => e.motivo.startsWith("Avaria")).map((e) => pedidoDoente.get(e.pedido_id)));
+    // A regra R-A governa as trocas: só essas são evitáveis. Avaria, ausência do médico e decisões do
+    // médico são inevitáveis (sinalizadas para chamada).
+    const porTroca = (e: { motivo: string }) => e.motivo.startsWith("Troca segura");
+    const segundasEvitaveis = new Set(segundasHoje.filter(porTroca).map((e) => pedidoDoente.get(e.pedido_id)));
+    const segundasInevitaveis = new Set(segundasHoje.filter((e) => !porTroca(e)).map((e) => pedidoDoente.get(e.pedido_id)));
     const planos = store.propostasRemarcacao.filter((p) => p.origem === "AVARIA");
     const sugestoesFalta = store.propostasRemarcacao.filter((p) => p.origem === "FALTA");
 
@@ -207,6 +257,7 @@ export function criarRotasPrioridades(store: typeof StoreType) {
         ],
       },
       servicoTac: descreverEspecialidade("7000_2"),
+      esperaPorEstadio: esperaPorEstadio(),
     });
   });
 

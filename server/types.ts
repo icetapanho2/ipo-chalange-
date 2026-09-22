@@ -91,6 +91,8 @@ export interface Vaga {
   duracao_min: number;
   atos_permitidos: string[];
   ato_id: string; // vazio = livre
+  /** Vaga criada fora do horário normal (vaga extra ou sessão extra). */
+  extra?: boolean;
   /** Vaga libertada que está guardada para uma oferta de antecipação PENDENTE (secção 8A, R-E). */
   oferta_id?: string;
   /** Vaga guardada para uma proposta de remarcação PENDENTE (plano de uma avaria). */
@@ -301,6 +303,8 @@ export interface Avaria {
   criado_em: string;
   /** Primeiro dia afectado (ISO data). A janela é [data_inicio, data_inicio + duracao_dias). */
   data_inicio: string;
+  /** Ausência de médico (férias, doença): só bloqueia as vagas deste médico. "" = avaria de equipamento. */
+  medico_id?: string;
   estado: "ABERTA" | "RESOLVIDA";
   decisao: "REMARCACAO_TOTAL" | "REMARCACAO_PARCIAL" | "";
   resolvido_por: string;
@@ -330,7 +334,8 @@ export type TipoAlerta =
   | "REMARCACOES_EXCESSIVAS"
   | "PRAZO_ULTRAPASSADO"
   | "URGENCIA"
-  | "SEGUNDA_REMARCACAO";
+  | "SEGUNDA_REMARCACAO"
+  | "SEM_VAGA_A_TEMPO";
 
 export type Gravidade = "media" | "alta";
 
@@ -461,10 +466,20 @@ export interface PropostaRemarcacao {
   indice_parcelas: ParcelaCusto[];
   justificacao: string;
   avisos: string[];
-  estado: "PENDENTE" | "ACEITE" | "REJEITADA";
+  estado: "PENDENTE" | "ACEITE" | "REJEITADA" | "AGUARDA_MEDICO";
   criado_em: string;
   decidido_por: string;
   decidido_em: string;
+  /** Não há vaga a tempo da consulta que depende deste exame: a administrativa resolve (vaga extra,
+   * outsourcing) ou passa ao médico, que decide avançar com a consulta ou adiá-la. */
+  sem_vaga_a_tempo?: boolean;
+  consulta_dependente?: { pedido_id: string; data_hora: string; descricao: string; medico_id: string; intervalo: number };
+  /** Primeira vaga depois do limite (só informativa, não reservada). */
+  alternativa_data_hora?: string;
+  /** Sugestão de data/hora para a vaga extra (último dia ainda a tempo, depois do horário normal). */
+  vaga_extra_sugerida?: string;
+  resolucao?: string;
+  alerta_id?: string;
 }
 
 /** Registo de cada vaga libertada (para as métricas: quantas foram reaproveitadas). */

@@ -1,6 +1,6 @@
 import { store } from "../store.ts";
 import { agora } from "../clock.ts";
-import { amanha, apenasData, diferencaDias, formatarDataHoraPt, formatarDataPt, isoDataHora, minData, parseIso, somarDias } from "../util.ts";
+import { amanha, apenasData, diferencaDias, formatarDataHoraPt, formatarDataPt, isoDataHora, maxData, minData, parseIso, somarDias } from "../util.ts";
 import { registarEvento } from "./estados.ts";
 import {
   encontrarVagaLivre,
@@ -39,7 +39,12 @@ interface Sugestao {
 function sugerirVaga(pedido: Pedido | null, ato: AtoMedico, quando: Date, limite: Date | null = null): Sugestao {
   const hoje = apenasData(quando);
   if (!pedido) {
-    const vaga = encontrarVagaLivre(ato.especialidade_codigo, ato.ato_codigo, amanha(hoje), somarDias(hoje, 60));
+    // Sem pedido não sabemos o prazo: nunca se antecipa sem o doente pedir — procura-se a partir da
+    // data original, primeiro com o mesmo médico.
+    const desde = maxData(amanha(hoje), apenasData(parseIso(ato.data_hora))) ?? amanha(hoje);
+    const vaga =
+      (ato.mvp_medico_id ? encontrarVagaLivre(ato.especialidade_codigo, ato.ato_codigo, desde, somarDias(desde, 60), ato.mvp_medico_id) : null) ??
+      encontrarVagaLivre(ato.especialidade_codigo, ato.ato_codigo, desde, somarDias(desde, 60));
     return {
       vaga,
       dentro: null,
@@ -101,6 +106,7 @@ export function planearRemarcacoesAvaria(avaria: Avaria, quando: Date = agora())
   const afetados = store.atosMedicos.filter((a) => {
     if (a.estado !== "MARCADA" || a.especialidade_codigo !== avaria.especialidade_codigo) return false;
     if (avaria.ato_codigo && a.ato_codigo !== avaria.ato_codigo) return false;
+    if (avaria.medico_id && a.mvp_medico_id !== avaria.medico_id) return false;
     if (store.propostasRemarcacao.some((p) => p.ato_id === a.mvp_ato_id && p.estado === "PENDENTE")) return false;
     const t = parseIso(a.data_hora).getTime();
     return t >= inicio.getTime() && t < fim.getTime();
@@ -126,16 +132,34 @@ export function planearRemarcacoesAvaria(avaria: Avaria, quando: Date = agora())
   const criadas: PropostaRemarcacao[] = [];
   itens.forEach(({ ato, pedido }, i) => {
     const propostaId = store.proximoId("remarcacao");
-    const sugestao = sugerirVaga(pedido, ato, quando);
+    // Se uma consulta depende deste exame, a nova data tem de deixar tempo para o resultado.
+    const dep = pedido ? consultaDependente(pedido) : null;
+    const limite = dep ? somarDias(apenasData(parseIso(dep.ato.data_hora)), -dep.intervalo) : null;
+    let sugestao = sugerirVaga(pedido, ato, quando, limite);
+    let semVagaATempo = false;
+    let alternativa = "";
+    if (dep && limite && (!sugestao.vaga || sugestao.dentro === false || parseIso(sugestao.vaga.data_hora).getTime() >= somarDias(limite, 1).getTime())) {
+      semVagaATempo = true;
+      alternativa = sugestao.vaga?.data_hora ?? sugerirVaga(pedido, ato, quando).vaga?.data_hora ?? "";
+      sugestao = { vaga: null, dentro: false, diasFora: 0, motivo: "" };
+    }
 
     // Que vaga teria este doente se os anteriores do plano não tivessem escolhido primeiro?
     const reservadas = criadas.map((c) => store.vagas.find((v) => v.vaga_id === c.vaga_sugerida_id)).filter((v): v is Vaga => !!v);
     for (const v of reservadas) v.reserva_id = "";
     const semConcorrencia = sugerirVaga(pedido, ato, quando);
     for (const v of reservadas) v.reserva_id = criadas.find((c) => c.vaga_sugerida_id === v.vaga_id)!.proposta_id;
-    // Só se explica "a vaga foi para outro" quando isso deixou este doente fora do prazo.
+    // Só se explica "a vaga foi para outro" quando isso deixou este doente fora do prazo (ou sem vaga a tempo).
     let perdeu = "";
-    if (semConcorrencia.vaga && semConcorrencia.dentro && sugestao.dentro === false && semConcorrencia.vaga.vaga_id !== sugestao.vaga?.vaga_id) {
+    if (semVagaATempo) {
+      for (const v of reservadas) v.reserva_id = "";
+      const livre = sugerirVaga(pedido, ato, quando, limite);
+      for (const v of reservadas) v.reserva_id = criadas.find((c) => c.vaga_sugerida_id === v.vaga_id)!.proposta_id;
+      const quem = livre.vaga ? criadas.find((c) => c.vaga_sugerida_id === livre.vaga!.vaga_id) : undefined;
+      if (quem && livre.vaga) {
+        perdeu = ` A única vaga a tempo (${formatarDataHoraPt(parseIso(livre.vaga.data_hora))}) ficou para ${descreverDoente(quem.doente_id)}: índice ${quem.indice} contra ${pedido?.indice_prioridade ?? 0}.`;
+      }
+    } else if (semConcorrencia.vaga && semConcorrencia.dentro && sugestao.dentro === false && semConcorrencia.vaga.vaga_id !== sugestao.vaga?.vaga_id) {
       const quem = criadas.find((c) => c.vaga_sugerida_id === semConcorrencia.vaga!.vaga_id);
       if (quem) {
         const meus = new Set((pedido?.indice_parcelas ?? []).map((p) => p.rotulo));
@@ -148,10 +172,12 @@ export function planearRemarcacoesAvaria(avaria: Avaria, quando: Date = agora())
 
     const avisos: string[] = [];
     if (pedido && remarcacoesHospital(pedido.doente_id, quando) >= store.parametros.max_remarcacoes_hospital) {
-      avisos.push("2.ª remarcação pelo hospital (inevitável: avaria) — ligar ao doente a explicar");
+      avisos.push(`2.ª remarcação pelo hospital (inevitável: ${avaria.medico_id ? "ausência do médico" : "avaria"}) — ligar ao doente a explicar`);
     }
     if (sugestao.dentro === false && sugestao.vaga) avisos.push(`Fica ${sugestao.diasFora} dia(s) fora do prazo — considerar vaga extra ou outsourcing`);
-    if (!sugestao.vaga) avisos.push("Sem vaga — precisa de vaga extra ou outsourcing");
+    if (semVagaATempo && dep) {
+      avisos.push(`Sem vaga a tempo da ${dep.ato.ato_descricao || "consulta"} de ${formatarDataHoraPt(parseIso(dep.ato.data_hora))} — resolver: vaga extra, outsourcing ou decisão do médico`);
+    } else if (!sugestao.vaga) avisos.push("Sem vaga — precisa de vaga extra ou outsourcing");
     if (store.doentes.find((d) => d.doente_id === ato.doente_id)?.contacto_digital === "NENHUM") avisos.push("Sem telemóvel nem email: avisar por telefone");
 
     const proposta: PropostaRemarcacao = {
@@ -172,9 +198,12 @@ export function planearRemarcacoesAvaria(avaria: Avaria, quando: Date = agora())
       indice_parcelas: pedido?.indice_parcelas ?? [],
       justificacao:
         `${i + 1}.º a escolher — ${pedido ? resumoIndice(pedido) : "sem pedido no sistema"}. ` +
-        (sugestao.vaga
-          ? `Sugerido ${formatarDataHoraPt(parseIso(sugestao.vaga.data_hora))}: ${sugestao.motivo.replace(/\.$/, "")}.`
-          : `${sugestao.motivo}.`) +
+        (semVagaATempo && dep && limite
+          ? `A ${dep.ato.ato_descricao || "consulta"} de ${formatarDataHoraPt(parseIso(dep.ato.data_hora))} precisa do resultado (${dep.intervalo} dias): o exame teria de ser até ${formatarDataPt(limite)} e não há vaga até lá.` +
+            (alternativa ? ` Primeira vaga livre: ${formatarDataHoraPt(parseIso(alternativa))} (já depois da consulta).` : "")
+          : sugestao.vaga
+            ? `Sugerido ${formatarDataHoraPt(parseIso(sugestao.vaga.data_hora))}: ${sugestao.motivo.replace(/\.$/, "")}.`
+            : `${sugestao.motivo}.`) +
         perdeu,
       avisos,
       estado: "PENDENTE",
@@ -182,6 +211,7 @@ export function planearRemarcacoesAvaria(avaria: Avaria, quando: Date = agora())
       decidido_por: "",
       decidido_em: "",
     };
+    if (semVagaATempo && dep && limite && pedido) marcarSemVagaATempo(proposta, pedido, dep, limite, alternativa, quando);
     reservar(sugestao.vaga, propostaId);
     store.propostasRemarcacao.push(proposta);
     criadas.push(proposta);
@@ -207,6 +237,42 @@ function concluirAvariaSeTerminada(avariaId: string, utilizadorId: string, quand
     mensagem: `A administração validou o plano de remarcação (${aceites} de ${doPlano.length} marcação(ões) remarcadas). A sua avaria reportada foi seguida.`,
     quando,
   });
+}
+
+/** Proposta sem vaga a tempo: dados para as três saídas e alerta para a administrativa (não é automático). */
+function marcarSemVagaATempo(
+  proposta: PropostaRemarcacao,
+  pedido: Pedido,
+  dep: { pedido: Pedido; ato: AtoMedico; intervalo: number },
+  limite: Date,
+  alternativa: string,
+  quando: Date,
+): void {
+  proposta.sem_vaga_a_tempo = true;
+  proposta.alternativa_data_hora = alternativa;
+  proposta.consulta_dependente = {
+    pedido_id: dep.pedido.pedido_id,
+    data_hora: dep.ato.data_hora,
+    descricao: dep.ato.ato_descricao || "consulta",
+    medico_id: dep.ato.mvp_medico_id || dep.pedido.medico_requisitante_id,
+    intervalo: dep.intervalo,
+  };
+  let diaExtra = apenasData(limite);
+  while (diaExtra.getDay() === 0 || diaExtra.getDay() === 6) diaExtra = somarDias(diaExtra, -1); // último dia útil a tempo
+  const extra = new Date(diaExtra.getFullYear(), diaExtra.getMonth(), diaExtra.getDate(), 13, 30);
+  proposta.vaga_extra_sugerida = isoDataHora(extra.getTime() < somarDias(apenasData(quando), 1).getTime() ? somarDias(apenasData(quando), 1) : extra);
+  const alerta = criarAlerta(
+    {
+      tipo: "SEM_VAGA_A_TEMPO",
+      gravidade: "alta",
+      especialidade: pedido.especialidade_destino,
+      pedido_id: pedido.pedido_id,
+      doente_id: pedido.doente_id,
+      descricao: `${descreverDoente(pedido.doente_id)}: sem vaga a tempo da ${proposta.consulta_dependente.descricao} de ${formatarDataHoraPt(parseIso(dep.ato.data_hora))}. Resolver com vaga extra, outsourcing ou pedir decisão ao médico.`,
+    },
+    quando,
+  );
+  proposta.alerta_id = alerta.alerta_id;
 }
 
 // ------------------------------------------------------------------------------ FALTA
@@ -250,6 +316,12 @@ export function actualizarSugestaoFalta(proposta: PropostaRemarcacao, quando: Da
   proposta.indice = pedido.indice_prioridade ?? 0;
   proposta.indice_parcelas = pedido.indice_parcelas ?? [];
   proposta.justificacao = `${quandoFaltou}.${paraQue}${sugerida}`;
+  if (dep && !aTempo && limite && !proposta.sem_vaga_a_tempo) {
+    proposta.alternativa_data_hora = proposta.data_hora_sugerida;
+    marcarSemVagaATempo(proposta, pedido, dep, limite, proposta.data_hora_sugerida, quando);
+  } else if (dep && !aTempo && limite) {
+    proposta.alternativa_data_hora = proposta.data_hora_sugerida;
+  }
   proposta.avisos = [
     ...(dep && !aTempo ? [`Não há vaga a tempo: a consulta de ${formatarDataPt(parseIso(dep.ato.data_hora))} terá de ser adiada`] : []),
     ...(faltas >= 2 ? [`${faltas} faltas registadas: ligar ao doente para perceber o motivo`] : []),
@@ -326,6 +398,7 @@ export function aceitarPropostaRemarcacao(propostaId: string, utilizadorId: stri
   const proposta = store.propostasRemarcacao.find((p) => p.proposta_id === propostaId);
   if (!proposta || proposta.estado !== "PENDENTE") return null;
   if (proposta.origem === "FALTA") actualizarSugestaoFalta(proposta, quando);
+  if (proposta.sem_vaga_a_tempo) return null; // resolve-se com vaga extra, outsourcing ou decisão do médico
   const ato = store.atosMedicos.find((a) => a.mvp_ato_id === proposta.ato_id);
   const pedido = store.pedidos.find((p) => p.pedido_id === proposta.pedido_id);
   const vaga = store.vagas.find((v) => v.vaga_id === proposta.vaga_sugerida_id);
@@ -421,7 +494,7 @@ export function rejeitarPropostaRemarcacao(propostaId: string, utilizadorId: str
 /** "Aceitar todas": aplica o plano inteiro de uma avaria, pela ordem do índice. */
 export function aceitarPlanoAvaria(avariaId: string, utilizadorId: string, quando: Date = agora()): number {
   const pendentes = store.propostasRemarcacao
-    .filter((p) => p.avaria_id === avariaId && p.estado === "PENDENTE")
+    .filter((p) => p.avaria_id === avariaId && p.estado === "PENDENTE" && !p.sem_vaga_a_tempo) // estes pedem uma escolha humana
     .sort((a, b) => a.ordem - b.ordem);
   for (const p of pendentes) aceitarPropostaRemarcacao(p.proposta_id, utilizadorId, quando);
   return pendentes.length;
@@ -430,4 +503,197 @@ export function aceitarPlanoAvaria(avariaId: string, utilizadorId: string, quand
 /** Proposta pendente de falta para um pedido (usada pelo botão "Remarcar exame" da ficha do doente). */
 export function propostaFaltaPendente(pedidoId: string): PropostaRemarcacao | undefined {
   return store.propostasRemarcacao.find((p) => p.pedido_id === pedidoId && p.origem === "FALTA" && p.estado === "PENDENTE");
+}
+
+// ------------------------------------------------------------------------------ sem vaga a tempo
+/** Vagas extra criadas pela administrativa (fora do horário normal). */
+function criarVagaExtra(ato: AtoMedico, dataHora: string): Vaga {
+  const n = store.vagas.filter((v) => v.extra).length + 1;
+  const vaga: Vaga = {
+    vaga_id: `VX${String(n).padStart(4, "0")}`,
+    especialidade_codigo: ato.especialidade_codigo,
+    gabinete_codigo: ato.gabinete_codigo,
+    medico_id: ato.mvp_medico_id,
+    data_hora: dataHora,
+    duracao_min: ato.duracao_min || 20,
+    atos_permitidos: [ato.ato_codigo],
+    ato_id: "",
+    extra: true,
+  };
+  store.vagas.push(vaga);
+  return vaga;
+}
+
+function fecharAlertaDaProposta(proposta: PropostaRemarcacao, utilizadorId: string, accao: string, quando: Date): void {
+  const alerta = store.alertas.find((a) => a.alerta_id === proposta.alerta_id && a.estado === "ABERTO");
+  if (!alerta) return;
+  alerta.estado = "RESOLVIDO";
+  alerta.resolvido_por = utilizadorId;
+  alerta.resolvido_em = isoDataHora(quando);
+  alerta.accao = accao;
+}
+
+function colocarExameNaVaga(proposta: PropostaRemarcacao, pedido: Pedido, ato: AtoMedico, vaga: Vaga, utilizadorId: string, motivo: string, quando: Date): void {
+  if (proposta.origem === "FALTA") {
+    pedido.estado = "ACEITE";
+    pedido.n_remarcacoes += 1;
+    registarEvento(pedido, "REMARCACAO", "ACEITE", utilizadorId, { motivo, dataHora: quando });
+    marcarPedidoNaVaga(pedido, vaga, quando, motivo);
+    return;
+  }
+  const dataAntiga = moverAto(ato, vaga, quando);
+  pedido.n_remarcacoes += 1;
+  registarEvento(pedido, "REMARCACAO", "", utilizadorId, {
+    motivo,
+    detalhe: `de ${formatarDataHoraPt(parseIso(dataAntiga))} para ${formatarDataHoraPt(parseIso(vaga.data_hora))}`,
+    dataHora: quando,
+  });
+  comunicarMarcacao(pedido, ato, "REMARCACAO", quando);
+}
+
+function concluir(proposta: PropostaRemarcacao, utilizadorId: string, resolucao: string, quando: Date): void {
+  proposta.estado = "ACEITE";
+  proposta.resolucao = resolucao;
+  proposta.decidido_por = utilizadorId;
+  proposta.decidido_em = isoDataHora(quando);
+  fecharAlertaDaProposta(proposta, utilizadorId, resolucao, quando);
+  if (proposta.origem === "AVARIA") concluirAvariaSeTerminada(proposta.avaria_id, utilizadorId, quando);
+  recalcularAlertas(quando);
+}
+
+/** "Resolvi com vaga extra": a administrativa abriu uma vaga fora do horário, a tempo da consulta. */
+export function resolverComVagaExtra(propostaId: string, dataHora: string, utilizadorId: string, quando: Date = agora()): PropostaRemarcacao | null {
+  const proposta = store.propostasRemarcacao.find((p) => p.proposta_id === propostaId);
+  const pedido = store.pedidos.find((p) => p.pedido_id === proposta?.pedido_id);
+  const ato = store.atosMedicos.find((a) => a.mvp_ato_id === proposta?.ato_id);
+  if (!proposta || !pedido || !ato || !["PENDENTE", "AGUARDA_MEDICO"].includes(proposta.estado)) return null;
+  libertarReserva(proposta);
+  const vaga = criarVagaExtra(ato, dataHora);
+  colocarExameNaVaga(proposta, pedido, ato, vaga, utilizadorId, `Vaga extra aberta pela administrativa (${formatarDataHoraPt(parseIso(dataHora))})`, quando);
+  pedido.decisao_pendente = false;
+  concluir(proposta, utilizadorId, `Resolvido com vaga extra a ${formatarDataHoraPt(parseIso(dataHora))}`, quando);
+  return proposta;
+}
+
+/** "Resolvi com outsourcing": o exame faz-se fora; a marcação interna é libertada. */
+export function resolverComOutsourcing(propostaId: string, nota: string, utilizadorId: string, quando: Date = agora()): PropostaRemarcacao | null {
+  const proposta = store.propostasRemarcacao.find((p) => p.proposta_id === propostaId);
+  const pedido = store.pedidos.find((p) => p.pedido_id === proposta?.pedido_id);
+  const ato = store.atosMedicos.find((a) => a.mvp_ato_id === proposta?.ato_id);
+  if (!proposta || !pedido || !ato || !["PENDENTE", "AGUARDA_MEDICO"].includes(proposta.estado)) return null;
+  libertarReserva(proposta);
+  const vagaAntiga = store.vagas.find((v) => v.vaga_id === ato.mvp_vaga_id);
+  if (vagaAntiga && vagaAntiga.ato_id === ato.mvp_ato_id) vagaAntiga.ato_id = "";
+  if (ato.estado === "MARCADA") ato.estado = "DESMARCADA";
+  const detalhe = nota.trim() || "Capacidade externa (outsourcing)";
+  registarEvento(pedido, "OUTSOURCING", "MARCADO", utilizadorId, { motivo: "Outsourcing (sem vaga interna a tempo)", detalhe, dataHora: quando });
+  registarEvento(pedido, "REALIZACAO", "REALIZADO", utilizadorId, { motivo: "Realizado em outsourcing", detalhe, dataHora: quando });
+  pedido.decisao_pendente = false;
+  concluir(proposta, utilizadorId, `Resolvido com outsourcing: ${detalhe}`, quando);
+  return proposta;
+}
+
+/** Sem vaga extra nem outsourcing: passa a decisão ao médico da consulta que depende do exame. */
+export function pedirDecisaoAoMedico(propostaId: string, utilizadorId: string, quando: Date = agora()): PropostaRemarcacao | null {
+  const proposta = store.propostasRemarcacao.find((p) => p.proposta_id === propostaId);
+  const pedido = store.pedidos.find((p) => p.pedido_id === proposta?.pedido_id);
+  if (!proposta || !pedido || proposta.estado !== "PENDENTE" || !proposta.consulta_dependente) return null;
+  libertarReserva(proposta);
+  proposta.estado = "AGUARDA_MEDICO";
+  proposta.decidido_por = utilizadorId;
+  proposta.decidido_em = isoDataHora(quando);
+  pedido.decisao_pendente = true;
+  const c = proposta.consulta_dependente;
+  registarEvento(pedido, "DECISAO_MEDICO", "", utilizadorId, {
+    motivo: "Sem vaga a tempo, sem vaga extra nem outsourcing: decisão pedida ao médico",
+    dataHora: quando,
+  });
+  notificar({
+    tipo: "PEDIDO_DECISAO_NECESSARIA",
+    destinatarios: [c.medico_id],
+    titulo: `Decisão necessária: ${descreverDoente(pedido.doente_id)} — ${c.descricao} de ${formatarDataHoraPt(parseIso(c.data_hora))}`,
+    mensagem:
+      `O exame de que a consulta depende ficou sem vaga a tempo (${proposta.origem === "AVARIA" ? "avaria" : "falta"}). ` +
+      `Quer avançar com a consulta e ver o exame depois${proposta.alternativa_data_hora ? ` (exame a ${formatarDataHoraPt(parseIso(proposta.alternativa_data_hora))})` : ""}, ou adiar a consulta — e para que dia?`,
+    pedidoId: c.pedido_id,
+    doenteId: pedido.doente_id,
+    quando,
+  });
+  fecharAlertaDaProposta(proposta, utilizadorId, "Decisão pedida ao médico", quando);
+  if (proposta.origem === "AVARIA") concluirAvariaSeTerminada(proposta.avaria_id, utilizadorId, quando);
+  return proposta;
+}
+
+/** Data mínima sensata para adiar a consulta: primeira vaga do exame + tempo do resultado. */
+export function dataMinimaParaAdiar(proposta: PropostaRemarcacao): string {
+  if (!proposta.alternativa_data_hora || !proposta.consulta_dependente) return "";
+  return isoDataHora(somarDias(apenasData(parseIso(proposta.alternativa_data_hora)), proposta.consulta_dependente.intervalo)).slice(0, 10);
+}
+
+/**
+ * O médico decide: AVANCAR — a consulta mantém-se e o exame fica na primeira vaga (depois; a
+ * dependência deixa de bloquear); ADIAR — a consulta passa para o primeiro dia a partir da data
+ * escolhida (mesmo médico, se houver) e o exame para a primeira vaga que ainda dá tempo ao resultado.
+ */
+export function decidirRemarcacaoMedico(
+  propostaId: string,
+  decisao: "AVANCAR" | "ADIAR",
+  utilizadorId: string,
+  novaData: string | null,
+  quando: Date = agora(),
+): { proposta: PropostaRemarcacao; consulta: string; exame: string } | null {
+  const proposta = store.propostasRemarcacao.find((p) => p.proposta_id === propostaId);
+  const pedido = store.pedidos.find((p) => p.pedido_id === proposta?.pedido_id);
+  const ato = store.atosMedicos.find((a) => a.mvp_ato_id === proposta?.ato_id);
+  const c = proposta?.consulta_dependente;
+  const consulta = store.pedidos.find((p) => p.pedido_id === c?.pedido_id);
+  const atoConsulta = consulta ? store.atosMedicos.find((a) => a.mvp_ato_id === consulta.ato_id) : undefined;
+  if (!proposta || !pedido || !ato || !c || !consulta || !atoConsulta || proposta.estado !== "AGUARDA_MEDICO") return null;
+  const hoje = apenasData(quando);
+  const { inicio } = janelaAgendamento(pedido, hoje);
+
+  if (decisao === "AVANCAR") {
+    store.dependencias = store.dependencias.filter((d) => !(d.pedido_id === consulta.pedido_id && d.depende_de_pedido_id === pedido.pedido_id));
+    registarEvento(consulta, "DECISAO_MEDICO", "", utilizadorId, {
+      motivo: `O médico decidiu manter a consulta sem esperar pelo resultado do exame (${pedido.especificacao || "exame"}); vê o exame depois`,
+      dataHora: quando,
+    });
+    const vaga = encontrarVagaLivre(pedido.especialidade_destino, pedido.ato_codigo, inicio, somarDias(parseIso(pedido.prazo_limite), 90), undefined, { pedido, quando });
+    if (vaga) colocarExameNaVaga(proposta, pedido, ato, vaga, utilizadorId, "Médico decidiu avançar com a consulta; exame na primeira vaga", quando);
+    pedido.decisao_pendente = false;
+    concluir(proposta, utilizadorId, "Médico: avançar com a consulta e ver o exame depois", quando);
+    return { proposta, consulta: atoConsulta.data_hora, exame: vaga?.data_hora ?? "" };
+  }
+
+  // ADIAR
+  const desde = novaData ? parseIso(novaData) : parseIso(dataMinimaParaAdiar(proposta) || c.data_hora);
+  const medico = consulta.continuidade_obrigatoria ? consulta.medico_preferido_id || undefined : atoConsulta.mvp_medico_id || undefined;
+  let vagaConsulta = encontrarVagaLivre(consulta.especialidade_destino, consulta.ato_codigo, desde, somarDias(desde, 60), medico);
+  if (!vagaConsulta) vagaConsulta = encontrarVagaLivre(consulta.especialidade_destino, consulta.ato_codigo, desde, somarDias(desde, 60));
+  if (!vagaConsulta) return null;
+  const dataAntigaConsulta = moverAto(atoConsulta, vagaConsulta, quando);
+  consulta.n_remarcacoes += 1;
+  registarEvento(consulta, "REMARCACAO", "", utilizadorId, {
+    motivo: "Consulta adiada por decisão do médico (exame sem vaga a tempo)",
+    detalhe: `de ${formatarDataHoraPt(parseIso(dataAntigaConsulta))} para ${formatarDataHoraPt(parseIso(vagaConsulta.data_hora))}`,
+    dataHora: quando,
+  });
+  comunicarMarcacao(consulta, atoConsulta, "REMARCACAO", quando);
+  const limite = somarDias(apenasData(parseIso(vagaConsulta.data_hora)), -c.intervalo);
+  const vagaExame =
+    encontrarVagaLivre(pedido.especialidade_destino, pedido.ato_codigo, inicio, limite, undefined, { pedido, quando }) ??
+    encontrarVagaLivre(pedido.especialidade_destino, pedido.ato_codigo, inicio, somarDias(limite, 60), undefined, { pedido, quando });
+  if (vagaExame) colocarExameNaVaga(proposta, pedido, ato, vagaExame, utilizadorId, "Exame remarcado para antes da consulta adiada", quando);
+  pedido.decisao_pendente = false;
+  concluir(proposta, utilizadorId, `Médico: adiar a consulta para ${formatarDataHoraPt(parseIso(vagaConsulta.data_hora))}`, quando);
+  notificar({
+    tipo: "PEDIDO_MARCADO",
+    destinatarios: utilizadoresPorPerfil("ADMINISTRATIVO", pedido.especialidade_destino),
+    titulo: `Decisão do médico aplicada: ${descreverDoente(pedido.doente_id)}`,
+    mensagem: `Consulta adiada para ${formatarDataHoraPt(parseIso(vagaConsulta.data_hora))}; exame a ${vagaExame ? formatarDataHoraPt(parseIso(vagaExame.data_hora)) : "definir"}.`,
+    pedidoId: pedido.pedido_id,
+    doenteId: pedido.doente_id,
+    quando,
+  });
+  return { proposta, consulta: vagaConsulta.data_hora, exame: vagaExame?.data_hora ?? "" };
 }

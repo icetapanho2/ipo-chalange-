@@ -124,7 +124,10 @@ Nota: as horas exactas pressupõem esta ordem. Os testes devem seguir a mesma or
 | 2 | Laboratório: Manuel com 1 remarcação | Passa a ser Graça Pereira Santos |
 | 3 | Rui desmarca (a partir de 19/10); Helena aceita | Rui **19/10 08:40**; Helena **30/09 09:00** (+13 dias); cascata para Luís Martins Alves **13/10 09:00** |
 | 4 | Dr. Pedro pede colheita s/ jejum ao Joaquim | **01/10 10:00** (dia único); lista de chamadas: Joaquim (sem contacto, 81 anos), Maria (preparação) |
-| 5 | Técnico reporta avaria na Ecografia (24/09, 1 dia); Tiago aceita o plano | Sónia 717 → **25/09 10:40**; Artur 621 → **28/09 11:00** (fora do prazo); Fátima 566 → **28/09 12:00** (2.ª remarcação); Olga 138 → **01/10 11:40** (dia único); Diogo 134 → **28/09 12:40** |
-| 6 | António: Rita aceita a sugestão da falta | **24/09 07:40**, vermelho → amarelo |
-| 7 | Gestão → Impacto | 0 remarcados 2.ª vez por troca (1 inevitável por avaria); 3 protegidos; 5/5 remarcações por avaria validadas; 1/1 vaga reaproveitada; 2 deslocações evitadas |
+| 5 | Técnico reporta avaria na Ecografia (24/09, 1 dia); Tiago aceita o plano (4) | Sónia 717 → **25/09 10:40**; Artur 621 → **28/09 11:00** (fora do prazo); Fátima 566 → **28/09 12:00** (2.ª remarcação); Olga 138 → **01/10 11:40** (dia único) |
+| 5 | Diogo (134): sem vaga a tempo da revisão de 29/09 → alerta → enviar ao médico → Dra. Sofia adia (data mínima 01/10) | consulta **06/10 09:30**; eco **28/09 12:40** |
+| 6 | Joana regista ausência da Dra. Sofia a 08/10 e aceita o plano | 7 consultas; 1.º Rui Marques Monteiro → **13/10 09:10** |
+| 7 | António: Rita aceita a sugestão da falta | **24/09 07:40**, vermelho → amarelo |
+| 8 | Gestão: sessão extra TAC 26/09 08:00, 6 vagas | só 2 ganham (Paula Ribeiro Nunes **08:00**, Helena Duarte Matos **08:20**) → abrir 2, 2 ofertas |
+| 8 | Gestão → Impacto | 0 remarcados 2.ª vez por troca (2 inevitáveis); 3 protegidos; 12/12 remarcações validadas; 1 vaga reaproveitada; 2 deslocações evitadas (630 km) |
 

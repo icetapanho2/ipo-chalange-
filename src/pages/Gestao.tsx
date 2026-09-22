@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { FlaskConical, Gauge } from "lucide-react";
 import { PainelImpacto } from "../components/PainelImpacto";
+import { PrazosEmRisco, SessaoExtra } from "../components/CapacidadeGestao";
 import { apiGet } from "../lib/api";
 import { CATEGORIAS, ESTADO, SEQUENCIAL } from "../lib/paleta";
 
@@ -117,6 +118,11 @@ export function Gestao() {
       <div className="mt-4">
         <h2 className="mb-2 text-sm font-semibold text-slate-600">Impacto das regras de prioridade e agendamento</h2>
         <PainelImpacto />
+      </div>
+
+      <div className="mt-4 space-y-4">
+        <PrazosEmRisco />
+        <SessaoExtra />
       </div>
 
       {metricas && (

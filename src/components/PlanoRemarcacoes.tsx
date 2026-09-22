@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../lib/api";
 import { dataHoraCurta } from "./PorqueEstaEscolha";
-import { AlertTriangle, ArrowRight, Check, CheckCheck, ChevronDown, ChevronUp, UserX, Wrench, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Building2, CalendarOff, CalendarPlus, Check, CheckCheck, ChevronDown, ChevronUp, Stethoscope, UserX, Wrench, X } from "lucide-react";
 
 interface Parcela {
   rotulo: string;
@@ -25,7 +25,73 @@ interface Proposta {
   indice_parcelas: Parcela[];
   justificacao: string;
   avisos: string[];
-  estado: "PENDENTE" | "ACEITE" | "REJEITADA";
+  estado: "PENDENTE" | "ACEITE" | "REJEITADA" | "AGUARDA_MEDICO";
+  sem_vaga_a_tempo?: boolean;
+  consulta_dependente?: { data_hora: string; descricao: string };
+  alternativa_data_hora?: string;
+  vaga_extra_sugerida?: string;
+  resolucao?: string;
+}
+
+export interface AccoesSemVaga {
+  vagaExtra: (id: string, dataHora: string) => void;
+  outsourcing: (id: string, nota: string) => void;
+  pedirMedico: (id: string) => void;
+}
+
+/** Sem vaga a tempo da consulta: a administrativa resolve (vaga extra, outsourcing) ou passa ao médico. */
+function ResolverSemVaga({ p, accoes }: { p: Proposta; accoes: AccoesSemVaga }) {
+  const [dataHora, setDataHora] = useState(p.vaga_extra_sugerida ?? "");
+  const [nota, setNota] = useState("");
+  return (
+    <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 p-2.5">
+      <div className="mb-2 text-[11px] font-bold text-rose-900">
+        Sem vaga a tempo da {p.consulta_dependente?.descricao ?? "consulta"} de {dataHoraCurta(p.consulta_dependente?.data_hora ?? "")}. Como resolver?
+      </div>
+      <div className="grid gap-2 md:grid-cols-3">
+        <div className="rounded border border-rose-100 bg-white p-2">
+          <input
+            type="datetime-local"
+            value={dataHora}
+            onChange={(e) => setDataHora(e.target.value)}
+            className="mb-1.5 w-full rounded border border-slate-300 px-1.5 py-0.5 text-[11px]"
+          />
+          <button
+            type="button"
+            onClick={() => accoes.vagaExtra(p.proposta_id, dataHora)}
+            className="flex w-full items-center justify-center gap-1 rounded bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
+          >
+            <CalendarPlus className="h-3 w-3" /> Resolvi com vaga extra
+          </button>
+        </div>
+        <div className="rounded border border-rose-100 bg-white p-2">
+          <input
+            value={nota}
+            onChange={(e) => setNota(e.target.value)}
+            placeholder="Ex.: Clínica X, 25/09"
+            className="mb-1.5 w-full rounded border border-slate-300 px-1.5 py-0.5 text-[11px]"
+          />
+          <button
+            type="button"
+            onClick={() => accoes.outsourcing(p.proposta_id, nota)}
+            className="flex w-full items-center justify-center gap-1 rounded bg-slate-700 px-2 py-1 text-[11px] font-bold text-white hover:bg-slate-800"
+          >
+            <Building2 className="h-3 w-3" /> Resolvi com outsourcing
+          </button>
+        </div>
+        <div className="flex flex-col justify-between rounded border border-rose-100 bg-white p-2">
+          <p className="mb-1.5 text-[10px] text-slate-500">Sem vaga extra nem outsourcing: o médico decide se avança com a consulta ou a adia.</p>
+          <button
+            type="button"
+            onClick={() => accoes.pedirMedico(p.proposta_id)}
+            className="flex w-full items-center justify-center gap-1 rounded bg-rose-700 px-2 py-1 text-[11px] font-bold text-white hover:bg-rose-800"
+          >
+            <Stethoscope className="h-3 w-3" /> Não há solução — enviar ao médico
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 interface AvariaPlano {
@@ -36,6 +102,7 @@ interface AvariaPlano {
   estado: string;
   reportado_por: string;
   ato_legivel: string;
+  tipo?: "EQUIPAMENTO" | "AUSENCIA_MEDICO";
   propostas: Proposta[];
 }
 
@@ -72,7 +139,17 @@ function Indice({ p }: { p: Proposta }) {
   );
 }
 
-function LinhaProposta({ p, aoDecidir, mostrarOrdem }: { p: Proposta; aoDecidir: (id: string, aceitar: boolean) => void; mostrarOrdem: boolean }) {
+function LinhaProposta({
+  p,
+  aoDecidir,
+  mostrarOrdem,
+  accoes,
+}: {
+  p: Proposta;
+  aoDecidir: (id: string, aceitar: boolean) => void;
+  mostrarOrdem: boolean;
+  accoes: AccoesSemVaga;
+}) {
   const decidida = p.estado !== "PENDENTE";
   return (
     <div className={`rounded-lg border bg-white p-3 ${decidida ? "border-slate-100 opacity-70" : "border-slate-200"}`}>
@@ -99,22 +176,24 @@ function LinhaProposta({ p, aoDecidir, mostrarOrdem }: { p: Proposta; aoDecidir:
             <span className="text-slate-400 line-through">{dataHoraCurta(p.data_hora_atual)}</span>
             <ArrowRight className="h-3 w-3 text-slate-400" />
             <span className={`font-bold ${p.dentro_do_prazo === false ? "text-rose-700" : "text-emerald-700"}`}>
-              {p.data_hora_sugerida ? dataHoraCurta(p.data_hora_sugerida) : "sem vaga"}
+              {p.data_hora_sugerida ? dataHoraCurta(p.data_hora_sugerida) : p.sem_vaga_a_tempo ? "sem vaga a tempo" : "sem vaga"}
             </span>
           </div>
           {p.dentro_do_prazo === true && <span className="text-[10px] font-semibold text-emerald-700">dentro do prazo</span>}
-          {p.dentro_do_prazo === false && p.data_hora_sugerida && (
+          {p.dentro_do_prazo === false && p.data_hora_sugerida && !p.sem_vaga_a_tempo && (
             <span className="text-[10px] font-semibold text-rose-700">{p.dias_fora_do_prazo} dia(s) fora do prazo</span>
           )}
         </div>
         <div className="flex gap-1.5">
           {decidida ? (
             <span
-              className={`rounded px-2 py-1 text-[10px] font-bold ${p.estado === "ACEITE" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}
+              className={`rounded px-2 py-1 text-[10px] font-bold ${
+                p.estado === "ACEITE" ? "bg-emerald-100 text-emerald-800" : p.estado === "AGUARDA_MEDICO" ? "bg-rose-100 text-rose-800" : "bg-slate-100 text-slate-600"
+              }`}
             >
-              {p.estado === "ACEITE" ? "Aceite" : "Rejeitada"}
+              {p.estado === "ACEITE" ? "Resolvida" : p.estado === "AGUARDA_MEDICO" ? "A aguardar o médico" : "Rejeitada"}
             </span>
-          ) : (
+          ) : p.sem_vaga_a_tempo ? null : (
             <>
               <button
                 type="button"
@@ -137,6 +216,8 @@ function LinhaProposta({ p, aoDecidir, mostrarOrdem }: { p: Proposta; aoDecidir:
       <p className="mt-2 rounded bg-slate-50 px-2.5 py-1.5 text-[11px] leading-relaxed text-slate-700">
         <strong>Porquê:</strong> {p.justificacao}
       </p>
+      {p.resolucao && <p className="mt-1 text-[11px] font-semibold text-emerald-800">✓ {p.resolucao}</p>}
+      {p.sem_vaga_a_tempo && p.estado === "PENDENTE" && <ResolverSemVaga p={p} accoes={accoes} />}
       {p.avisos.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">
           {p.avisos.map((a) => (
@@ -174,6 +255,32 @@ export function PlanoRemarcacoes({ aoMudar }: { aoMudar?: (mensagem: string) => 
     }
   }
 
+  async function executar(caminho: string, corpo: unknown, mensagem: string) {
+    setErro(null);
+    try {
+      await apiPost(caminho, corpo);
+      recarregar();
+      aoMudar?.(mensagem);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
+  }
+  const accoes: AccoesSemVaga = {
+    vagaExtra: (id, dataHora) => executar(`/servico/remarcacoes/${id}/vaga-extra`, { dataHora }, "Resolvido com vaga extra: exame marcado a tempo da consulta. Alerta fechado."),
+    outsourcing: (id, nota) => executar(`/servico/remarcacoes/${id}/outsourcing`, { nota }, "Resolvido com outsourcing. Alerta fechado."),
+    pedirMedico: (id) => executar(`/servico/remarcacoes/${id}/pedir-decisao-medico`, {}, "Enviado ao médico: vai decidir se avança com a consulta ou a adia."),
+  };
+
+  // Ausência de médico (férias, doença): mesmo plano que uma avaria, só na agenda desse médico.
+  const [medicos, setMedicos] = useState<{ utilizador_id: string; nome: string }[]>([]);
+  const [ausencia, setAusencia] = useState({ medico_id: "", data_inicio: "", duracao_dias: 1, motivo: "Férias" });
+  useEffect(() => {
+    apiGet<{ utilizador_id: string; nome: string }[]>("/servico/medicos").then((m) => {
+      setMedicos(m);
+      if (m[0]) setAusencia((a) => ({ ...a, medico_id: a.medico_id || m[0].utilizador_id }));
+    });
+  }, []);
+
   async function aceitarTodas(avariaId: string) {
     setErro(null);
     try {
@@ -190,6 +297,59 @@ export function PlanoRemarcacoes({ aoMudar }: { aoMudar?: (mensagem: string) => 
   return (
     <div className="mt-5 space-y-5">
       {erro && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
+      {medicos.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-700">
+            <CalendarOff className="h-4 w-4 text-slate-500" /> Registar ausência de médico
+          </div>
+          <div className="flex flex-wrap items-end gap-2 text-xs">
+            <select
+              value={ausencia.medico_id}
+              onChange={(e) => setAusencia({ ...ausencia, medico_id: e.target.value })}
+              className="rounded border border-slate-300 px-2 py-1"
+            >
+              {medicos.map((m) => (
+                <option key={m.utilizador_id} value={m.utilizador_id}>
+                  {m.nome}
+                </option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={ausencia.data_inicio}
+              onChange={(e) => setAusencia({ ...ausencia, data_inicio: e.target.value })}
+              className="rounded border border-slate-300 px-2 py-1"
+            />
+            <label className="flex items-center gap-1 text-slate-600">
+              dias
+              <input
+                type="number"
+                min={1}
+                value={ausencia.duracao_dias}
+                onChange={(e) => setAusencia({ ...ausencia, duracao_dias: Math.max(1, Number(e.target.value) || 1) })}
+                className="w-14 rounded border border-slate-300 px-2 py-1"
+              />
+            </label>
+            <select
+              value={ausencia.motivo}
+              onChange={(e) => setAusencia({ ...ausencia, motivo: e.target.value })}
+              className="rounded border border-slate-300 px-2 py-1"
+            >
+              <option>Férias</option>
+              <option>Doença</option>
+              <option>Formação</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => executar("/servico/ausencias", ausencia, "Ausência registada: o plano de remarcação das consultas afectadas está abaixo.")}
+              className="rounded bg-slate-800 px-3 py-1 font-bold text-white hover:bg-slate-900"
+            >
+              Registar e planear remarcações
+            </button>
+          </div>
+        </div>
+      )}
+
       {dados.avarias.length === 0 && dados.faltas.length === 0 && (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
           Sem remarcações propostas neste serviço.
@@ -197,14 +357,14 @@ export function PlanoRemarcacoes({ aoMudar }: { aoMudar?: (mensagem: string) => 
       )}
 
       {dados.avarias.map((a) => {
-        const pendentes = a.propostas.filter((p) => p.estado === "PENDENTE").length;
+        const pendentes = a.propostas.filter((p) => p.estado === "PENDENTE" && !p.sem_vaga_a_tempo).length;
         return (
           <div key={a.avaria_id} className="rounded-xl border border-orange-200 bg-orange-50/40 p-4 shadow-sm">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-orange-900">
                   <Wrench className="h-4 w-4 text-orange-600" />
-                  Avaria: plano de remarcação ({a.propostas.length} marcações)
+                  {a.tipo === "AUSENCIA_MEDICO" ? "Ausência de médico" : "Avaria"}: plano de remarcação ({a.propostas.length} marcações)
                 </h2>
                 <p className="mt-1 text-xs text-slate-700">
                   {a.ato_legivel} indisponível {a.duracao_dias === 1 ? "a" : `${a.duracao_dias} dias desde`} {dataHoraCurta(a.data_inicio)} — {a.descricao}.
@@ -227,7 +387,7 @@ export function PlanoRemarcacoes({ aoMudar }: { aoMudar?: (mensagem: string) => 
             </div>
             <div className="space-y-2">
               {a.propostas.map((p) => (
-                <LinhaProposta key={p.proposta_id} p={p} aoDecidir={decidir} mostrarOrdem />
+                <LinhaProposta key={p.proposta_id} p={p} aoDecidir={decidir} mostrarOrdem accoes={accoes} />
               ))}
             </div>
           </div>
@@ -246,7 +406,7 @@ export function PlanoRemarcacoes({ aoMudar }: { aoMudar?: (mensagem: string) => 
           </p>
           <div className="space-y-2">
             {dados.faltas.map((p) => (
-              <LinhaProposta key={p.proposta_id} p={p} aoDecidir={decidir} mostrarOrdem={false} />
+              <LinhaProposta key={p.proposta_id} p={p} aoDecidir={decidir} mostrarOrdem={false} accoes={accoes} />
             ))}
           </div>
         </div>

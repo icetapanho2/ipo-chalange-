@@ -5,17 +5,20 @@ import { apenasData, diferencaDias, parseIso, somarDias } from "../util.ts";
 import { aprovarPropostaTroca, rejeitarPropostaTroca, contarVagasLivres, janelaAgendamento } from "../motor/agendamento.ts";
 import { resolverAlerta } from "../motor/alertas.ts";
 import { calcularSemaforo } from "../motor/semaforo.ts";
-import { resolverAvaria } from "../motor/avarias.ts";
+import { reportarAvaria, resolverAvaria } from "../motor/avarias.ts";
 import {
   aceitarPlanoAvaria,
   aceitarPropostaRemarcacao,
   actualizarSugestaoFalta,
   propostaFaltaPendente,
   rejeitarPropostaRemarcacao,
+  resolverComVagaExtra,
+  resolverComOutsourcing,
+  pedirDecisaoAoMedico,
 } from "../motor/propostasRemarcacao.ts";
 import { remarcarPedido, adiarConsulta, marcarOutsourcing, pedirDecisaoMedico } from "../motor/fluxo.ts";
 import { desmarcarAPedidoDoDoente, expirarOfertas, responderOferta } from "../motor/antecipacao.ts";
-import { listaChamadas, registarChamada } from "../motor/chamadas.ts";
+import { encaixesSugeridos, listaChamadas, registarChamada } from "../motor/chamadas.ts";
 import { PESOS_PRIORIDADE_OMISSAO, pesosPrioridadeDoServico } from "../motor/prioridade.ts";
 import {
   descreverDoente,
@@ -155,7 +158,12 @@ export function criarRotasServico(store: typeof StoreType) {
         duracao_dias: a.duracao_dias,
         estado: a.estado,
         reportado_por: descreverUtilizador(a.reportado_por),
-        ato_legivel: a.ato_codigo ? descreverAto(a.especialidade_codigo, a.ato_codigo) : "Todo o serviço",
+        ato_legivel: a.medico_id
+          ? `Agenda de ${descreverUtilizador(a.medico_id)}`
+          : a.ato_codigo
+            ? descreverAto(a.especialidade_codigo, a.ato_codigo)
+            : "Todo o serviço",
+        tipo: a.medico_id ? "AUSENCIA_MEDICO" : "EQUIPAMENTO",
         propostas: doServico.filter((p) => p.avaria_id === a.avaria_id).sort((x, y) => x.ordem - y.ordem).map(propostaRemarcacaoJson),
       }));
     const faltas = doServico.filter((p) => p.origem === "FALTA").reverse().map(propostaRemarcacaoJson);
@@ -178,6 +186,67 @@ export function criarRotasServico(store: typeof StoreType) {
       return;
     }
     res.json({ ok: true, proposta: propostaRemarcacaoJson(p) });
+  });
+
+  router.post("/remarcacoes/:id/vaga-extra", (req, res) => {
+    const dataHora: string = req.body?.dataHora ?? "";
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dataHora)) {
+      res.status(400).json({ erro: "Indique a data e hora da vaga extra." });
+      return;
+    }
+    const p = resolverComVagaExtra(req.params.id, dataHora, req.utilizadorId, agora());
+    if (!p) {
+      res.status(404).json({ erro: "Proposta não encontrada ou já resolvida." });
+      return;
+    }
+    res.json({ ok: true, proposta: propostaRemarcacaoJson(p) });
+  });
+
+  router.post("/remarcacoes/:id/outsourcing", (req, res) => {
+    const p = resolverComOutsourcing(req.params.id, req.body?.nota ?? "", req.utilizadorId, agora());
+    if (!p) {
+      res.status(404).json({ erro: "Proposta não encontrada ou já resolvida." });
+      return;
+    }
+    res.json({ ok: true, proposta: propostaRemarcacaoJson(p) });
+  });
+
+  router.post("/remarcacoes/:id/pedir-decisao-medico", (req, res) => {
+    const p = pedirDecisaoAoMedico(req.params.id, req.utilizadorId, agora());
+    if (!p) {
+      res.status(404).json({ erro: "Proposta não encontrada, já resolvida, ou sem consulta dependente." });
+      return;
+    }
+    res.json({ ok: true, proposta: propostaRemarcacaoJson(p) });
+  });
+
+  // Ausência de médico (férias, doença): mesmo motor das avarias, só bloqueia a agenda desse médico.
+  router.get("/medicos", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    const ids = new Set(store.vagas.filter((v) => v.especialidade_codigo === especialidade && v.medico_id).map((v) => v.medico_id));
+    res.json([...ids].map((id) => ({ utilizador_id: id, nome: descreverUtilizador(id) })));
+  });
+
+  router.post("/ausencias", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    const medicoId: string = req.body?.medico_id ?? "";
+    const dataInicio: string = req.body?.data_inicio ?? "";
+    const duracaoDias = Number(req.body?.duracao_dias ?? 1);
+    const motivo: string = (req.body?.motivo ?? "").trim() || "Ausência";
+    if (!especialidade || !store.vagas.some((v) => v.especialidade_codigo === especialidade && v.medico_id === medicoId)) {
+      res.status(400).json({ erro: "Escolha um médico deste serviço." });
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dataInicio) || !(duracaoDias > 0)) {
+      res.status(400).json({ erro: "Indique a data de início e o número de dias." });
+      return;
+    }
+    const avaria = reportarAvaria(
+      { especialidadeCodigo: especialidade, descricao: `${motivo} de ${descreverUtilizador(medicoId)}`, duracaoDias, dataInicio, medicoId },
+      req.utilizadorId,
+      agora(),
+    );
+    res.json({ ok: true, avaria_id: avaria.avaria_id, afetadas: avaria.pedidos_afetados });
   });
 
   router.post("/avarias/:id/aceitar-plano", (req, res) => {
@@ -250,7 +319,7 @@ export function criarRotasServico(store: typeof StoreType) {
   // ------------------------------------------------ lista de chamadas (secção 8A, R-G)
   router.get("/chamadas", (req, res) => {
     const especialidade = especialidadeDoUtilizador(req.utilizadorId) ?? undefined;
-    res.json(listaChamadas(especialidade, agora()));
+    res.json({ ...listaChamadas(especialidade, agora()), encaixes: encaixesSugeridos(especialidade, agora()) });
   });
 
   router.post("/chamadas/:atoId", (req, res) => {
