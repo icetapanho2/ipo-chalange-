@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { dataHoraPT, dataPT } from "../lib/datas";
 import { apiGet, apiPost } from "../lib/api";
 import { DoenteModal } from "../components/DoenteModal";
 import { PorqueEstaEscolha, type CandidatoTroca } from "../components/PorqueEstaEscolha";
@@ -383,7 +384,7 @@ export function Servico() {
         {[
           {
             chave: "risco" as const,
-            titulo: "Consultas em Risco",
+            titulo: "Marcações em risco",
             icone: AlertTriangle,
             contagem: (overbooking?.length ?? 0) + (emRisco?.length ?? 0),
           },
@@ -459,15 +460,15 @@ export function Servico() {
         ))}
       </div>
 
-      {/* SECÇÃO 2: PROPOSTAS DE TROCA INTELIGENTE DE VAGAS */}
+      {/* SECÇÃO 2: PROPOSTAS DE TROCA DE VAGA */}
       {abaAtiva === "pendencias" && propostas && propostas.length > 0 && (
         <div className="mt-5 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-indigo-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
               <TrendingUp className="h-4 w-4 text-indigo-600" />
-              <span>Propostas de Troca Inteligente de Agenda</span>
+              <span>Propostas de troca de vaga</span>
             </h2>
-            <span className="text-[11px] text-indigo-700">Otimização automática de vagas</span>
+            <span className="text-[11px] text-indigo-700">Nada muda sem a sua aprovação</span>
           </div>
 
           <div className="space-y-2.5">
@@ -524,7 +525,7 @@ export function Servico() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h4 className="text-sm font-bold text-slate-800">
-                      {s.ato_legivel} · {s.prioridade_legivel} · prazo {s.prazo_limite}
+                      {s.ato_legivel} · {s.prioridade_legivel} · prazo {dataPT(s.prazo_limite)}
                     </h4>
                     <p className="text-xs text-slate-600 mt-0.5">
                       {s.n_pedidos} pedido(s) a competir por {s.vagas_livres_estimadas} vaga(s) livre(s) estimada(s) —
@@ -731,7 +732,7 @@ export function Servico() {
                 <div>
                   <span className="font-bold text-slate-800 text-xs">{a.doente_nome}: </span>
                   <span className="text-xs text-slate-600">{a.descricao}</span>
-                  <span className="text-[11px] text-slate-400 block mt-0.5">Criado em {a.criado_em.replace("T", " ")}</span>
+                  <span className="text-[11px] text-slate-400 block mt-0.5">Criado em {dataHoraPT(a.criado_em)}</span>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -832,7 +833,7 @@ export function Servico() {
                       </div>
                       <h4 className="text-xs font-semibold text-slate-800 mt-0.5">{p.descricao}</h4>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        Requisitante: {p.medico_requisitante_nome} · Prazo limite: <span className="font-mono">{p.prazo_limite}</span>
+                        Requisitante: {p.medico_requisitante_nome} · Prazo limite: <span className="font-mono">{dataPT(p.prazo_limite)}</span>
                       </p>
                     </div>
 

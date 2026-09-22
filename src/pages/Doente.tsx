@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { dataHoraPT, dataPT } from "../lib/datas";
 import { AgendaDoente, type Comunicacao, type IndicePedido, type MarcacaoAgenda, type PerfilLogistico } from "../components/AgendaDoente";
 import { useParams, Link } from "react-router-dom";
 import { apiGet, apiPost, apiPut } from "../lib/api";
@@ -249,7 +250,7 @@ export function Doente() {
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-slate-500">
-                Sexo: <strong className="text-slate-700">{dados.doente.sexo === "M" ? "Masculino" : "Feminino"}</strong> · Data de Nascimento: <strong className="text-slate-700">{dados.doente.data_nascimento}</strong>
+                Sexo: <strong className="text-slate-700">{dados.doente.sexo === "M" ? "Masculino" : "Feminino"}</strong> · Data de Nascimento: <strong className="text-slate-700">{dataPT(dados.doente.data_nascimento)}</strong>
               </p>
             </div>
           </div>
@@ -281,7 +282,7 @@ export function Doente() {
                     ? "Pendências Bloqueantes"
                     : temAmarelos
                     ? "Avisos de Prazo"
-                    : "Prontidão 100% Conforme"}
+                    : "Nada em falta"}
                 </strong>
               </div>
             </div>
@@ -380,10 +381,10 @@ export function Doente() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
               <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
                 <FileText className="h-4 w-4 text-oasis-accent" />
-                <span>Diagnóstico Inteligente de Prontidão Clínica ("O Que Falta")</span>
+                <span>O que falta</span>
               </h2>
               <span className="text-[11px] text-slate-400">
-                Análise em tempo real do motor de regras Oasis
+                Regras de dependência, prazos e marcações
               </span>
             </div>
 
@@ -760,7 +761,7 @@ export function Doente() {
                       </div>
                       <h4 className="text-sm font-bold text-slate-800 mt-0.5">{ped.descricao}</h4>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        Prioridade: <strong>{ped.prioridade_legivel}</strong> · Prazo limite: <span className="font-mono">{ped.prazo_limite}</span>
+                        Prioridade: <strong>{ped.prioridade_legivel}</strong> · Prazo limite: <span className="font-mono">{dataPT(ped.prazo_limite)}</span>
                       </p>
                     </div>
 
@@ -811,7 +812,7 @@ export function Doente() {
                   <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-2xs hover:border-slate-300">
                     <div className="flex items-center justify-between text-slate-400 text-[11px] mb-1">
                       <span className="font-bold text-slate-700">{ev.tipo}</span>
-                      <span className="font-mono">{ev.data_hora.replace("T", " ")}</span>
+                      <span className="font-mono">{dataHoraPT(ev.data_hora)}</span>
                     </div>
                     <p className="font-bold text-slate-900">{ev.pedido_descricao}</p>
                     <p className="text-slate-500 mt-0.5">

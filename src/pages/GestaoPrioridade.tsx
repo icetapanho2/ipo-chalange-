@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { dataHoraPT, dataPT } from "../lib/datas";
 import { Link } from "react-router-dom";
 import { apiGet, apiPost } from "../lib/api";
 import { ArrowLeft, Gauge, Save, ChevronDown, ChevronUp, Info } from "lucide-react";
@@ -222,7 +223,7 @@ export function GestaoPrioridade() {
                     <div>
                       <p>{o.detalhe}</p>
                       <p className="mt-1 text-[11px] text-slate-400">
-                        {o.especialidade_destino_legivel} · Prazo limite: {o.prazo_limite} · Criado em {o.criado_em.replace("T", " ")}
+                        {o.especialidade_destino_legivel} · Prazo limite: {dataPT(o.prazo_limite)} · Criado em {dataHoraPT(o.criado_em)}
                       </p>
                     </div>
                   </div>

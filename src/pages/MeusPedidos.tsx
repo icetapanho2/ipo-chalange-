@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { dataPT } from "../lib/datas";
 import { apiGet, apiPost } from "../lib/api";
 import { DecisoesRemarcacao } from "../components/DecisoesRemarcacao";
 import {
@@ -452,7 +453,7 @@ export function MeusPedidos() {
                           </span>
                         </div>
                         <p className="mt-0.5 opacity-80">
-                          {p.especialidade_destino_legivel} · Prazo: {p.prazo_limite}
+                          {p.especialidade_destino_legivel} · Prazo: {dataPT(p.prazo_limite)}
                         </p>
                       </div>
                     ))}

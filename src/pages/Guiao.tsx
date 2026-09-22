@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { dataPT } from "../lib/datas";
 import { useNavigate } from "react-router-dom";
 import { usePerfil } from "../lib/PerfilContext";
 import { apiGet, apiPost, apiPut } from "../lib/api";
@@ -529,12 +530,12 @@ export function Guiao() {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Hospital Central de Lisboa · Ambiente de Demonstração
+                Dados simulados · demonstração
               </span>
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 mt-1">Centro de Testes e Guião Clínico</h1>
+            <h1 className="text-2xl font-bold text-slate-900 mt-1">Guião da demonstração</h1>
             <p className="text-sm text-slate-600 mt-1">
-              Explore o circuito ponta-a-ponta, teste o tradutor de linguagem natural médica com IA ou gira perfis clínicos de pacientes.
+              Os casos pela ordem de apresentação, um testador da extracção e os perfis dos doentes.
             </p>
           </div>
 
@@ -563,7 +564,7 @@ export function Guiao() {
               }`}
             >
               <Sparkles className="h-3.5 w-3.5 text-sky-600" />
-              <span>Testador Tradutor IA</span>
+              <span>Testar extracção</span>
             </button>
 
             <button
@@ -777,7 +778,7 @@ export function Guiao() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-semibold text-slate-700">
-                  Texto Clínico Livre (Campo 'P' do SOAP):
+                  Texto livre do plano:
                 </label>
                 <span className="text-[11px] text-slate-400">
                   Experimente acrónimos, exames com contraste, ou interconsultas urgentes
@@ -906,7 +907,7 @@ export function Guiao() {
                           Prioridade: <strong>{p.prioridade}</strong> ({p.prioridade_legivel || "Normal"})
                         </div>
                         <div>
-                          Prazo Limite: <strong>{p.prazo_limite}</strong>
+                          Prazo Limite: <strong>{dataPT(p.prazo_limite)}</strong>
                         </div>
                         <div>
                           Confiança: <strong>{(p.confianca * 100).toFixed(0)}%</strong>
@@ -1019,7 +1020,7 @@ export function Guiao() {
                 >
                   {listaDoentes.map((d) => (
                     <option key={d.doente_id} value={d.doente_id}>
-                      {d.nome} (SNS: {d.n_utente} · {d.sexo} · Nasc: {d.data_nascimento}) {d.demo_cenario ? `— [${d.demo_cenario}]` : ""}
+                      {d.nome} (SNS: {d.n_utente} · {d.sexo} · Nasc: {dataPT(d.data_nascimento)}) {d.demo_cenario ? `— [${d.demo_cenario}]` : ""}
                     </option>
                   ))}
                 </select>

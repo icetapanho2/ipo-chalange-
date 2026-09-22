@@ -6,7 +6,7 @@ import { TrocadorUtilizador } from "./TrocadorUtilizador";
 import {
   Stethoscope,
   RotateCcw,
-  CheckCircle,
+  AlertTriangle,
   Activity,
   Layers,
   FileCheck2,
@@ -67,7 +67,8 @@ export function Cabecalho() {
     setMensagem(null);
     try {
       await apiPost("/repor-demo");
-      setMensagem("Dados repostos.");
+      // A página aberta tem dados antigos em memória: recarregar para não mostrar estado fantasma.
+      window.location.reload();
     } catch (erro) {
       setMensagem(erro instanceof Error ? erro.message : "Falha ao repor a demo.");
     } finally {
@@ -87,16 +88,13 @@ export function Cabecalho() {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-bold text-slate-900 text-sm tracking-tight">OASIS 2.0</span>
-              <span className="rounded bg-sky-100 px-1.5 py-0.2 text-[10px] font-bold text-sky-800">
-                IA Clínica
-              </span>
             </div>
-            <p className="text-[11px] text-slate-500 leading-none">Gestão Inteligente Pós-Consulta</p>
+            <p className="text-[11px] text-slate-500 leading-none">Pedidos pós-consulta</p>
           </div>
         </div>
 
         {/* Navegação — específica do perfil activo (o Guião fica sempre visível, à parte) */}
-        <nav className="flex flex-1 flex-wrap items-center justify-center gap-1 px-2">
+        <nav className="-mx-4 order-last flex w-full items-center gap-1 overflow-x-auto px-4 pb-1 md:order-none md:mx-0 md:w-auto md:flex-1 md:justify-center md:overflow-visible md:px-2 md:pb-0">
           {itens.map((item) => {
             const Icone = ICONES_NAV[item.caminho] || Activity;
             return (
@@ -104,7 +102,7 @@ export function Cabecalho() {
                 key={item.caminho}
                 to={item.caminho}
                 className={({ isActive }) =>
-                  `inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                  `inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
                     isActive
                       ? "bg-oasis-header text-white shadow-2xs"
                       : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
@@ -117,13 +115,13 @@ export function Cabecalho() {
             );
           })}
 
-          <span className="mx-1.5 h-4 w-px bg-slate-200" aria-hidden="true" />
+          <span className="mx-1.5 h-4 w-px shrink-0 bg-slate-200" aria-hidden="true" />
 
           <NavLink
             to={ITEM_GUIAO.caminho}
             title="Guião da demonstração — orquestra a troca de perfis para apresentar o sistema todo"
             className={({ isActive }) =>
-              `inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-all ${
+              `inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-all ${
                 isActive
                   ? "border-amber-400 bg-amber-500 text-white shadow-2xs"
                   : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
@@ -147,12 +145,12 @@ export function Cabecalho() {
             title="Repor a base de dados para o estado inicial da demonstração"
           >
             <RotateCcw className={`h-3 w-3 ${aRepor ? "animate-spin" : ""}`} />
-            <span>{aRepor ? "A repor…" : "Repor"}</span>
+            <span>{aRepor ? "A repor…" : "Repor demo"}</span>
           </button>
 
           {mensagem && (
-            <span className="flex items-center gap-1 text-xs font-medium text-emerald-600 animate-in fade-in">
-              <CheckCircle className="h-3.5 w-3.5" />
+            <span className="flex items-center gap-1 text-xs font-medium text-red-700">
+              <AlertTriangle className="h-3.5 w-3.5" />
               <span>{mensagem}</span>
             </span>
           )}

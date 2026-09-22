@@ -269,3 +269,17 @@ administrativa com a solução e a justificação, para ela validar.
    da demo, de 6 vagas de TAC só 2 têm quem ganhe com elas; não se inventam doentes para as encher.
 8. **Encaixes** ficam como sugestão (número por dia), sem marcar nada, como combinado.
 
+
+## 2026-09-23 — Revisão da interface: menos texto de marketing, mais "o que fazer"
+
+1. **Início por perfil = lista de tarefas com números** (remarcações a validar, trocas a aprovar,
+   vagas libertadas, chamadas, decisões do médico, prazos em risco…), cada uma com ligação para onde
+   se resolve. Saíram o hospital inventado ("Hospital Central de Lisboa"), a lista aleatória de
+   doentes (agora só os da demonstração, com o que cada um mostra) e a descrição errada da R1.
+2. **"Repor demo" recarrega a página**: repunha o servidor mas o ecrã aberto continuava com dados
+   antigos — em demo ao vivo parecia que não tinha funcionado.
+3. **Texto sem adjectivos de IA**: saíram "IA Clínica", "Inteligente", "motor inteligente",
+   "SOAP" (o Oasis usa diário), "Prontidão 100% Conforme". A IA só faz a extracção; o resto são regras.
+4. **Datas em dd/mm/aaaa** em toda a interface (`src/lib/datas.ts`); o ISO fica só na API.
+5. `ConstrutorPedidos.tsx` removido: não era usado e apontava para um campo "P — Plano" que já não existe.
+6. Navegação em telemóvel: uma linha com deslocamento horizontal em vez de empilhar os botões.

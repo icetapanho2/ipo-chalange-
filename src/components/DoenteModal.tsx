@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { dataHoraPT, dataPT } from "../lib/datas";
 import { Link } from "react-router-dom";
 import { apiGet, apiPost } from "../lib/api";
 import {
@@ -163,7 +164,7 @@ export function DoenteModal({ doenteId, onFechar }: DoenteModalProps) {
               </div>
               {dados?.doente && (
                 <p className="text-xs text-slate-500">
-                  {dados.doente.sexo === "M" ? "Masculino" : "Feminino"} · Nasc. {dados.doente.data_nascimento}
+                  {dados.doente.sexo === "M" ? "Masculino" : "Feminino"} · Nasc. {dataPT(dados.doente.data_nascimento)}
                 </p>
               )}
             </div>
@@ -281,13 +282,13 @@ export function DoenteModal({ doenteId, onFechar }: DoenteModalProps) {
                       <div>
                         <h3 className="font-bold text-base">
                           {dados.oQueFalta && dados.oQueFalta.some((item) => item.nivel === "vermelho")
-                            ? "Atenção: Existem pendências críticas que bloqueiam consultas ou tratamentos"
+                            ? "Há pendências que bloqueiam uma consulta ou tratamento"
                             : dados.oQueFalta && dados.oQueFalta.length > 0
-                            ? "Prontidão Parcial: Existem etapas ou prazos a acompanhar"
-                            : "Prontidão Total: Todos os requisitos e exames estão validados e em conformidade"}
+                            ? "Há passos ou prazos a acompanhar"
+                            : "Nada em falta: exames e dependências em dia"}
                         </h3>
                         <p className="mt-1 text-xs opacity-90">
-                          O motor inteligente do Oasis 2.0 avaliou dependências cruzadas (jejum, análises prévias de creatinina, exames de imagem e vagas).
+                          Verificado pelas regras de dependência (R1–R3), prazos e marcações do doente.
                         </p>
                       </div>
                     </div>
@@ -370,7 +371,7 @@ export function DoenteModal({ doenteId, onFechar }: DoenteModalProps) {
                                 </span>
                                 <div>
                                   <h5 className="font-bold text-sm text-slate-800">{mf.descricao}</h5>
-                                  <p className="text-xs text-slate-500">{mf.especialidade_legivel} · {mf.data_hora.replace("T", " ")}</p>
+                                  <p className="text-xs text-slate-500">{mf.especialidade_legivel} · {dataHoraPT(mf.data_hora)}</p>
                                 </div>
                               </div>
                               <span
@@ -470,7 +471,7 @@ export function DoenteModal({ doenteId, onFechar }: DoenteModalProps) {
                             </div>
                             <p className="text-sm font-semibold text-slate-800 mt-0.5">{ped.descricao}</p>
                             <p className="text-xs text-slate-500 mt-0.5">
-                              Prioridade: {ped.prioridade_legivel} · Prazo limite: {ped.prazo_limite}
+                              Prioridade: {ped.prioridade_legivel} · Prazo limite: {dataPT(ped.prazo_limite)}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
@@ -519,7 +520,7 @@ export function DoenteModal({ doenteId, onFechar }: DoenteModalProps) {
                           <div className="rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-sm">
                             <div className="flex items-center justify-between text-slate-400 text-[11px] mb-1">
                               <span className="font-semibold text-slate-600">{ev.tipo}</span>
-                              <span>{ev.data_hora.replace("T", " ")}</span>
+                              <span>{dataHoraPT(ev.data_hora)}</span>
                             </div>
                             <p className="font-semibold text-slate-800">{ev.pedido_descricao}</p>
                             <p className="text-slate-500 mt-0.5">
@@ -543,7 +544,7 @@ export function DoenteModal({ doenteId, onFechar }: DoenteModalProps) {
 
         {/* Rodapé do Modal */}
         <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-3 text-xs text-slate-500">
-          <span>Oasis 2.0 · Motor de Validação & Triagem Inteligente</span>
+          <span>Dados simulados</span>
           <button
             type="button"
             onClick={onFechar}

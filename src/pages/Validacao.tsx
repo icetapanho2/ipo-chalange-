@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { dataHoraPT } from "../lib/datas";
 import { apiGet, apiPost } from "../lib/api";
 import { EditarPedido, type Catalogo } from "../components/EditarPedido";
 import { DoenteModal } from "../components/DoenteModal";
@@ -173,7 +174,7 @@ export function Validacao() {
                 </span>
                 <span className="text-slate-300">|</span>
                 <span className="text-xs text-slate-400 font-mono">
-                  {grupo.criado_em.replace("T", " ")}
+                  {dataHoraPT(grupo.criado_em)}
                 </span>
               </div>
 
@@ -192,7 +193,7 @@ export function Validacao() {
 
             {/* Comparativo: Texto Original vs Pedidos Extraídos */}
             <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-              {/* Lado Esquerdo: Texto Original do SOAP (P) */}
+              {/* Lado Esquerdo: Texto original do diário */}
               <div className="p-4 bg-slate-50/50">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">

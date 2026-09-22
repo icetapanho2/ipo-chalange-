@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { dataPT } from "../lib/datas";
 import { apiGet, apiPost } from "../lib/api";
 import { usePerfil } from "../lib/PerfilContext";
 import { DoenteModal } from "../components/DoenteModal";
@@ -249,7 +250,7 @@ export function Triagem() {
                 </div>
                 <h4 className="text-sm font-semibold text-slate-800 mt-1">{item.descricao}</h4>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Requisitado por <strong className="text-slate-700">{item.medico_requisitante_nome}</strong> ({item.especialidade_origem_legivel}) · Prazo limite: <span className="font-mono text-slate-700 font-semibold">{item.prazo_limite}</span>
+                  Requisitado por <strong className="text-slate-700">{item.medico_requisitante_nome}</strong> ({item.especialidade_origem_legivel}) · Prazo limite: <span className="font-mono text-slate-700 font-semibold">{dataPT(item.prazo_limite)}</span>
                 </p>
               </div>
 

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { dataHoraPT, dataPT } from "../../lib/datas";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiGet, apiPost, apiPut } from "../../lib/api";
 import { DoenteModal } from "../../components/DoenteModal";
@@ -282,7 +283,7 @@ export function OasisConsulta() {
                     <ExternalLink className="h-3.5 w-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-1.5 rounded border border-slate-200">
-                    <span>Nasc: {dados.doente?.data_nascimento}</span>
+                    <span>Nasc: {dataPT(dados.doente?.data_nascimento)}</span>
                     <span>Sexo: {dados.doente?.sexo === "M" ? "Masc" : "Fem"}</span>
                   </div>
                 </div>
@@ -302,7 +303,7 @@ export function OasisConsulta() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Data e Hora:</span>
-                    <span className="font-mono text-slate-800">{dados.ato.data_hora.replace("T", " ")}</span>
+                    <span className="font-mono text-slate-800">{dataHoraPT(dados.ato.data_hora)}</span>
                   </div>
                 </div>
 

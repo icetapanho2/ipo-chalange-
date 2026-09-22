@@ -203,7 +203,7 @@ export function OasisMedico() {
                     <th className="py-2.5 px-3">Acto Clínico</th>
                     <th className="py-2.5 px-3">Gabinete</th>
                     <th className="py-2.5 px-3">Estado</th>
-                    <th className="py-2.5 px-3">Registo SOAP</th>
+                    <th className="py-2.5 px-3">Diário</th>
                     <th className="py-2.5 px-3 text-right">Ação</th>
                   </tr>
                 </thead>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { dataHoraPT } from "../lib/datas";
 import { useNavigate } from "react-router-dom";
 import { apiGet, apiPost } from "../lib/api";
 import { usePerfil } from "../lib/PerfilContext";
@@ -273,7 +274,7 @@ export function TrocadorUtilizador() {
                         </div>
                         <p className="mt-0.5 text-xs font-semibold text-slate-800">{n.titulo}</p>
                         <p className="text-[11px] text-slate-500">{n.mensagem}</p>
-                        <p className="mt-0.5 text-[10px] text-slate-400">{n.criado_em.replace("T", " ")}</p>
+                        <p className="mt-0.5 text-[10px] text-slate-400">{dataHoraPT(n.criado_em)}</p>
                       </button>
                       <div className="flex flex-col items-center gap-1 pt-0.5">
                         {!n.lida && (

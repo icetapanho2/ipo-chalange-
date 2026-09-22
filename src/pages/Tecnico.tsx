@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../lib/api";
+import { dataHoraPT } from "../lib/datas";
 import { Wrench, Send, Clock, CheckCircle2 } from "lucide-react";
 
 interface Especialidade {
@@ -106,8 +107,8 @@ export function Tecnico() {
           <span>Reportar Avaria de Serviço ou Equipamento</span>
         </h1>
         <p className="mt-1 text-xs text-slate-500">
-          A administração do serviço afectado é notificada de imediato e decide se aplica remarcação total (todo o
-          serviço) ou parcial (só o acto/equipamento indicado) para o período reportado.
+          As vagas do período ficam bloqueadas e a administrativa do serviço recebe logo um plano de remarcação: uma
+          nova data para cada doente afectado, por ordem de prioridade e com a justificação, que ela valida.
         </p>
       </div>
 
@@ -216,12 +217,12 @@ export function Tecnico() {
                       {a.especialidade_legivel} · {a.ato_legivel}
                     </h4>
                     <p className="text-xs text-slate-500 mt-0.5">{a.descricao}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{a.criado_em.replace("T", " ")}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{dataHoraPT(a.criado_em)}</p>
                   </div>
                   {a.estado === "ABERTA" ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
                       <Clock className="h-3 w-3" />
-                      <span>Aguarda decisão da administração</span>
+                      <span>Plano de remarcação por validar</span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800">
