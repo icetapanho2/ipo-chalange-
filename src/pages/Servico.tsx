@@ -13,6 +13,10 @@ import {
   Wrench,
   CalendarClock,
   Users,
+  ClipboardList,
+  Inbox,
+  Building2,
+  HelpCircle,
 } from "lucide-react";
 
 interface ResumoPedido {
@@ -27,6 +31,7 @@ interface ResumoPedido {
   estado: string;
   estado_legivel: string;
   n_remarcacoes: number;
+  decisao_pendente?: boolean;
 }
 
 interface RespostaPedidos {
@@ -122,6 +127,13 @@ export function Servico() {
   const [doenteModalId, setDoenteModalId] = useState<string | null>(null);
   const [estadoAtivo, setEstadoAtivo] = useState<string>("SEM_VAGA");
   const [aResolverAvaria, setAResolverAvaria] = useState<string | null>(null);
+  const [abaAtiva, setAbaAtiva] = useState<"risco" | "pendencias" | "carteira">("risco");
+  const [notasOutsourcing, setNotasOutsourcing] = useState<Record<string, string>>({});
+  const [motivosDecisao, setMotivosDecisao] = useState<Record<string, string>>({});
+  const [aProcessarPedido, setAProcessarPedido] = useState<string | null>(null);
+  const [formSemVagaAberto, setFormSemVagaAberto] = useState<{ pedidoId: string; tipo: "outsourcing" | "decisao" } | null>(
+    null,
+  );
 
   function recarregar() {
     apiGet<RespostaPedidos>("/servico/pedidos")
@@ -190,6 +202,43 @@ export function Servico() {
     }
   }
 
+  async function confirmarOutsourcing(pedidoId: string) {
+    setErro(null);
+    setAProcessarPedido(pedidoId);
+    try {
+      await apiPost(`/servico/pedidos/${pedidoId}/outsourcing`, { nota: notasOutsourcing[pedidoId] ?? "" });
+      setMensagemSucesso("Pedido resolvido por capacidade externa (outsourcing).");
+      setFormSemVagaAberto(null);
+      recarregar();
+      setTimeout(() => setMensagemSucesso(null), 4000);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAProcessarPedido(null);
+    }
+  }
+
+  async function confirmarPedirDecisao(pedidoId: string) {
+    setErro(null);
+    const motivo = motivosDecisao[pedidoId] ?? "";
+    if (!motivo.trim()) {
+      setErro("Descreva porque não há solução interna nem externa.");
+      return;
+    }
+    setAProcessarPedido(pedidoId);
+    try {
+      await apiPost(`/servico/pedidos/${pedidoId}/pedir-decisao`, { motivo });
+      setMensagemSucesso("O médico requisitante foi notificado para decidir.");
+      setFormSemVagaAberto(null);
+      recarregar();
+      setTimeout(() => setMensagemSucesso(null), 4000);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAProcessarPedido(null);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-6">
       {/* Cabeçalho do Painel do Serviço */}
@@ -233,8 +282,59 @@ export function Servico() {
         </div>
       )}
 
+      {/* Separadores para não misturar tudo numa só lista longa */}
+      <div className="mt-5 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        {[
+          {
+            chave: "risco" as const,
+            titulo: "Consultas em Risco",
+            icone: AlertTriangle,
+            contagem: (overbooking?.length ?? 0) + (emRisco?.length ?? 0),
+          },
+          {
+            chave: "pendencias" as const,
+            titulo: "Alertas e Pendências",
+            icone: Inbox,
+            contagem:
+              (avarias?.filter((a) => a.estado === "ABERTA").length ?? 0) +
+              (paraRever ? paraRever.faltas.length + paraRever.emRisco.length : 0) +
+              (propostas?.length ?? 0) +
+              (alertas?.length ?? 0),
+          },
+          {
+            chave: "carteira" as const,
+            titulo: "Carteira de Pedidos",
+            icone: ClipboardList,
+            contagem: pedidos ? Object.values(pedidos.porEstado).reduce((soma, l) => soma + l.length, 0) : 0,
+          },
+        ].map((aba) => (
+          <button
+            key={aba.chave}
+            type="button"
+            onClick={() => setAbaAtiva(aba.chave)}
+            className={`rounded-lg px-3.5 py-2 text-xs font-bold transition-colors flex items-center gap-1.5 ${
+              abaAtiva === aba.chave
+                ? "bg-oasis-header text-white shadow-2xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <aba.icone className="h-3.5 w-3.5" />
+            <span>{aba.titulo}</span>
+            {aba.contagem > 0 && (
+              <span
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                  abaAtiva === aba.chave ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                }`}
+              >
+                {aba.contagem}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* SECÇÃO 0A: SOBRELOTAÇÃO — MESMA PRIORIDADE/PRAZO, SEM VAGAS SUFICIENTES */}
-      {overbooking && overbooking.length > 0 && (
+      {abaAtiva === "risco" && overbooking && overbooking.length > 0 && (
         <div className="mt-5 rounded-xl border border-rose-300 bg-rose-50/60 p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-rose-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-rose-900 flex items-center gap-1.5">
@@ -271,7 +371,7 @@ export function Servico() {
       )}
 
       {/* SECÇÃO 0B: AVARIAS REPORTADAS PELOS TÉCNICOS */}
-      {avarias && avarias.some((a) => a.estado === "ABERTA") && (
+      {abaAtiva === "pendencias" && avarias && avarias.some((a) => a.estado === "ABERTA") && (
         <div className="mt-5 rounded-xl border border-orange-300 bg-orange-50/60 p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-orange-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-orange-900 flex items-center gap-1.5">
@@ -317,7 +417,7 @@ export function Servico() {
       )}
 
       {/* SECÇÃO 0C: FALTAS E RISCOS PARA REVER (O SISTEMA SUGERE, A ADMIN DECIDE) */}
-      {paraRever && (paraRever.faltas.length > 0 || paraRever.emRisco.length > 0) && (
+      {abaAtiva === "pendencias" && paraRever && (paraRever.faltas.length > 0 || paraRever.emRisco.length > 0) && (
         <div className="mt-5 rounded-xl border border-sky-200 bg-sky-50/50 p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-sky-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-sky-900 flex items-center gap-1.5">
@@ -350,7 +450,7 @@ export function Servico() {
       )}
 
       {/* SECÇÃO 1: CONSULTAS EM RISCO (PRÓXIMOS 14 DIAS) */}
-      {emRisco && emRisco.length > 0 && (
+      {abaAtiva === "risco" && emRisco && emRisco.length > 0 && (
         <div className="mt-5 rounded-xl border border-red-200 bg-red-50/50 p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-red-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-red-900 flex items-center gap-1.5">
@@ -408,7 +508,7 @@ export function Servico() {
       )}
 
       {/* SECÇÃO 2: PROPOSTAS DE TROCA INTELIGENTE DE VAGAS */}
-      {propostas && propostas.length > 0 && (
+      {abaAtiva === "pendencias" && propostas && propostas.length > 0 && (
         <div className="mt-5 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-indigo-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
@@ -455,8 +555,17 @@ export function Servico() {
         </div>
       )}
 
+      {/* Nada a mostrar nesta aba */}
+      {abaAtiva === "risco" &&
+        (!overbooking || overbooking.length === 0) &&
+        (!emRisco || emRisco.length === 0) && (
+          <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+            Sem consultas em risco de momento.
+          </div>
+        )}
+
       {/* SECÇÃO 3: ALERTAS DO SERVIÇO */}
-      {alertas && alertas.length > 0 && (
+      {abaAtiva === "pendencias" && alertas && alertas.length > 0 && (
         <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50/40 p-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-amber-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
@@ -499,7 +608,19 @@ export function Servico() {
         </div>
       )}
 
+      {/* Nada a mostrar nesta aba */}
+      {abaAtiva === "pendencias" &&
+        (!avarias || !avarias.some((a) => a.estado === "ABERTA")) &&
+        (!paraRever || (paraRever.faltas.length === 0 && paraRever.emRisco.length === 0)) &&
+        (!propostas || propostas.length === 0) &&
+        (!alertas || alertas.length === 0) && (
+          <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+            Sem alertas ou pendências de momento.
+          </div>
+        )}
+
       {/* SECÇÃO 4: QUADRO DE PEDIDOS POR ESTADO */}
+      {abaAtiva === "carteira" && (
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-3 flex items-center gap-1.5">
           <Layers className="h-4 w-4 text-oasis-accent" />
@@ -545,47 +666,134 @@ export function Servico() {
               {pedidos?.porEstado[estadoAtivo]?.map((p) => (
                 <div
                   key={p.pedido_id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-slate-300 transition-colors"
+                  className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-2xs hover:border-slate-300 transition-colors"
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => p.doente_id && setDoenteModalId(p.doente_id)}
-                        className="font-bold text-sm text-slate-900 hover:text-oasis-accent flex items-center gap-1 text-left"
-                      >
-                        <span>{p.doente_nome}</span>
-                        <Activity className="h-3 w-3 text-sky-600" />
-                      </button>
-                      <span className="text-slate-300">·</span>
-                      <span className="text-xs font-semibold text-slate-600">{p.tipo_pedido_legivel}</span>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => p.doente_id && setDoenteModalId(p.doente_id)}
+                          className="font-bold text-sm text-slate-900 hover:text-oasis-accent flex items-center gap-1 text-left"
+                        >
+                          <span>{p.doente_nome}</span>
+                          <Activity className="h-3 w-3 text-sky-600" />
+                        </button>
+                        <span className="text-slate-300">·</span>
+                        <span className="text-xs font-semibold text-slate-600">{p.tipo_pedido_legivel}</span>
+                      </div>
+                      <h4 className="text-xs font-semibold text-slate-800 mt-0.5">{p.descricao}</h4>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Requisitante: {p.medico_requisitante_nome} · Prazo limite: <span className="font-mono">{p.prazo_limite}</span>
+                      </p>
                     </div>
-                    <h4 className="text-xs font-semibold text-slate-800 mt-0.5">{p.descricao}</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Requisitante: {p.medico_requisitante_nome} · Prazo limite: <span className="font-mono">{p.prazo_limite}</span>
-                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+                        {p.prioridade_legivel}
+                      </span>
+                      {p.doente_id && (
+                        <button
+                          type="button"
+                          onClick={() => setDoenteModalId(p.doente_id!)}
+                          className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
+                        >
+                          Ver Perfil
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
-                      {p.prioridade_legivel}
-                    </span>
-                    {p.doente_id && (
-                      <button
-                        type="button"
-                        onClick={() => setDoenteModalId(p.doente_id!)}
-                        className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
-                      >
-                        Ver Perfil
-                      </button>
-                    )}
-                  </div>
+                  {/* Sem vaga: vaga extra/outsourcing, ou pedir decisão ao médico se não houver solução */}
+                  {p.estado === "SEM_VAGA" && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      {p.decisao_pendente ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
+                          <HelpCircle className="h-3.5 w-3.5" />
+                          <span>Aguarda decisão do médico requisitante</span>
+                        </span>
+                      ) : formSemVagaAberto?.pedidoId === p.pedido_id ? (
+                        formSemVagaAberto.tipo === "outsourcing" ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="Ex: Marcado em clínica convencionada, resultado até dd/mm…"
+                              className="min-w-[240px] flex-1 rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                              value={notasOutsourcing[p.pedido_id] ?? ""}
+                              onChange={(e) => setNotasOutsourcing((n) => ({ ...n, [p.pedido_id]: e.target.value }))}
+                            />
+                            <button
+                              type="button"
+                              disabled={aProcessarPedido === p.pedido_id}
+                              onClick={() => confirmarOutsourcing(p.pedido_id)}
+                              className="rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-800 disabled:opacity-50"
+                            >
+                              Confirmar outsourcing
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFormSemVagaAberto(null)}
+                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="Porque não há vaga interna nem outsourcing…"
+                              className="min-w-[240px] flex-1 rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                              value={motivosDecisao[p.pedido_id] ?? ""}
+                              onChange={(e) => setMotivosDecisao((m) => ({ ...m, [p.pedido_id]: e.target.value }))}
+                            />
+                            <button
+                              type="button"
+                              disabled={aProcessarPedido === p.pedido_id}
+                              onClick={() => confirmarPedirDecisao(p.pedido_id)}
+                              className="rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-800 disabled:opacity-50"
+                            >
+                              Notificar médico
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setFormSemVagaAberto(null)}
+                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        )
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] text-slate-500">Sem vaga interna dentro do prazo:</span>
+                          <button
+                            type="button"
+                            onClick={() => setFormSemVagaAberto({ pedidoId: p.pedido_id, tipo: "outsourcing" })}
+                            className="inline-flex items-center gap-1 rounded-lg border border-rose-300 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-800 hover:bg-rose-100"
+                          >
+                            <Building2 className="h-3 w-3" />
+                            <span>Marcar outsourcing</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormSemVagaAberto({ pedidoId: p.pedido_id, tipo: "decisao" })}
+                            className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                          >
+                            <HelpCircle className="h-3 w-3" />
+                            <span>Pedir decisão ao médico</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
+      )}
 
       {/* Modal Universal de Feedback do Doente */}
       {doenteModalId && (

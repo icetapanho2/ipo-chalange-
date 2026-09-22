@@ -6,7 +6,7 @@ import { aprovarPropostaTroca, rejeitarPropostaTroca, contarVagasLivres, janelaA
 import { resolverAlerta } from "../motor/alertas.ts";
 import { calcularSemaforo } from "../motor/semaforo.ts";
 import { resolverAvaria } from "../motor/avarias.ts";
-import { remarcarPedido, adiarConsulta } from "../motor/fluxo.ts";
+import { remarcarPedido, adiarConsulta, marcarOutsourcing, pedirDecisaoMedico } from "../motor/fluxo.ts";
 import {
   descreverDoente,
   descreverEspecialidade,
@@ -39,6 +39,7 @@ export function criarRotasServico(store: typeof StoreType) {
       estado: p.estado,
       estado_legivel: descreverEstado(p.estado),
       n_remarcacoes: p.n_remarcacoes,
+      decisao_pendente: !!p.decisao_pendente,
     };
   }
 
@@ -195,6 +196,35 @@ export function criarRotasServico(store: typeof StoreType) {
       return;
     }
     adiarConsulta(pedido, req.utilizadorId, agora());
+    res.json({ ok: true, pedido: pedidoResumo(pedido) });
+  });
+
+  // Sem vaga, sem solução interna: a administração conseguiu capacidade externa (outsourcing).
+  router.post("/pedidos/:id/outsourcing", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    const pedido = store.pedidos.find((p) => p.pedido_id === req.params.id && p.especialidade_destino === especialidade);
+    if (!pedido || pedido.estado !== "SEM_VAGA") {
+      res.status(404).json({ erro: "Pedido não encontrado ou não está sem vaga." });
+      return;
+    }
+    marcarOutsourcing(pedido, req.utilizadorId, req.body?.nota ?? "", agora());
+    res.json({ ok: true, pedido: pedidoResumo(pedido) });
+  });
+
+  // Sem vaga, sem solução (nem vaga extra, nem outsourcing): pede ao médico para decidir.
+  router.post("/pedidos/:id/pedir-decisao", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    const pedido = store.pedidos.find((p) => p.pedido_id === req.params.id && p.especialidade_destino === especialidade);
+    if (!pedido || pedido.estado !== "SEM_VAGA") {
+      res.status(404).json({ erro: "Pedido não encontrado ou não está sem vaga." });
+      return;
+    }
+    const motivo: string = req.body?.motivo ?? "";
+    if (!motivo.trim()) {
+      res.status(400).json({ erro: "Descreva porque não há solução interna nem externa." });
+      return;
+    }
+    pedirDecisaoMedico(pedido, req.utilizadorId, motivo.trim(), agora());
     res.json({ ok: true, pedido: pedidoResumo(pedido) });
   });
 

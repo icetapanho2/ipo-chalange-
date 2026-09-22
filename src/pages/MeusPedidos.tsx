@@ -9,6 +9,7 @@ import {
   CalendarClock,
   User,
   Filter,
+  HelpCircle,
 } from "lucide-react";
 
 interface ResumoPedido {
@@ -27,6 +28,7 @@ interface ResumoPedido {
 interface Resposta {
   devolvidos: ResumoPedido[];
   recusados: ResumoPedido[];
+  semVagaDecisao: ResumoPedido[];
   todos: ResumoPedido[];
 }
 
@@ -134,6 +136,17 @@ export function MeusPedidos() {
     }
   }
 
+  async function decidirSemVaga(pedidoId: string, decisao: "MANTER" | "CANCELAR") {
+    setErro(null);
+    try {
+      await apiPost(`/meus-pedidos/${pedidoId}/decidir-sem-vaga`, { decisao });
+      recarregar();
+      recarregarPainel();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   function alternarEstadio(valor: string) {
     setFiltroEstadios((s) => {
       const novo = new Set(s);
@@ -188,6 +201,45 @@ export function MeusPedidos() {
       </div>
 
       {erro && <p className="mt-3 text-sm text-red-600">{erro}</p>}
+
+      {/* Sem vaga (nem interna, nem outsourcing): a administração pede ao médico para decidir */}
+      {dados && dados.semVagaDecisao.length > 0 && (
+        <section className="mt-4 rounded-xl border border-red-300 bg-red-50 p-3">
+          <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-red-800">
+            <HelpCircle className="h-3.5 w-3.5" />
+            <span>Sem vaga — precisam da sua decisão ({dados.semVagaDecisao.length})</span>
+          </h2>
+          <div className="mt-2 space-y-2">
+            {dados.semVagaDecisao.map((p) => (
+              <div key={p.pedido_id} className="rounded-lg border border-red-300 bg-white p-3">
+                <p className="text-sm font-semibold text-slate-800">
+                  {p.doente_nome} — {p.descricao}
+                </p>
+                <p className="mt-1 text-xs text-red-700">
+                  A administração não conseguiu vaga interna nem capacidade externa dentro do prazo. Quer manter o
+                  pedido em espera ou cancelá-lo?
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => decidirSemVaga(p.pedido_id, "MANTER")}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Manter em espera
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => decidirSemVaga(p.pedido_id, "CANCELAR")}
+                    className="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-800"
+                  >
+                    Cancelar pedido
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Pedidos devolvidos: precisam de resposta do médico antes de tudo o resto */}
       {dados && dados.devolvidos.length > 0 && (

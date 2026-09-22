@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
 import { apenasData, parseIso, somarDias } from "../util.ts";
-import { responderDevolucao } from "../motor/fluxo.ts";
+import { decidirSemVaga, responderDevolucao } from "../motor/fluxo.ts";
 import {
   descreverDoente,
   descreverEspecialidade,
@@ -44,8 +44,25 @@ export function criarRotasMeusPedidos(store: typeof StoreType) {
     res.json({
       devolvidos: meus.filter((p) => p.estado === "DEVOLVIDO").map(resumo),
       recusados: meus.filter((p) => p.estado === "RECUSADO").map(resumo),
+      // Sem vaga interna nem externa: a administração pede ao médico para decidir manter/cancelar.
+      semVagaDecisao: meus.filter((p) => p.estado === "SEM_VAGA" && p.decisao_pendente).map(resumo),
       todos: meus.map(resumo).sort((a, b) => b.criado_em.localeCompare(a.criado_em)),
     });
+  });
+
+  router.post("/:id/decidir-sem-vaga", (req, res) => {
+    const pedido = store.pedidos.find((p) => p.pedido_id === req.params.id && p.medico_requisitante_id === req.utilizadorId);
+    if (!pedido || pedido.estado !== "SEM_VAGA" || !pedido.decisao_pendente) {
+      res.status(404).json({ erro: "Pedido não encontrado ou não aguarda decisão." });
+      return;
+    }
+    const decisao = req.body?.decisao as "MANTER" | "CANCELAR";
+    if (decisao !== "MANTER" && decisao !== "CANCELAR") {
+      res.status(400).json({ erro: "Decisão inválida." });
+      return;
+    }
+    decidirSemVaga(pedido, req.utilizadorId, decisao, agora());
+    res.json({ ok: true, pedido: resumo(pedido) });
   });
 
   // Painel do médico por doente (secção N2): um cartão por doente, agrupando todos os pedidos
