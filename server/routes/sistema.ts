@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { gerarPropostasFaltasPendentes } from "../motor/propostasRemarcacao.ts";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
 import { isoDataHora } from "../util.ts";
@@ -46,6 +47,7 @@ export function criarRotasSistema(store: typeof StoreType) {
   router.post("/repor-demo", (_req, res) => {
     store.carregar();
     recalcularAlertas(agora());
+    gerarPropostasFaltasPendentes(agora());
     res.json({ ok: true, recarregadoEm: isoDataHora(agora()) });
   });
 

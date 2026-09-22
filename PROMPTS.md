@@ -124,6 +124,7 @@ Nota: as horas exactas pressupõem esta ordem. Os testes devem seguir a mesma or
 | 2 | Laboratório: Manuel com 1 remarcação | Passa a ser Graça Pereira Santos |
 | 3 | Rui desmarca (a partir de 19/10); Helena aceita | Rui **19/10 08:40**; Helena **30/09 09:00** (+13 dias); cascata para Luís Martins Alves **13/10 09:00** |
 | 4 | Dr. Pedro pede colheita s/ jejum ao Joaquim | **01/10 10:00** (dia único); lista de chamadas: Joaquim (sem contacto, 81 anos), Maria (preparação) |
-| 5 | António: remarcar colheita | **24/09 07:40**, vermelho → amarelo |
-| 6 | Gestão → Impacto | 0 remarcados 2.ª vez; 3 doentes protegidos; 1/1 vaga reaproveitada; 1 deslocação evitada |
+| 5 | Técnico reporta avaria na Ecografia (24/09, 1 dia); Tiago aceita o plano | Sónia 717 → **25/09 10:40**; Artur 621 → **28/09 11:00** (fora do prazo); Fátima 566 → **28/09 12:00** (2.ª remarcação); Olga 138 → **01/10 11:40** (dia único); Diogo 134 → **28/09 12:40** |
+| 6 | António: Rita aceita a sugestão da falta | **24/09 07:40**, vermelho → amarelo |
+| 7 | Gestão → Impacto | 0 remarcados 2.ª vez por troca (1 inevitável por avaria); 3 protegidos; 5/5 remarcações por avaria validadas; 1/1 vaga reaproveitada; 2 deslocações evitadas |
 

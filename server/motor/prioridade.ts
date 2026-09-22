@@ -222,8 +222,8 @@ export interface ItemFila {
 
 /**
  * Ordem da fila (secção 8 da especificação): (1) menor folga, (2) nível mais alto,
- * (3) score da equação de prioridade do sistema (desempate dentro do mesmo nível/folga,
- * ver calcularPrioridadeSistema), (4) pedido mais antigo.
+ * (3) índice de prioridade guardado (server/motor/indice.ts; na falta dele, o score da equação),
+ * (4) pedido mais antigo.
  */
 export function compararFila(a: ItemFila, b: ItemFila): number {
   const folgaA = folgaDias(a.pedido, a.dataMinima);
@@ -234,8 +234,8 @@ export function compararFila(a: ItemFila, b: ItemFila): number {
   const nivelB = PESO_NIVEL[b.pedido.prioridade];
   if (nivelA !== nivelB) return nivelB - nivelA;
 
-  const scoreA = a.pedido.score_prioridade ?? nivelA * 30;
-  const scoreB = b.pedido.score_prioridade ?? nivelB * 30;
+  const scoreA = a.pedido.indice_prioridade ?? a.pedido.score_prioridade ?? nivelA * 30;
+  const scoreB = b.pedido.indice_prioridade ?? b.pedido.score_prioridade ?? nivelB * 30;
   if (scoreA !== scoreB) return scoreB - scoreA;
 
   return parseIso(a.pedido.criado_em).getTime() - parseIso(b.pedido.criado_em).getTime();

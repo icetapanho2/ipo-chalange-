@@ -18,6 +18,12 @@ interface Impacto {
     trocas_diferentes_da_regra_antiga: number;
     doentes_vulneraveis_protegidos: number;
     doentes_remarcados_2_vezes: number;
+    segundas_remarcacoes_inevitaveis: number;
+    remarcacoes_avaria_propostas: number;
+    remarcacoes_avaria_validadas: number;
+    remarcacoes_avaria_fora_prazo: number;
+    sugestoes_falta: number;
+    sugestoes_falta_aceites: number;
     vagas_libertadas: number;
     vagas_reaproveitadas: number;
     ofertas_pendentes: number;
@@ -88,7 +94,13 @@ export function PainelImpacto({ recarregarCada }: { recarregarCada?: number }) {
           <ShieldCheck className="h-4 w-4" /> Com as regras — nesta demonstração
         </h3>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <Numero destaque valor={s.doentes_remarcados_2_vezes} rotulo="doentes remarcados uma 2.ª vez pelo hospital (a regra impede)" />
+          <Numero
+            destaque
+            valor={s.doentes_remarcados_2_vezes}
+            rotulo={`doentes remarcados uma 2.ª vez por troca (a regra impede)${
+              s.segundas_remarcacoes_inevitaveis ? ` — ${s.segundas_remarcacoes_inevitaveis} inevitável(eis) por avaria, sinalizada(s) para chamada` : ""
+            }`}
+          />
           <Numero
             destaque
             valor={s.doentes_vulneraveis_protegidos}
@@ -108,6 +120,14 @@ export function PainelImpacto({ recarregarCada }: { recarregarCada?: number }) {
           />
           <Numero valor={s.comunicacoes_enviadas} rotulo={`avisos ao doente com preparação (+${s.lembretes_agendados} lembretes a D-3 agendados)`} />
           <Numero valor={s.trocas_aprovadas} rotulo="trocas aprovadas por um humano (nunca automáticas)" />
+          <Numero
+            destaque
+            valor={`${s.remarcacoes_avaria_validadas}/${s.remarcacoes_avaria_propostas}`}
+            rotulo={`remarcações por avaria propostas com justificação e validadas pela administrativa${
+              s.remarcacoes_avaria_fora_prazo ? ` (${s.remarcacoes_avaria_fora_prazo} fora do prazo, sinalizada)` : ""
+            }`}
+          />
+          <Numero valor={`${s.sugestoes_falta_aceites}/${s.sugestoes_falta}`} rotulo="faltas com remarcação sugerida e aceite" />
           <Numero valor={s.ofertas_pendentes} rotulo="ofertas de antecipação à espera de resposta do doente" />
         </div>
       </div>

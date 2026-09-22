@@ -196,20 +196,57 @@ const CASOS: Caso[] = [
   },
   {
     id: "5",
-    titulo: "Caso 5 — Faltou a uma análise antes da consulta",
+    titulo: "Caso 5 — Avaria: 5 doentes para remarcar de uma vez",
     tipo: "problema",
-    problema: "António Ribeiro faltou ontem à colheita de que depende a revisão de 28/09. Sem o sistema, só se descobre no dia da consulta.",
+    problema:
+      "O ecógrafo avariou e só fica reparado depois de amanhã: as 5 ecografias de 24/09 têm de ser remarcadas, e só há uma vaga livre antes de sexta. Hoje a administrativa pega no telefone e remarca pela ordem da lista — quem calha fica com a vaga.",
+    regras: [
+      "Cada pedido já tem o índice de prioridade calculado e guardado (nível, prazo, estádio, score clínico, remarcações já sofridas, tempo de espera): a ordem já está feita antes da avaria.",
+      "Dois MP com o mesmo prazo não empatam: quem está em diagnóstico fica à frente.",
+      "Quem já foi remarcado é sinalizado (2.ª remarcação inevitável: ligar ao doente).",
+      "Dia único para quem mora longe; nunca se remarca sem a administrativa validar.",
+    ],
     passos: [
       {
-        titulo: "Semáforo vermelho na ficha do doente",
-        descricao: "Abrir a ficha do António: a revisão de 28/09 está a vermelho. Clicar em \"Remarcar exame\".",
-        resultado: "Colheita remarcada para 24/09 07:40 → o semáforo passa a amarelo, a consulta mantém-se.",
-        acoes: [{ etiqueta: "Ficha do António", utilizadorId: "U08", caminho: "/doente/100102" }],
+        titulo: "O técnico reporta a avaria",
+        descricao:
+          "Perfil Técnico → Reportar avaria: serviço Radiologia-Geral (Ecografia), todo o serviço, \"Ecógrafo avariado (sonda); técnico da marca só amanhã ao fim do dia\", a partir de 24/09, 1 dia.",
+        resultado: "A administrativa da Ecografia (Tiago Neves) recebe logo: \"Avaria em Radiologia-Geral (Ecografia): 5 marcação(ões) a remarcar — plano pronto\".",
+        acoes: [{ etiqueta: "Reportar avaria (Técnico)", utilizadorId: "U13", caminho: "/tecnico" }],
+      },
+      {
+        titulo: "A administrativa revê o plano e valida",
+        descricao:
+          "Serviço → Remarcações: as 5 propostas por ordem do índice, com a vaga sugerida, a justificação e os avisos. Carregar no índice mostra de onde vem cada ponto. \"Aceitar todas\".",
+        resultado:
+          "1.º Sónia (MP, em diagnóstico, índice 717) → 25/09 10:40, a única vaga dentro do prazo. 2.º Artur (também MP, mesmo prazo, índice 621) → 28/09 11:00, 3 dias fora do prazo, com aviso para vaga extra. 3.º Fátima (em QT) → 28/09 12:00, com aviso \"2.ª remarcação — ligar à doente\". 4.º Olga (84 anos, Santarém) → 01/10 11:40, no dia da consulta dela. 5.º Diogo (rotina) → 28/09 12:40. Doentes e médicos avisados; o técnico recebe \"avaria resolvida\".",
+        acoes: [{ etiqueta: "Remarcações (Ecografia)", utilizadorId: "U11", caminho: "/servico?aba=remarcacoes" }],
+        fala: "Cinco remarcações em segundos, cada uma com o porquê. A decisão continua a ser da administrativa — o sistema tira-lhe o trabalho de pensar a ordem e procurar vagas.",
       },
     ],
   },
   {
     id: "6",
+    titulo: "Caso 6 — Faltou a uma análise antes da consulta",
+    tipo: "problema",
+    problema: "António Ribeiro faltou ontem à colheita de que depende a revisão de 28/09. Sem o sistema, só se descobre no dia da consulta.",
+    passos: [
+      {
+        titulo: "A administrativa recebe a sugestão e aceita",
+        descricao:
+          "Perfil Rita Vieira (Patologia Clínica): a notificação da falta já traz a sugestão. Serviço → Remarcações → Faltas: ler a justificação e \"Aceitar\". Na ficha do António o semáforo está a vermelho antes e passa a amarelo depois.",
+        resultado:
+          "Sugerido e marcado 24/09 07:40 — a primeira vaga que ainda dá tempo ao resultado (2 dias) antes da consulta de 28/09. O semáforo passa de vermelho a amarelo; não conta como remarcação pelo hospital.",
+        acoes: [
+          { etiqueta: "Remarcações (Patologia Clínica)", utilizadorId: "U08", caminho: "/servico?aba=remarcacoes" },
+          { etiqueta: "Ficha do António", utilizadorId: "U08", caminho: "/doente/100102" },
+        ],
+        fala: "Uma falta deixa de rebentar a consulta seguinte: a solução chega à administrativa antes de ela ter de a procurar.",
+      },
+    ],
+  },
+  {
+    id: "7",
     titulo: "Impacto em números",
     tipo: "impacto",
     problema: "O que isto vale para a gestão: o antes (60 dias de histórico), o que o sistema fez nesta demonstração e a projecção mensal, com os pressupostos à vista.",
@@ -217,7 +254,8 @@ const CASOS: Caso[] = [
       {
         titulo: "Dashboard de gestão",
         descricao: "Abrir a Gestão: o painel \"Impacto das regras\" actualiza-se com o que foi feito nos casos anteriores.",
-        resultado: "0 doentes remarcados uma 2.ª vez, 3 doentes vulneráveis protegidos, 1 vaga libertada reaproveitada (13 dias ganhos), 1 deslocação evitada (460 km), ~23% das marcações a ligar.",
+        resultado:
+          "0 doentes remarcados uma 2.ª vez por troca (1 inevitável por avaria, sinalizada), 3 doentes vulneráveis protegidos, 5/5 remarcações por avaria justificadas e validadas, 1 vaga libertada reaproveitada (13 dias ganhos), 2 deslocações evitadas, ~23% das marcações a ligar.",
         acoes: [{ etiqueta: "Abrir Gestão", utilizadorId: "U12", caminho: "/gestao" }],
       },
     ],
@@ -505,7 +543,7 @@ export function Guiao() {
         <div>
           <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600 shadow-2xs">
             <strong className="text-slate-800">Como apresentar:</strong> carregar em \"Repor demo\" e seguir os casos por esta ordem. O Caso 1
-            mostra o circuito normal; os Casos 2 a 5 mostram problemas reais em que as regras de prioridade decidem; o último mostra o impacto
+            mostra o circuito normal; os Casos 2 a 6 mostram problemas reais em que as regras de prioridade decidem; o último mostra o impacto
             em números. Cada botão já troca para o perfil certo.
           </div>
 

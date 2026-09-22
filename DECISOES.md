@@ -226,3 +226,25 @@ Pedido explícito do dono do produto (alarga o âmbito da secção 16). Decisõe
 9. **Fica por fazer:** ausência de médico como bloqueio de agenda (R-I); validação dos pesos com a
    direcção clínica.
 
+## 2026-09-22 — Índice de prioridade guardado e remarcações sempre propostas (R-J, R-K)
+
+Pedido explícito: a prioridade de cada doente deve estar já calculada (não refeita cada vez que é
+preciso remarcar 20 pessoas), distinguir MP de MP, e as remarcações por avaria/falta devem chegar à
+administrativa com a solução e a justificação, para ela validar.
+1. **Índice guardado no pedido** e refrescado dentro de `recalcularAlertas` (arranque + cada acção): é o
+   único sítio por onde todas as acções já passam. O índice substitui o score como critério (3) da fila
+   (depois de folga e nível), por isso as datas dos cenários antigos não mudaram.
+2. **Avaria passa a ter "a partir de"** (`data_inicio`, por omissão hoje) e a janela é
+   [início, início + dias). O teste antigo (avaria de 6 dias a partir de hoje) mantém o mesmo efeito.
+3. **Remarcar por avaria move a mesma marcação** (como a troca segura) em vez de desmarcar e criar outra;
+   o teste de avarias passou a verificar a data (fora da janela) em vez do id da marcação.
+   `resolverAvaria` passou a significar "aceitar o plano".
+4. **Vagas do plano ficam reservadas; as da falta não.** Reservar a sugestão do António no arranque
+   tiraria a vaga das 07:30 de 24/09 à Maria e mudaria as datas da demo. A sugestão da falta é
+   recalculada sempre que é vista e no momento de aceitar.
+5. **Cenário da Ecografia** gerado depois da sequência aleatória: as 5 marcações de 24/09 passam para 5
+   doentes-cenário (as restantes desse dia ficam desmarcadas) e a 25/09 só fica livre a vaga das 10:40,
+   para haver disputa real entre dois MP com o mesmo prazo.
+6. **2.ª remarcação na métrica**: separam-se as evitáveis (por troca — a regra impede, 0) das inevitáveis
+   (avaria — sinalizadas para chamada), para o painel não se contradizer.
+

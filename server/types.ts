@@ -93,6 +93,8 @@ export interface Vaga {
   ato_id: string; // vazio = livre
   /** Vaga libertada que está guardada para uma oferta de antecipação PENDENTE (secção 8A, R-E). */
   oferta_id?: string;
+  /** Vaga guardada para uma proposta de remarcação PENDENTE (plano de uma avaria). */
+  reserva_id?: string;
 }
 
 export interface AtoMedicoExame {
@@ -197,6 +199,13 @@ export interface Pedido {
   /** true quando a administração pediu ao médico para decidir manter/cancelar um pedido SEM_VAGA
    * sem solução interna (nem vaga extra, nem outsourcing) — ver server/motor/fluxo.ts. */
   decisao_pendente?: boolean;
+  /** Índice de prioridade de acesso, guardado (server/motor/indice.ts) — distingue MP de MP. */
+  indice_prioridade?: number;
+  indice_parcelas?: ParcelaCusto[];
+  indice_calculado_em?: string;
+  /** Custo de remarcar este doente (R-B), guardado para quem está marcado. */
+  custo_remarcacao?: number;
+  custo_remarcacao_parcelas?: ParcelaCusto[];
 }
 
 export interface Dependencia {
@@ -255,7 +264,8 @@ export type TipoNotificacao =
   | "PEDIDO_RECUSADO"
   | "AVARIA_SERVICO"
   | "AVARIA_RESOLVIDA"
-  | "PEDIDO_DECISAO_NECESSARIA";
+  | "PEDIDO_DECISAO_NECESSARIA"
+  | "REMARCACAO_SUGERIDA";
 
 /** Notificação dirigida a um utilizador, gerada pelo motor em cada transição relevante do fluxo (secção 5/N2). */
 export interface Notificacao {
@@ -289,6 +299,8 @@ export interface Avaria {
   duracao_dias: number;
   reportado_por: string;
   criado_em: string;
+  /** Primeiro dia afectado (ISO data). A janela é [data_inicio, data_inicio + duracao_dias). */
+  data_inicio: string;
   estado: "ABERTA" | "RESOLVIDA";
   decisao: "REMARCACAO_TOTAL" | "REMARCACAO_PARCIAL" | "";
   resolvido_por: string;
@@ -425,6 +437,34 @@ export interface CandidatoAntecipacao {
   atraso_previsto_dias: number | null;
   grupo: 1 | 2;
   motivo: string;
+}
+
+/**
+ * Proposta de remarcação (ESPECIFICACAO.md secção 8A, R-F/R-K): o sistema já traz a solução e a
+ * justificação; a administrativa do serviço valida. Origem AVARIA (plano em lote) ou FALTA (individual).
+ */
+export interface PropostaRemarcacao {
+  proposta_id: string;
+  origem: "AVARIA" | "FALTA";
+  avaria_id: string;
+  pedido_id: string; // "" = marcação sem pedido no sistema
+  ato_id: string;
+  doente_id: string;
+  especialidade: string;
+  data_hora_atual: string;
+  vaga_sugerida_id: string; // "" = sem vaga
+  data_hora_sugerida: string;
+  dentro_do_prazo: boolean | null;
+  dias_fora_do_prazo: number;
+  ordem: number;
+  indice: number;
+  indice_parcelas: ParcelaCusto[];
+  justificacao: string;
+  avisos: string[];
+  estado: "PENDENTE" | "ACEITE" | "REJEITADA";
+  criado_em: string;
+  decidido_por: string;
+  decidido_em: string;
 }
 
 /** Registo de cada vaga libertada (para as métricas: quantas foram reaproveitadas). */

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AgendaDoente, type Comunicacao, type MarcacaoAgenda, type PerfilLogistico } from "../components/AgendaDoente";
+import { AgendaDoente, type Comunicacao, type IndicePedido, type MarcacaoAgenda, type PerfilLogistico } from "../components/AgendaDoente";
 import { useParams, Link } from "react-router-dom";
 import { apiGet, apiPost, apiPut } from "../lib/api";
 import {
@@ -110,6 +110,7 @@ interface RespostaDoente {
   agenda?: MarcacaoAgenda[];
   comunicacoes?: Comunicacao[];
   logistica?: { idade: number; remarcacoes_hospital_90d: number };
+  indices?: IndicePedido[];
   timeline: ItemTimeline[];
   marcacoesFuturas: MarcacaoFutura[];
   todosPedidos?: PedidoJson[];
@@ -372,6 +373,7 @@ export function Doente() {
             perfil={dados.doente}
             idade={dados.logistica?.idade}
             remarcacoes={dados.logistica?.remarcacoes_hospital_90d}
+            indices={dados.indices}
           />
           {/* SECÇÃO O QUE FALTA */}
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

@@ -17,6 +17,7 @@ export function criarRotasTecnico(store: typeof StoreType) {
       ato_legivel: a.ato_codigo ? descreverAto(a.especialidade_codigo, a.ato_codigo) : "Todo o serviço",
       descricao: a.descricao,
       duracao_dias: a.duracao_dias,
+      data_inicio: a.data_inicio,
       criado_em: a.criado_em,
       estado: a.estado,
       decisao: a.decisao,
@@ -42,6 +43,7 @@ export function criarRotasTecnico(store: typeof StoreType) {
     const atoCodigo: string = req.body?.ato_codigo ?? "";
     const descricao: string = req.body?.descricao ?? "";
     const duracaoDias = Number(req.body?.duracao_dias ?? 0);
+    const dataInicio: string = req.body?.data_inicio ?? "";
 
     if (!especialidadeCodigo || !store.especialidades.some((e) => e.codigo === especialidadeCodigo)) {
       res.status(400).json({ erro: "Escolha um serviço válido." });
@@ -51,13 +53,17 @@ export function criarRotasTecnico(store: typeof StoreType) {
       res.status(400).json({ erro: "Descreva a avaria." });
       return;
     }
+    if (dataInicio && !/^\d{4}-\d{2}-\d{2}$/.test(dataInicio)) {
+      res.status(400).json({ erro: "Data de início inválida (aaaa-mm-dd)." });
+      return;
+    }
     if (!Number.isFinite(duracaoDias) || duracaoDias <= 0) {
       res.status(400).json({ erro: "Indique a duração estimada, em dias." });
       return;
     }
 
     const avaria = reportarAvaria(
-      { especialidadeCodigo, atoCodigo: atoCodigo || undefined, descricao: descricao.trim(), duracaoDias },
+      { especialidadeCodigo, atoCodigo: atoCodigo || undefined, descricao: descricao.trim(), duracaoDias, dataInicio: dataInicio || undefined },
       req.utilizadorId,
       agora(),
     );

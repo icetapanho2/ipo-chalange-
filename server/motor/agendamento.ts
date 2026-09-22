@@ -42,15 +42,20 @@ function dentroDaJanela(dataHoraIso: string, inicio: Date, fim: Date): boolean {
   return dh.getTime() >= inicio.getTime() && apenasData(dh).getTime() <= apenasData(fim).getTime();
 }
 
+/** Janela afectada por uma avaria: [data_inicio 00:00, data_inicio + duracao_dias 00:00). */
+export function janelaAvaria(av: { data_inicio: string; criado_em: string; duracao_dias: number }): { inicio: Date; fim: Date } {
+  const inicio = parseIso(av.data_inicio || av.criado_em);
+  return { inicio, fim: somarDias(inicio, av.duracao_dias) };
+}
+
 /** Uma avaria ABERTA (N2) tira temporariamente do pool as vagas do serviço (ou só de um acto) na sua janela. */
 export function vagaBloqueadaPorAvaria(vaga: Vaga, atoCodigo: string): boolean {
   return store.avarias.some((av) => {
     if (av.estado !== "ABERTA" || av.especialidade_codigo !== vaga.especialidade_codigo) return false;
     if (av.ato_codigo && av.ato_codigo !== atoCodigo) return false;
-    const inicio = parseIso(av.criado_em);
-    const fim = somarDias(inicio, av.duracao_dias);
+    const { inicio, fim } = janelaAvaria(av);
     const dh = parseIso(vaga.data_hora);
-    return dh.getTime() >= inicio.getTime() && dh.getTime() <= fim.getTime();
+    return dh.getTime() >= inicio.getTime() && dh.getTime() < fim.getTime();
   });
 }
 
@@ -80,6 +85,7 @@ export function contarVagasLivres(especialidadeCodigo: string, atoCodigo: string
       v.especialidade_codigo === especialidadeCodigo &&
       !v.ato_id &&
       !v.oferta_id &&
+      !v.reserva_id &&
       v.atos_permitidos.includes(atoCodigo) &&
       dentroDaJanela(v.data_hora, inicio, fim) &&
       !vagaBloqueadaPorAvaria(v, atoCodigo),
@@ -100,6 +106,7 @@ export function vagasLivresCompativeis(
       v.especialidade_codigo === especialidadeCodigo &&
       !v.ato_id &&
       !v.oferta_id &&
+      !v.reserva_id &&
       v.atos_permitidos.includes(atoCodigo) &&
       dentroDaJanela(v.data_hora, inicio, fim) &&
       (!medicoId || v.medico_id === medicoId) &&
@@ -130,7 +137,7 @@ const HORA_MINIMA_LONGE = 10;
  * num dia em que ele já vem ao hospital (com >= 30 min de intervalo das outras marcações). Entre
  * vagas do mesmo dia, evita as de antes das 10:00. Nunca sai da janela (logo, nunca do prazo).
  */
-function vagaDiaUnico(
+export function vagaDiaUnico(
   pedido: Pedido,
   inicio: Date,
   fim: Date,
@@ -173,7 +180,7 @@ function vagaDiaUnico(
 }
 
 /** Para doentes de longe, dentro do mesmo dia evita vagas antes das 10:00 (R-H). */
-function preferirHoraTardiaSeLonge(pedido: Pedido, vaga: Vaga | null, inicio: Date, fim: Date, medicoId: string | undefined, quando: Date): Vaga | null {
+export function preferirHoraTardiaSeLonge(pedido: Pedido, vaga: Vaga | null, inicio: Date, fim: Date, medicoId: string | undefined, quando: Date): Vaga | null {
   if (!vaga || parseIso(vaga.data_hora).getHours() >= HORA_MINIMA_LONGE) return vaga;
   const doente = store.doentes.find((d) => d.doente_id === pedido.doente_id);
   if (!doente || (doente.distancia_km ?? 0) < store.parametros.distancia_agrupar_km) return vaga;

@@ -24,6 +24,16 @@ export interface Comunicacao {
   estado: "ENVIADA" | "AGENDADA";
 }
 
+export interface IndicePedido {
+  pedido_id: string;
+  descricao: string;
+  prioridade: string;
+  indice: number;
+  parcelas: { rotulo: string; pontos: number }[];
+  custo_remarcacao: number | null;
+  custo_parcelas: { rotulo: string; pontos: number }[];
+}
+
 export interface PerfilLogistico {
   concelho?: string;
   distancia_km?: number;
@@ -49,12 +59,14 @@ export function AgendaDoente({
   perfil,
   idade,
   remarcacoes,
+  indices = [],
 }: {
   agenda: MarcacaoAgenda[];
   comunicacoes: Comunicacao[];
   perfil: PerfilLogistico;
   idade?: number;
   remarcacoes?: number;
+  indices?: IndicePedido[];
 }) {
   const [verTodas, setVerTodas] = useState(false);
   const visiveis = verTodas ? comunicacoes : comunicacoes.slice(0, 4);
@@ -98,6 +110,30 @@ export function AgendaDoente({
       </div>
 
       <div className="space-y-4">
+        {indices.length > 0 && (
+          <div className="rounded-xl border border-indigo-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-1 text-xs font-bold uppercase tracking-wider text-indigo-900">Prioridade já calculada</h2>
+            <p className="mb-2 text-[10px] text-slate-400">Guardada em cada pedido e actualizada a cada mudança — pronta para qualquer remarcação.</p>
+            <ul className="space-y-2">
+              {indices.map((i) => (
+                <li key={i.pedido_id} className="text-[11px] text-slate-600">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-semibold text-slate-800">{i.descricao.split(" — ")[0]}</span>
+                    <span className="font-bold text-indigo-800">índice {i.indice}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500">{i.parcelas.map((p) => `+${p.pontos} ${p.rotulo}`).join(" · ")}</div>
+                  {i.custo_remarcacao !== null && (
+                    <div className="text-[10px] text-slate-500">
+                      Custo de o remarcar: <strong>{i.custo_remarcacao}</strong>
+                      {i.custo_parcelas.length > 0 && <> ({i.custo_parcelas.map((p) => `${p.pontos > 0 ? "+" : ""}${p.pontos} ${p.rotulo}`).join(" · ")})</>}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-600">Perfil logístico</h2>
           <dl className="space-y-1 text-xs text-slate-600">

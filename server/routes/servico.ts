@@ -6,6 +6,13 @@ import { aprovarPropostaTroca, rejeitarPropostaTroca, contarVagasLivres, janelaA
 import { resolverAlerta } from "../motor/alertas.ts";
 import { calcularSemaforo } from "../motor/semaforo.ts";
 import { resolverAvaria } from "../motor/avarias.ts";
+import {
+  aceitarPlanoAvaria,
+  aceitarPropostaRemarcacao,
+  actualizarSugestaoFalta,
+  propostaFaltaPendente,
+  rejeitarPropostaRemarcacao,
+} from "../motor/propostasRemarcacao.ts";
 import { remarcarPedido, adiarConsulta, marcarOutsourcing, pedirDecisaoMedico } from "../motor/fluxo.ts";
 import { desmarcarAPedidoDoDoente, expirarOfertas, responderOferta } from "../motor/antecipacao.ts";
 import { listaChamadas, registarChamada } from "../motor/chamadas.ts";
@@ -118,6 +125,64 @@ export function criarRotasServico(store: typeof StoreType) {
         escolhido_regra_antiga: p.escolhido_regra_antiga ?? "",
       }));
     res.json(propostas);
+  });
+
+  // ------------------------------------------------ remarcações propostas (avaria em lote, falta individual)
+  function propostaRemarcacaoJson(p: (typeof store.propostasRemarcacao)[number]) {
+    const pedido = store.pedidos.find((x) => x.pedido_id === p.pedido_id);
+    const doente = store.doentes.find((d) => d.doente_id === p.doente_id);
+    return {
+      ...p,
+      doente_nome: doente?.nome ?? p.doente_id,
+      estadio_cuidado: doente?.estadio_cuidado ?? "",
+      descricao: pedido ? descreverPedido(pedido) : "Marcação sem pedido no sistema",
+      prioridade: pedido?.prioridade ?? "",
+      prazo_limite: pedido?.prazo_limite ?? "",
+    };
+  }
+
+  router.get("/remarcacoes", (req, res) => {
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    const doServico = store.propostasRemarcacao.filter((p) => p.especialidade === especialidade);
+    for (const p of doServico) if (p.origem === "FALTA" && p.estado === "PENDENTE") actualizarSugestaoFalta(p, agora());
+    const avarias = store.avarias
+      .filter((a) => a.especialidade_codigo === especialidade && doServico.some((p) => p.avaria_id === a.avaria_id))
+      .sort((a, b) => b.criado_em.localeCompare(a.criado_em))
+      .map((a) => ({
+        avaria_id: a.avaria_id,
+        descricao: a.descricao,
+        data_inicio: a.data_inicio,
+        duracao_dias: a.duracao_dias,
+        estado: a.estado,
+        reportado_por: descreverUtilizador(a.reportado_por),
+        ato_legivel: a.ato_codigo ? descreverAto(a.especialidade_codigo, a.ato_codigo) : "Todo o serviço",
+        propostas: doServico.filter((p) => p.avaria_id === a.avaria_id).sort((x, y) => x.ordem - y.ordem).map(propostaRemarcacaoJson),
+      }));
+    const faltas = doServico.filter((p) => p.origem === "FALTA").reverse().map(propostaRemarcacaoJson);
+    res.json({ avarias, faltas, pendentes: doServico.filter((p) => p.estado === "PENDENTE").length });
+  });
+
+  router.post("/remarcacoes/:id/aceitar", (req, res) => {
+    const p = aceitarPropostaRemarcacao(req.params.id, req.utilizadorId, agora());
+    if (!p) {
+      res.status(404).json({ erro: "Proposta não encontrada ou já decidida." });
+      return;
+    }
+    res.json({ ok: true, proposta: propostaRemarcacaoJson(p) });
+  });
+
+  router.post("/remarcacoes/:id/rejeitar", (req, res) => {
+    const p = rejeitarPropostaRemarcacao(req.params.id, req.utilizadorId, agora());
+    if (!p) {
+      res.status(404).json({ erro: "Proposta não encontrada ou já decidida." });
+      return;
+    }
+    res.json({ ok: true, proposta: propostaRemarcacaoJson(p) });
+  });
+
+  router.post("/avarias/:id/aceitar-plano", (req, res) => {
+    const n = aceitarPlanoAvaria(req.params.id, req.utilizadorId, agora());
+    res.json({ ok: true, aceites: n });
   });
 
   // ------------------------------------------------ marcações do serviço (para desmarcar a pedido do doente)
@@ -287,7 +352,9 @@ export function criarRotasServico(store: typeof StoreType) {
       res.status(404).json({ erro: "Pedido não encontrado ou não está em falta por remarcar." });
       return;
     }
-    remarcarPedido(pedido, req.utilizadorId, agora());
+    const proposta = propostaFaltaPendente(pedido.pedido_id);
+    if (proposta) aceitarPropostaRemarcacao(proposta.proposta_id, req.utilizadorId, agora());
+    else remarcarPedido(pedido, req.utilizadorId, agora());
     res.json({ ok: true, pedido: pedidoResumo(pedido) });
   });
 

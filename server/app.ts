@@ -15,6 +15,7 @@ import { criarRotasNotificacoes } from "./routes/notificacoes.ts";
 import { criarRotasTecnico } from "./routes/tecnico.ts";
 import { criarRotasPrioridades } from "./routes/prioridades.ts";
 import { recalcularAlertas } from "./motor/alertas.ts";
+import { gerarPropostasFaltasPendentes } from "./motor/propostasRemarcacao.ts";
 import { agora } from "./clock.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -57,3 +58,4 @@ export function criarApp() {
 
 // Os alertas são recalculados no arranque e depois de cada acção (secção 12 da especificação).
 recalcularAlertas(agora());
+gerarPropostasFaltasPendentes(agora());

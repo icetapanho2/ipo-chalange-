@@ -5,6 +5,7 @@ import { apenasData, parseIso } from "../util.ts";
 import { adiarConsulta, remarcarPedido } from "../motor/fluxo.ts";
 import { avaliarDependenciasDetalhado, calcularSemaforo } from "../motor/semaforo.ts";
 import { idadeDoente, remarcacoesHospital } from "../motor/remarcacao.ts";
+import { aceitarPropostaRemarcacao, propostaFaltaPendente } from "../motor/propostasRemarcacao.ts";
 import {
   descreverEspecialidade,
   descreverEstado,
@@ -282,8 +283,21 @@ export function criarRotasDoente(store: typeof StoreType) {
       idade: idadeDoente(doente, hoje),
       remarcacoes_hospital_90d: remarcacoesHospital(doente.doente_id, agora()),
     };
+    // Índice de prioridade guardado em cada pedido activo (secção 8A, R-J).
+    const indices = pedidos
+      .filter((p) => p.indice_prioridade !== undefined && !["REALIZADO", "CANCELADO", "RECUSADO"].includes(p.estado))
+      .map((p) => ({
+        pedido_id: p.pedido_id,
+        descricao: descreverPedido(p),
+        prioridade: p.prioridade,
+        indice: p.indice_prioridade,
+        parcelas: p.indice_parcelas ?? [],
+        custo_remarcacao: p.custo_remarcacao ?? null,
+        custo_parcelas: p.custo_remarcacao_parcelas ?? [],
+        calculado_em: p.indice_calculado_em ?? "",
+      }));
 
-    res.json({ doente, timeline, marcacoesFuturas, todosPedidos, alertas, oQueFalta, agenda, comunicacoes, ofertas, logistica });
+    res.json({ doente, timeline, marcacoesFuturas, todosPedidos, alertas, oQueFalta, agenda, comunicacoes, ofertas, logistica, indices });
   });
 
   router.post("/:id/pedidos/:pedidoId/remarcar-exame", (req, res) => {
@@ -292,7 +306,10 @@ export function criarRotasDoente(store: typeof StoreType) {
       res.status(404).json({ erro: "Pedido não encontrado." });
       return;
     }
-    remarcarPedido(pedido, req.utilizadorId, agora());
+    // Se já há sugestão de remarcação pronta (falta), aceitá-la; senão, remarcar directamente.
+    const proposta = propostaFaltaPendente(pedido.pedido_id);
+    if (proposta) aceitarPropostaRemarcacao(proposta.proposta_id, req.utilizadorId, agora());
+    else remarcarPedido(pedido, req.utilizadorId, agora());
     res.json({ ok: true, estado: pedido.estado });
   });
 

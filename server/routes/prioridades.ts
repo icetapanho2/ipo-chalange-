@@ -118,21 +118,34 @@ export function criarRotasPrioridades(store: typeof StoreType) {
     const passaramADentroDoPrazo = antecipacoes.filter((e) => e.motivo.includes("dentro do prazo")).length;
     const ofertasPendentes = store.ofertasAntecipacao.filter((o) => o.estado === "PENDENTE").length;
 
-    const diasUnicos = eventosHoje.filter((e) => e.tipo === "MARCACAO" && e.motivo.startsWith("Dia único"));
-    const kmPoupados = diasUnicos.reduce((s, e) => {
-      const d = store.doentes.find((x) => x.doente_id === pedidoDoente.get(e.pedido_id));
-      return s + 2 * (d?.distancia_km ?? 0);
-    }, 0);
+    // Deslocações evitadas: marcações novas e remarcações validadas que usaram o "dia único".
+    const doentesDiaUnico = [
+      ...eventosHoje.filter((e) => e.tipo === "MARCACAO" && e.motivo.startsWith("Dia único")).map((e) => pedidoDoente.get(e.pedido_id) ?? ""),
+      ...store.propostasRemarcacao.filter((p) => p.estado === "ACEITE" && p.justificacao.includes("Dia único")).map((p) => p.doente_id),
+    ];
+    const diasUnicos = doentesDiaUnico;
+    const kmPoupados = doentesDiaUnico.reduce((s, id) => s + 2 * (store.doentes.find((x) => x.doente_id === id)?.distancia_km ?? 0), 0);
 
     const chamadas = listaChamadas(undefined, quando);
     const limiteHorizonte = somarDias(hoje, chamadas.horizonteDias + 1).getTime();
     const chamadasNoHorizonte = chamadas.itens.filter((i) => parseIso(i.data_hora).getTime() < limiteHorizonte).length;
-    const remAgora = new Map<string, number>();
+    // 2.ª remarcação pelo hospital: evitáveis (por troca — a regra impede) vs inevitáveis (avaria, sinalizadas).
+    const remTotal = new Map<string, number>();
     for (const e of store.eventos) {
-      if (e.tipo !== "REMARCACAO" || MOTIVO_DO_DOENTE.test(e.motivo) || parseIso(e.data_hora).getTime() < hoje.getTime()) continue;
+      if (e.tipo !== "REMARCACAO" || MOTIVO_DO_DOENTE.test(e.motivo)) continue;
+      if (parseIso(e.data_hora).getTime() < somarDias(hoje, -90).getTime()) continue;
       const d = pedidoDoente.get(e.pedido_id);
-      if (d) remAgora.set(d, (remAgora.get(d) ?? 0) + 1);
+      if (d) remTotal.set(d, (remTotal.get(d) ?? 0) + 1);
     }
+    const segundasHoje = eventosHoje.filter((e) => {
+      if (e.tipo !== "REMARCACAO" || MOTIVO_DO_DOENTE.test(e.motivo)) return false;
+      const d = pedidoDoente.get(e.pedido_id);
+      return !!d && (remTotal.get(d) ?? 0) >= 2;
+    });
+    const segundasEvitaveis = new Set(segundasHoje.filter((e) => !e.motivo.startsWith("Avaria")).map((e) => pedidoDoente.get(e.pedido_id)));
+    const segundasInevitaveis = new Set(segundasHoje.filter((e) => e.motivo.startsWith("Avaria")).map((e) => pedidoDoente.get(e.pedido_id)));
+    const planos = store.propostasRemarcacao.filter((p) => p.origem === "AVARIA");
+    const sugestoesFalta = store.propostasRemarcacao.filter((p) => p.origem === "FALTA");
 
     // --- projecção mensal (estimativa; pressupostos em parametros.csv)
     const p = store.parametros;
@@ -157,7 +170,13 @@ export function criarRotasPrioridades(store: typeof StoreType) {
         trocas_aprovadas: aprovadas.length,
         trocas_diferentes_da_regra_antiga: trocasDiferentesDaRegraAntiga,
         doentes_vulneraveis_protegidos: vulneraveisProtegidos.size,
-        doentes_remarcados_2_vezes: [...remAgora.values()].filter((n) => n >= 2).length,
+        doentes_remarcados_2_vezes: segundasEvitaveis.size,
+        segundas_remarcacoes_inevitaveis: segundasInevitaveis.size,
+        remarcacoes_avaria_propostas: planos.length,
+        remarcacoes_avaria_validadas: planos.filter((p) => p.estado !== "PENDENTE").length,
+        remarcacoes_avaria_fora_prazo: planos.filter((p) => p.dentro_do_prazo === false).length,
+        sugestoes_falta: sugestoesFalta.length,
+        sugestoes_falta_aceites: sugestoesFalta.filter((p) => p.estado === "ACEITE").length,
         vagas_libertadas: libertadas.length,
         vagas_reaproveitadas: store.ofertasAntecipacao.filter((o) => o.estado === "ACEITE").length,
         ofertas_pendentes: ofertasPendentes,

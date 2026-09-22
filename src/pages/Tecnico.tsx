@@ -42,6 +42,17 @@ export function Tecnico() {
   const [atoCodigo, setAtoCodigo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [duracaoDias, setDuracaoDias] = useState(1);
+  // Por omissão a avaria começa amanhã (dia da demo + 1): as marcações de hoje já estão a decorrer.
+  const [dataInicio, setDataInicio] = useState("");
+  useEffect(() => {
+    apiGet<{ demoDate: string }>("/estado")
+      .then((r) => {
+        const d = new Date(`${r.demoDate}T12:00`);
+        d.setDate(d.getDate() + 1);
+        setDataInicio(d.toISOString().slice(0, 10));
+      })
+      .catch(() => undefined);
+  }, []);
   const [aEnviar, setAEnviar] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
@@ -72,8 +83,9 @@ export function Tecnico() {
         ato_codigo: atoCodigo,
         descricao: descricao.trim(),
         duracao_dias: duracaoDias,
+        data_inicio: dataInicio || undefined,
       });
-      setSucesso("Avaria reportada. A administração do serviço foi notificada.");
+      setSucesso("Avaria reportada. A administração do serviço já recebeu o plano de remarcação das marcações afectadas.");
       setDescricao("");
       setAtoCodigo("");
       setDuracaoDias(1);
@@ -159,6 +171,15 @@ export function Tecnico() {
         </div>
 
         <div className="flex items-center gap-3">
+          <div>
+            <label className="text-xs font-bold text-slate-700 block mb-1">Indisponível a partir de</label>
+            <input
+              type="date"
+              value={dataInicio}
+              onChange={(e) => setDataInicio(e.target.value)}
+              className="rounded border border-slate-300 px-2.5 py-2 text-sm text-slate-800"
+            />
+          </div>
           <div>
             <label className="text-xs font-bold text-slate-700 block mb-1">Duração estimada (dias)</label>
             <input

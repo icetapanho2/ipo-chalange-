@@ -462,3 +462,8 @@
 100111;295595009;Tiago Marques Silva;M;1979-04-15;9 - em tratamento (excluído de trocas);Adenocarcinoma do recto, QT neoadjuvante em curso;Estádio III;;913 000 111;TC de avaliação de resposta a meio da quimioterapia.;EM_TRATAMENTO;Oeiras;16;SMS;1;0
 100112;321785158;Helena Duarte Matos;F;1968-03-28;10 - em diagnóstico, marcada fora do prazo (antecipação);Suspeita de neoplasia do pâncreas (em estudo);;;913 000 112;Perda de peso e icterícia. Aguarda TC para estadiamento.;NOVO;Almada;15;SMS;1;0
 100113;365255599;Rui Fonseca Lima;M;1960-01-11;10 - desmarca o TC com uma semana de aviso;Neoplasia do cólon, em vigilância;Estádio I;;913 000 113;;FOLLOW_UP;Lisboa;9;EMAIL;0;0
+100114;276081089;Sónia Marques Lopes;F;1972-07-02;11 - avaria Eco: MP em diagnóstico (ganha a única vaga);Suspeita de metástases hepáticas (em estudo);;;913 000 114;"Lesões hepáticas de novo no TC; eco para caracterizar antes da biópsia.";NOVO;Lisboa;10;SMS;1;0
+100115;397712483;Artur Nunes Gomes;M;1963-02-22;11 - avaria Eco: MP em vigilância (mesmo prazo, índice menor);"Neoplasia do cólon em vigilância; CEA a subir";Estádio II;;913 000 115;;FOLLOW_UP;Amadora;12;SMS;1;0
+100116;354123667;Fátima Correia Dias;F;1977-04-25;11 - avaria Eco: em QT e já remarcada (2.ª remarcação);Adenocarcinoma gástrico, quimioterapia em curso;Estádio III;;913 000 116;;EM_TRATAMENTO;Loures;18;SMS;1;0
+100117;178047239;Diogo Almeida Reis;M;1985-07-04;11 - avaria Eco: rotina com muita folga;Neoplasia do recto, em remissão;Estádio I;;913 000 117;;FOLLOW_UP;Lisboa;6;EMAIL;1;0
+100118;399305514;Olga Santos Ferreira;F;1942-06-08;11 - avaria Eco: idosa de longe (dia único com a consulta);Neoplasia gástrica, em vigilância;Estádio I;;243 000 118 (fixo);;FOLLOW_UP;Santarém;85;NENHUM;0;1

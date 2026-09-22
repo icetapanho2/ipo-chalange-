@@ -2,6 +2,7 @@ import { store } from "../store.ts";
 import { agora } from "../clock.ts";
 import { apenasData, diferencaDias, isoDataHora, parseIso } from "../util.ts";
 import { calcularSemaforo } from "./semaforo.ts";
+import { recalcularIndices } from "./indice.ts";
 import type { Alerta, Pedido, TipoAlerta } from "../types.ts";
 
 /** Tipos geridos automaticamente por `recalcularAlertas` (recalculados do zero a cada chamada). */
@@ -48,6 +49,8 @@ export function resolverAlerta(alertaId: string, utilizadorId: string, accao: st
  * extracção) e os já RESOLVIDOS não são tocados.
  */
 export function recalcularAlertas(quando: Date = agora()): void {
+  // O índice de prioridade de cada pedido é guardado e refrescado aqui (arranque + depois de cada acção).
+  recalcularIndices(quando);
   store.alertas = store.alertas.filter((a) => !(TIPOS_AUTOMATICOS.includes(a.tipo) && a.estado === "ABERTO"));
 
   const hoje = apenasData(quando);

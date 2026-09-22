@@ -1,4 +1,5 @@
 import { store } from "../store.ts";
+import { criarPropostaFalta } from "./propostasRemarcacao.ts";
 import { agora } from "../clock.ts";
 import { formatarDataHoraPt, isoDataHora, parseIso } from "../util.ts";
 import { registarEvento } from "./estados.ts";
@@ -157,7 +158,11 @@ export function responderDevolucao(pedido: Pedido, utilizadorId: string, respost
 }
 
 export function registarFalta(pedido: Pedido, utilizadorId: string, quando: Date = agora()): void {
+  const ato = store.atosMedicos.find((a) => a.mvp_ato_id === pedido.ato_id);
+  if (ato) ato.estado = "FALTOU";
   registarEvento(pedido, "FALTA", "FALTOU", utilizadorId, { motivo: "Doente faltou", dataHora: quando });
+  // Secção 8A (R-K): a falta gera logo a sugestão de remarcação, com justificação, para a administrativa validar.
+  criarPropostaFalta(pedido, quando);
   recalcularAlertas(quando);
 }
 

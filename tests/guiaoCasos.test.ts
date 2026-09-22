@@ -111,12 +111,35 @@ async function correrCasos() {
   r.chamada_joaquim = chamadasTac.itens.find((i) => i.doente_nome.includes("Joaquim"))?.motivos.map((m) => m.codigo).join(",") ?? null;
   r.chamada_maria = chamadasTac.itens.find((i) => i.doente_nome.includes("Maria Fernandes"))?.motivos.map((m) => m.codigo).join(",") ?? null;
 
-  // Caso E — falta a uma análise: semáforo vermelho → remarcar → amarelo
+  // Caso E — avaria na Ecografia a 24/09: o técnico reporta, a administrativa recebe o plano e valida
+  await post("/api/tecnico/avarias", "U13", {
+    especialidade_codigo: "7000_3",
+    descricao: "Ecógrafo avariado (sonda); técnico da marca só amanhã ao fim do dia",
+    duracao_dias: 1,
+    data_inicio: "2026-09-24",
+  });
+  const notifEco = await get<{ notificacoes: { tipo: string; titulo: string }[] }>("/api/notificacoes", "U11");
+  r.notificacao_eco = notifEco.notificacoes.find((n) => n.tipo === "AVARIA_SERVICO")?.titulo ?? null;
+  interface PR { proposta_id: string; ordem: number; doente_nome: string; indice: number; data_hora_sugerida: string; dentro_do_prazo: boolean | null; justificacao: string; avisos: string[] }
+  const planoEco = await get<{ avarias: { avaria_id: string; propostas: PR[] }[] }>("/api/servico/remarcacoes", "U11");
+  const plano = planoEco.avarias[0];
+  r.plano_eco = plano.propostas.map((p) => `${p.ordem} ${p.doente_nome} ${p.indice} → ${p.data_hora_sugerida}${p.dentro_do_prazo === false ? " FORA" : ""}`);
+  r.plano_artur = plano.propostas.find((p) => p.doente_nome.startsWith("Artur"))!.justificacao;
+  r.plano_fatima_avisos = plano.propostas.find((p) => p.doente_nome.startsWith("Fátima"))!.avisos;
+  await post(`/api/servico/avarias/${plano.avaria_id}/aceitar-plano`, "U11");
+  r.olga = (await get<Agenda>("/api/doente/100118", "U11")).agenda.map((m) => `${m.especialidade_legivel} ${m.data_hora}`);
+  const tecnico = await get<{ notificacoes: { tipo: string }[] }>("/api/notificacoes", "U13");
+  r.tecnico_avisado = tecnico.notificacoes.some((n) => n.tipo === "AVARIA_RESOLVIDA");
+
+  // Caso F — falta a uma análise: a administrativa recebe a sugestão com justificação e aceita
   interface MF { semaforo: { cor: string }; dependencias: { pedido_id: string; pode_remarcar: boolean }[] }
   const antes = await get<{ marcacoesFuturas: MF[] }>("/api/doente/100102", "U08");
   r.antonio_antes = antes.marcacoesFuturas[0].semaforo.cor;
+  const faltas = await get<{ faltas: PR[] }>("/api/servico/remarcacoes", "U08");
+  const sugestao = faltas.faltas.find((p) => p.doente_nome.startsWith("António"))!;
+  r.antonio_sugestao = sugestao.justificacao;
+  await post(`/api/servico/remarcacoes/${sugestao.proposta_id}/aceitar`, "U08");
   const dep = antes.marcacoesFuturas[0].dependencias.find((d) => d.pode_remarcar)!;
-  await post(`/api/doente/100102/pedidos/${dep.pedido_id}/remarcar-exame`, "U08");
   r.antonio_depois = (await get<{ marcacoesFuturas: MF[] }>("/api/doente/100102", "U08")).marcacoesFuturas[0].semaforo.cor;
   r.antonio_colheita = (await get<Agenda>("/api/doente/100102", "U08")).agenda.find((m) => m.pedido_id === dep.pedido_id)?.data_hora;
 
@@ -182,7 +205,22 @@ describe("Guião por casos (caso normal + casos em que a prioridade decide)", ()
     expect(primeira.chamada_joaquim).toBe("SEM_CONTACTO,IDADE");
     expect(primeira.chamada_maria).toBe("PREPARACAO");
 
-    // Caso E — falta a uma análise
+    // Caso E — avaria na Ecografia
+    expect(primeira.notificacao_eco).toBe("Avaria em Radiologia-Geral (Ecografia): 5 marcação(ões) a remarcar");
+    expect(primeira.plano_eco).toEqual([
+      "1 Sónia Marques Lopes 717 → 2026-09-25T10:40",
+      "2 Artur Nunes Gomes 621 → 2026-09-28T11:00 FORA",
+      "3 Fátima Correia Dias 566 → 2026-09-28T12:00",
+      "4 Olga Santos Ferreira 138 → 2026-10-01T11:40",
+      "5 Diogo Almeida Reis 134 → 2026-09-28T12:40",
+    ]);
+    expect(primeira.plano_artur).toContain("A única vaga dentro do prazo (25/09/2026 10:40) ficou para Sónia Marques Lopes: índice 717 contra 621");
+    expect(primeira.plano_fatima_avisos).toEqual(["2.ª remarcação pelo hospital (inevitável: avaria) — ligar ao doente a explicar"]);
+    expect(primeira.olga).toEqual(["Onc. Cirúrgica-C. Digestivo 2026-10-01T10:50", "Radiologia-Geral (Ecografia) 2026-10-01T11:40"]);
+    expect(primeira.tecnico_avisado).toBe(true);
+    expect(primeira.antonio_sugestao).toContain("Sugerido 24/09/2026 07:40: primeira vaga que ainda dá tempo ao resultado antes da consulta");
+
+    // Caso F — falta a uma análise
     expect(primeira.antonio_antes).toBe("vermelho");
     expect(primeira.antonio_depois).toBe("amarelo");
     expect(primeira.antonio_colheita).toBe("2026-09-24T07:40");
@@ -193,7 +231,10 @@ describe("Guião por casos (caso normal + casos em que a prioridade decide)", ()
     expect(impacto.sessao.doentes_vulneraveis_protegidos).toBe(3);
     expect(impacto.sessao.vagas_reaproveitadas).toBe(1);
     expect(impacto.sessao.dias_ganhos).toBe(13);
-    expect(impacto.sessao.deslocacoes_evitadas).toBe(1);
+    expect(impacto.sessao.deslocacoes_evitadas).toBe(2);
+    expect(impacto.sessao.segundas_remarcacoes_inevitaveis).toBe(1);
+    expect(impacto.sessao.remarcacoes_avaria_validadas).toBe(5);
+    expect(impacto.sessao.sugestoes_falta_aceites).toBe(1);
 
     await post("/api/repor-demo", "U12");
     const segunda = await correrCasos();

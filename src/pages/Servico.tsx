@@ -4,6 +4,7 @@ import { DoenteModal } from "../components/DoenteModal";
 import { PorqueEstaEscolha, type CandidatoTroca } from "../components/PorqueEstaEscolha";
 import { VagasLibertadas } from "../components/VagasLibertadas";
 import { ListaChamadas } from "../components/ListaChamadas";
+import { PlanoRemarcacoes } from "../components/PlanoRemarcacoes";
 import {
   AlertTriangle,
   ArrowRight,
@@ -66,8 +67,8 @@ interface PropostaServico {
   escolhido_regra_antiga: string;
 }
 
-type AbaServico = "risco" | "pendencias" | "carteira" | "vagas" | "chamadas" | "estatisticas" | "definicoes";
-const ABAS_VALIDAS: AbaServico[] = ["risco", "pendencias", "carteira", "vagas", "chamadas", "estatisticas", "definicoes"];
+type AbaServico = "risco" | "pendencias" | "remarcacoes" | "carteira" | "vagas" | "chamadas" | "estatisticas" | "definicoes";
+const ABAS_VALIDAS: AbaServico[] = ["risco", "pendencias", "remarcacoes", "carteira", "vagas", "chamadas", "estatisticas", "definicoes"];
 
 /** Separador inicial: ?aba=... (usado pelo Guião) ou, se houver propostas de troca, "pendencias". */
 function abaInicial(): AbaServico {
@@ -181,12 +182,12 @@ export function Servico() {
   const [overbooking, setOverbooking] = useState<SinalOverbooking[] | null>(null);
   const [avarias, setAvarias] = useState<AvariaServico[] | null>(null);
   const [paraRever, setParaRever] = useState<ParaRever | null>(null);
+  const [remarcacoesPendentes, setRemarcacoesPendentes] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
   const [mensagemSucesso, setMensagemSucesso] = useState<string | null>(null);
   const [accoes, setAccoes] = useState<Record<string, string>>({});
   const [doenteModalId, setDoenteModalId] = useState<string | null>(null);
   const [estadoAtivo, setEstadoAtivo] = useState<string>("SEM_VAGA");
-  const [aResolverAvaria, setAResolverAvaria] = useState<string | null>(null);
   const [abaAtiva, setAbaAtiva] = useState<AbaServico>(abaInicial);
   const [notasOutsourcing, setNotasOutsourcing] = useState<Record<string, string>>({});
   const [motivosDecisao, setMotivosDecisao] = useState<Record<string, string>>({});
@@ -211,6 +212,7 @@ export function Servico() {
     apiGet<SinalOverbooking[]>("/servico/overbooking").then(setOverbooking);
     apiGet<AvariaServico[]>("/servico/avarias").then(setAvarias);
     apiGet<ParaRever>("/servico/para-rever").then(setParaRever);
+    apiGet<{ pendentes: number }>("/servico/remarcacoes").then((r) => setRemarcacoesPendentes(r.pendentes));
     apiGet<RespostaPrioridade>("/servico/prioridade").then((r) => {
       setPrioridade(r);
       setPesosForm(r.pesos);
@@ -249,23 +251,6 @@ export function Servico() {
       setTimeout(() => setMensagemSucesso(null), 4000);
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
-    }
-  }
-
-  async function resolverAvaria(id: string, decisao: "REMARCACAO_TOTAL" | "REMARCACAO_PARCIAL") {
-    setErro(null);
-    setAResolverAvaria(id);
-    try {
-      const r = await apiPost<{ avaria: AvariaServico }>(`/servico/avarias/${id}/resolver`, { decisao });
-      setMensagemSucesso(
-        `Avaria resolvida: ${r.avaria.pedidos_afetados} marcação(ões) reagendada(s) automaticamente.`,
-      );
-      recarregar();
-      setTimeout(() => setMensagemSucesso(null), 5000);
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : String(e));
-    } finally {
-      setAResolverAvaria(null);
     }
   }
 
@@ -411,6 +396,12 @@ export function Servico() {
               (paraRever ? paraRever.faltas.length + paraRever.emRisco.length : 0) +
               (propostas?.length ?? 0) +
               (alertas?.length ?? 0),
+          },
+          {
+            chave: "remarcacoes" as const,
+            titulo: "Remarcações",
+            icone: Wrench,
+            contagem: remarcacoesPendentes,
           },
           {
             chave: "carteira" as const,
@@ -560,7 +551,7 @@ export function Servico() {
           <div className="flex items-center justify-between border-b border-orange-200 pb-2 mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-orange-900 flex items-center gap-1.5">
               <Wrench className="h-4 w-4 text-orange-600" />
-              <span>Avarias Reportadas — Decida a Remarcação</span>
+              <span>Avarias Reportadas — Plano de Remarcação Pronto</span>
             </h2>
           </div>
           <div className="space-y-2.5">
@@ -578,19 +569,10 @@ export function Servico() {
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        disabled={aResolverAvaria === a.avaria_id}
-                        onClick={() => resolverAvaria(a.avaria_id, "REMARCACAO_PARCIAL")}
-                        className="rounded-lg border border-orange-300 bg-white px-3 py-1.5 text-xs font-semibold text-orange-800 hover:bg-orange-50 disabled:opacity-50"
+                        onClick={() => setAbaAtiva("remarcacoes")}
+                        className="rounded-lg bg-orange-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-800"
                       >
-                        Remarcação parcial
-                      </button>
-                      <button
-                        type="button"
-                        disabled={aResolverAvaria === a.avaria_id}
-                        onClick={() => resolverAvaria(a.avaria_id, "REMARCACAO_TOTAL")}
-                        className="rounded-lg bg-orange-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-orange-800 disabled:opacity-50"
-                      >
-                        Remarcação total
+                        Ver plano de remarcação ({a.pedidos_afetados})
                       </button>
                     </div>
                   </div>
@@ -689,6 +671,16 @@ export function Servico() {
             ))}
           </div>
         </div>
+      )}
+
+      {abaAtiva === "remarcacoes" && (
+        <PlanoRemarcacoes
+          aoMudar={(m) => {
+            setMensagemSucesso(m);
+            recarregar();
+            setTimeout(() => setMensagemSucesso(null), 6000);
+          }}
+        />
       )}
 
       {abaAtiva === "vagas" && (

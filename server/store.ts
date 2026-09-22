@@ -34,6 +34,7 @@ import type {
   RegraCapacidade,
   ComunicacaoDoente,
   ChamadaRegistada,
+  PropostaRemarcacao,
 } from "./types.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -89,6 +90,7 @@ class Store {
   ofertasAntecipacao: OfertaAntecipacao[] = [];
   comunicacoesDoente: ComunicacaoDoente[] = [];
   chamadas: ChamadaRegistada[] = [];
+  propostasRemarcacao: PropostaRemarcacao[] = [];
 
   private contadores: Record<string, number> = {
     pedido: 0,
@@ -101,6 +103,7 @@ class Store {
     avaria: 0,
     oferta: 0,
     comunicacao: 0,
+    remarcacao: 0,
   };
 
   carregar(): void {
@@ -336,6 +339,7 @@ class Store {
     this.ofertasAntecipacao = [];
     this.comunicacoesDoente = [];
     this.chamadas = [];
+    this.propostasRemarcacao = [];
 
     this.contadores = {
       pedido: maxSufixo(this.pedidos.map((x) => x.pedido_id), "P"),
@@ -348,6 +352,7 @@ class Store {
       avaria: 0,
       oferta: 0,
       comunicacao: 0,
+      remarcacao: 0,
     };
   }
 
@@ -395,7 +400,7 @@ class Store {
   }
 
   proximoId(
-    entidade: "pedido" | "dependencia" | "evento" | "alerta" | "proposta" | "ato" | "notificacao" | "avaria" | "oferta" | "comunicacao",
+    entidade: "pedido" | "dependencia" | "evento" | "alerta" | "proposta" | "ato" | "notificacao" | "avaria" | "oferta" | "comunicacao" | "remarcacao",
   ): string {
     this.contadores[entidade] += 1;
     const n = this.contadores[entidade];
@@ -410,6 +415,7 @@ class Store {
       avaria: "AV",
       oferta: "OF",
       comunicacao: "CM",
+      remarcacao: "PR",
     };
     const casas = entidade === "ato" ? 6 : 5;
     return `${prefixos[entidade]}${String(n).padStart(casas, "0")}`;

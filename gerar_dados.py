@@ -787,6 +787,62 @@ pr_ = novo_pedido(D13, "", "U01", cr, "exame", "7000_2", "1", "N", exames=TC_AP,
 validar(pr_, cr + timedelta(minutes=30))
 assumir_vaga(pr_, tac(date(2026, 9, 30), "09:00"), cr + timedelta(minutes=45))
 
+# ---- Cenário "avaria na Ecografia a 24/09": 5 doentes marcados nesse dia, uma só vaga livre a
+# 25/09 (disputada por dois MP com o mesmo prazo), e uma doente de longe com consulta a 01/10.
+ECO_DIA = date(2026, 9, 24)
+def ato_de(v): return next(x for x in atos if x["ato_id"] == v["ato_id"])
+eco_24 = [v for v in vagas_by_esp["7000_3"] if v["data_hora"].date() == ECO_DIA and v["ato_id"]]
+assert len(eco_24) >= 5, "Ecografia de 24/09 com menos de 5 marcações"
+for v in eco_24[5:]:  # o dia fica com exactamente 5 marcações (as restantes tinham sido desmarcadas)
+    a = ato_de(v); assert not a["pedido_id"]
+    a["estado"], a["vaga_id"], v["ato_id"] = "DESMARCADA", "", None
+for v in vagas_by_esp["7000_3"]:  # a 25/09 só fica livre a vaga das 10:40
+    if v["data_hora"].date() == date(2026, 9, 25) and not v["ato_id"] and v["data_hora"].time() != t("10:40"):
+        book(v, rng.choice(BACKGROUND), "7000_3", "1", exames=["7100010"],
+             criado=datetime.combine(date(2026, 9, 1), t("14:00")), estado="MARCADA")
+assert not get_vaga("7000_3", datetime.combine(date(2026, 9, 25), t("10:40")))["ato_id"]
+
+ECO = ["7100010"]
+D14 = demo_doente_prioridade(
+    "100114", "Sónia Marques Lopes", "F", 54, "11 - avaria Eco: MP em diagnóstico (ganha a única vaga)",
+    diagnostico_principal="Suspeita de metástases hepáticas (em estudo)", contacto="913 000 114",
+    notas_clinicas="Lesões hepáticas de novo no TC; eco para caracterizar antes da biópsia.", estadio_cuidado="NOVO",
+    concelho="Lisboa", distancia_km=10, contacto_digital="SMS", aceita_antecipacao=1)
+D15 = demo_doente_prioridade(
+    "100115", "Artur Nunes Gomes", "M", 63, "11 - avaria Eco: MP em vigilância (mesmo prazo, índice menor)",
+    diagnostico_principal="Neoplasia do cólon em vigilância; CEA a subir", estadiamento="Estádio II", contacto="913 000 115",
+    estadio_cuidado="FOLLOW_UP", concelho="Amadora", distancia_km=12, contacto_digital="SMS", aceita_antecipacao=1)
+D16 = demo_doente_prioridade(
+    "100116", "Fátima Correia Dias", "F", 49, "11 - avaria Eco: em QT e já remarcada (2.ª remarcação)",
+    diagnostico_principal="Adenocarcinoma gástrico, quimioterapia em curso", estadiamento="Estádio III", contacto="913 000 116",
+    estadio_cuidado="EM_TRATAMENTO", concelho="Loures", distancia_km=18, contacto_digital="SMS", aceita_antecipacao=1)
+D17 = demo_doente_prioridade(
+    "100117", "Diogo Almeida Reis", "M", 41, "11 - avaria Eco: rotina com muita folga",
+    diagnostico_principal="Neoplasia do recto, em remissão", estadiamento="Estádio I", contacto="913 000 117",
+    estadio_cuidado="FOLLOW_UP", concelho="Lisboa", distancia_km=6, contacto_digital="EMAIL", aceita_antecipacao=1)
+D18 = demo_doente_prioridade(
+    "100118", "Olga Santos Ferreira", "F", 84, "11 - avaria Eco: idosa de longe (dia único com a consulta)",
+    diagnostico_principal="Neoplasia gástrica, em vigilância", estadiamento="Estádio I", contacto="243 000 118 (fixo)",
+    estadio_cuidado="FOLLOW_UP", concelho="Santarém", distancia_km=85, contacto_digital="NENHUM", aceita_antecipacao=0,
+    transporte_nao_urgente=1)
+for (pid, prio, prazo, cr_d, txt, med), v in zip([
+    (D14, "MP", date(2026, 9, 25), date(2026, 9, 18), "Eco abdominal urgente: caracterizar lesões hepáticas antes da biópsia.", "U01"),
+    (D15, "MP", date(2026, 9, 25), date(2026, 9, 11), "CEA a subir. Eco abdominal prioritária.", "U02"),
+    (D16, "P", date(2026, 9, 30), date(2026, 9, 2), "Eco abdominal de controlo durante a QT.", "U01"),
+    (D17, "N", date(2026, 11, 30), date(2026, 9, 8), "Eco abdominal de vigilância.", "U02"),
+    (D18, "N", date(2026, 11, 30), date(2026, 9, 4), "Eco abdominal de vigilância.", "U02"),
+], eco_24[:5]):
+    cr = datetime.combine(cr_d, t("10:00"))
+    pe = novo_pedido(pid, "", med, cr, "exame", "7000_3", "1", prio, exames=ECO, prazo=prazo, texto=txt, confianca=0.96)
+    validar(pe, cr + timedelta(minutes=30))
+    assumir_vaga(pe, v, cr + timedelta(minutes=45))
+    if pid == D16:  # já foi remarcada uma vez pelo hospital
+        pe["n_remarcacoes"] = 1; ato_de(v)["n_rem"] = 1
+        ev(pe["pedido_id"], datetime.combine(date(2026, 9, 10), t("15:00")), "REMARCACAO", "MARCADO", "MARCADO", "SISTEMA",
+           motivo="Médico indisponível", detalhe="de 14/09/2026 para 24/09/2026")
+book(get_vaga("2102", datetime.combine(date(2026, 10, 1), t("10:50")), "U02"), D18, "2102", "22",
+     criado=datetime.combine(date(2026, 9, 4), t("10:30")), estado="MARCADA")
+
 # Preparação dos exames (texto PROVISÓRIO — a validar com cada serviço). requer_confirmacao = o
 # serviço quer confirmar por telefone quando há um factor de risco (ver server/motor/chamadas.ts).
 PREPARACOES = [

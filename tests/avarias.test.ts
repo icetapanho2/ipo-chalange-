@@ -53,7 +53,8 @@ describe("Avarias e remarcação (Prompt N2)", () => {
   it("resolver com remarcação parcial reagenda quem estava marcado na janela e avisa o médico", () => {
     const p4 = pedido("P00004"); // MARCADO, 2102/22, AT000013 a 28/09/2026 09:30
     expect(p4.estado).toBe("MARCADO");
-    const atoAntigoId = p4.ato_id;
+    const dataAntiga = store.atosMedicos.find((a) => a.mvp_ato_id === p4.ato_id)!.data_hora;
+    expect(dataAntiga).toBe("2026-09-28T09:30");
 
     const avaria = reportarAvaria(
       { especialidadeCodigo: "2102", atoCodigo: "22", descricao: "TAC avariado", duracaoDias: 6 },
@@ -65,9 +66,12 @@ describe("Avarias e remarcação (Prompt N2)", () => {
     expect(resolvida?.estado).toBe("RESOLVIDA");
     expect(resolvida?.pedidos_afetados).toBeGreaterThanOrEqual(1);
 
-    // ou foi remarcado para outro ato, ou ficou sem vaga — nunca fica preso ao ato bloqueado
-    expect(p4.ato_id).not.toBe(atoAntigoId);
+    // ou foi remarcado para fora da janela da avaria (23/09–28/09), ou ficou sem vaga — nunca fica preso ao dia bloqueado
     expect(["MARCADO", "SEM_VAGA"]).toContain(p4.estado);
+    if (p4.estado === "MARCADO") {
+      const nova = store.atosMedicos.find((a) => a.mvp_ato_id === p4.ato_id)!.data_hora;
+      expect(nova >= "2026-09-29").toBe(true);
+    }
 
     const avisoMedico = store.notificacoes.filter((n) => n.destinatario_utilizador_id === p4.medico_requisitante_id && n.pedido_id === "P00004");
     expect(avisoMedico.some((n) => n.tipo === "PEDIDO_MARCADO" || n.tipo === "PEDIDO_SEM_VAGA")).toBe(true);

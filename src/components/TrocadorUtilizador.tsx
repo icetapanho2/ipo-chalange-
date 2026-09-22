@@ -12,7 +12,9 @@ type TipoNotificacao =
   | "PEDIDO_DEVOLVIDO"
   | "PEDIDO_RECUSADO"
   | "AVARIA_SERVICO"
-  | "AVARIA_RESOLVIDA";
+  | "AVARIA_RESOLVIDA"
+  | "PEDIDO_DECISAO_NECESSARIA"
+  | "REMARCACAO_SUGERIDA";
 
 interface Notificacao {
   notificacao_id: string;
@@ -47,8 +49,10 @@ const ROTA_POR_TIPO: Record<TipoNotificacao, string> = {
   PEDIDO_SEM_VAGA: "/servico",
   PEDIDO_DEVOLVIDO: "/meus-pedidos",
   PEDIDO_RECUSADO: "/meus-pedidos",
-  AVARIA_SERVICO: "/servico",
+  AVARIA_SERVICO: "/servico?aba=remarcacoes",
   AVARIA_RESOLVIDA: "/tecnico",
+  PEDIDO_DECISAO_NECESSARIA: "/meus-pedidos",
+  REMARCACAO_SUGERIDA: "/servico?aba=remarcacoes",
 };
 
 const COR_POR_TIPO: Record<TipoNotificacao, string> = {
@@ -60,6 +64,8 @@ const COR_POR_TIPO: Record<TipoNotificacao, string> = {
   PEDIDO_RECUSADO: "bg-red-100 text-red-700",
   AVARIA_SERVICO: "bg-orange-100 text-orange-800",
   AVARIA_RESOLVIDA: "bg-emerald-100 text-emerald-700",
+  PEDIDO_DECISAO_NECESSARIA: "bg-amber-100 text-amber-800",
+  REMARCACAO_SUGERIDA: "bg-sky-100 text-sky-700",
 };
 
 const NOME_PERFIL: Record<string, string> = {
@@ -150,7 +156,7 @@ export function TrocadorUtilizador() {
       carregarResumo();
     }
     setAberto(false);
-    if (n.doente_id) navigate(`/doente/${n.doente_id}`);
+    if (n.doente_id && n.tipo !== "REMARCACAO_SUGERIDA") navigate(`/doente/${n.doente_id}`);
     else navigate(ROTA_POR_TIPO[n.tipo] ?? "/");
   }
 
