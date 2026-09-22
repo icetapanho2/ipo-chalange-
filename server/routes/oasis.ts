@@ -3,7 +3,7 @@ import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
 import { isoDataHora } from "../util.ts";
 import { extrair } from "../extracao/index.ts";
-import { pedidoParaJson, descreverDoente, descreverUtilizador } from "../apresentacao.ts";
+import { pedidoParaJson, descreverDoente, descreverEspecialidade, descreverUtilizador } from "../apresentacao.ts";
 import { notificar, utilizadoresPorPerfil } from "../motor/notificacoes.ts";
 
 export function criarRotasOasis(store: typeof StoreType) {
@@ -92,9 +92,10 @@ export function criarRotasOasis(store: typeof StoreType) {
         })
       : { pedidos: [], alertas: [] as string[] };
 
+    const destinatariosAdministrativo = utilizadoresPorPerfil("ADMINISTRATIVO", ato.especialidade_codigo);
     notificar({
       tipo: "CONSULTA_SUBMETIDA",
-      destinatarios: utilizadoresPorPerfil("ADMINISTRATIVO", ato.especialidade_codigo),
+      destinatarios: destinatariosAdministrativo,
       titulo: `Fim de consulta: ${descreverDoente(ato.doente_id)}`,
       mensagem:
         resultado.pedidos.length > 0
@@ -105,11 +106,24 @@ export function criarRotasOasis(store: typeof StoreType) {
       quando,
     });
 
+    // Quem recebeu a notificação administrativa (secção N2): usado pelo toast no canto da
+    // agenda do médico — dá ênfase ao cargo/serviço, não ao nome (mais claro numa demo).
+    const primeiroAdministrativo = destinatariosAdministrativo
+      .map((id) => store.utilizadores.find((u) => u.utilizador_id === id))
+      .find((u): u is NonNullable<typeof u> => !!u);
+
     res.json({
       ok: true,
       pedidosCriados: resultado.pedidos.length,
       pedidos: resultado.pedidos.map((pedido) => pedidoParaJson(pedido, store.parametros.limiar_confianca)),
       alertas: resultado.alertas,
+      notificacaoAdministrativa: primeiroAdministrativo
+        ? {
+            nome: primeiroAdministrativo.nome,
+            cargo: "Administrativo",
+            especialidade_legivel: descreverEspecialidade(ato.especialidade_codigo),
+          }
+        : null,
     });
   });
 

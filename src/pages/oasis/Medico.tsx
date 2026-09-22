@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { OasisPainel, OasisShell } from "../../oasis/OasisShell";
 import { apiGet } from "../../lib/api";
 import { usePerfil } from "../../lib/PerfilContext";
@@ -12,7 +12,15 @@ import {
   ChevronLeft,
   Stethoscope,
   CalendarDays,
+  BellRing,
+  X,
 } from "lucide-react";
+
+interface NotificacaoAdministrativa {
+  nome: string;
+  cargo: string;
+  especialidade_legivel: string;
+}
 
 interface ItemAgenda {
   ato_id: string;
@@ -51,6 +59,7 @@ function deslocarDia(isoData: string, dias: number): string {
 export function OasisMedico() {
   const { utilizador, definirUtilizadorId, utilizadores } = usePerfil();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const [resposta, setResposta] = useState<RespostaAgenda | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -60,6 +69,23 @@ export function OasisMedico() {
   // para daqui a 3 semanas); ?data=aaaa-mm-dd na URL define o dia inicial mostrado.
   const [dataVista, setDataVista] = useState<string | null>(() => searchParams.get("data"));
   const primeiraVez = useRef(true);
+
+  // Toast no canto: a consulta que acabou de ser guardada avisa qual administrativa foi
+  // notificada (ênfase no cargo/serviço — na demo importa perceber a ligação entre pessoas).
+  const [toastAdministrativo, setToastAdministrativo] = useState<NotificacaoAdministrativa | null>(null);
+  useEffect(() => {
+    const estado = location.state as { toastAdministrativo?: NotificacaoAdministrativa } | null;
+    if (estado?.toastAdministrativo) {
+      setToastAdministrativo(estado.toastAdministrativo);
+      navigate(location.pathname + location.search, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!toastAdministrativo) return;
+    const temporizador = setTimeout(() => setToastAdministrativo(null), 6000);
+    return () => clearTimeout(temporizador);
+  }, [toastAdministrativo]);
 
   // Ao trocar de médico (não na primeira montagem), volta sempre a mostrar "hoje" desse médico.
   useEffect(() => {
@@ -248,6 +274,37 @@ export function OasisMedico() {
           doenteId={doenteModalId}
           onFechar={() => setDoenteModalId(null)}
         />
+      )}
+
+      {/* Toast no canto: notificação administrativa enviada ao guardar a consulta anterior */}
+      {toastAdministrativo && (
+        <div
+          id="toast-notificacao-administrativa"
+          className="fixed bottom-4 right-4 z-50 w-full max-w-sm rounded-xl border border-sky-200 bg-white p-3.5 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-300"
+        >
+          <div className="flex items-start gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700">
+              <BellRing className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-slate-800">Notificação administrativa enviada</p>
+              <p className="mt-0.5 text-xs text-slate-600">
+                <span className="font-semibold text-sky-800">
+                  {toastAdministrativo.cargo} de {toastAdministrativo.especialidade_legivel}
+                </span>
+                <span className="text-slate-400"> · {toastAdministrativo.nome}</span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setToastAdministrativo(null)}
+              className="shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              title="Fechar"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
       )}
     </OasisShell>
   );

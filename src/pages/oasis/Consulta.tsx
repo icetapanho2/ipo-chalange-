@@ -73,45 +73,40 @@ interface RespostaConsulta {
   pedidosExistentes?: PedidoDetalhado[];
 }
 
+interface NotificacaoAdministrativa {
+  nome: string;
+  cargo: string;
+  especialidade_legivel: string;
+}
+
 interface RespostaGuardar {
   ok: boolean;
   pedidosCriados: number;
   pedidos: PedidoDetalhado[];
   alertas: string[];
+  notificacaoAdministrativa?: NotificacaoAdministrativa | null;
 }
 
-const SECOES_SOAP: { chave: keyof Pick<Nota, "s" | "o" | "a" | "p">; titulo: string; subtitulo: string; ajuda: string }[] = [
-  {
-    chave: "s",
-    titulo: "S — Subjectivo (Anamnese)",
-    subtitulo: "História da doença atual, sintomas relatados pelo utente",
-    ajuda: "Ex: Doente refere cansaço ligeiro, nega dor abdominal ou náuseas. Boa tolerância ao último ciclo.",
-  },
-  {
-    chave: "o",
-    titulo: "O — Objectivo (Exame Físico)",
-    subtitulo: "Achados físicos, sinais vitais, dados analíticos prévios",
-    ajuda: "Ex: ECOG 0, eupneico. Abdómen mole, indolor, sem massas ou megalias palpáveis.",
-  },
-  {
-    chave: "a",
-    titulo: "A — Avaliação (Diagnóstico)",
-    subtitulo: "Evolução do quadro e resposta terapêutica",
-    ajuda: "Ex: Adenocarcinoma do cólon estádio III sob vigilância / pós-quimioterapia adjuvante.",
-  },
-  {
-    chave: "p",
-    titulo: "P — Plano Terapêutico & Pedidos Pós-Consulta",
-    subtitulo: "Exames, análises, consultas de revisão e interconsultas a outros serviços",
-    ajuda: "O Agente Oasis analisa este plano para extrair pedidos, marcar no serviço e enviar a triagem.",
-  },
-];
+const SECAO_CLINICA = {
+  titulo: "S/O/A — Registo Clínico",
+  subtitulo: "Subjectivo, objectivo e avaliação: sintomas, achados do exame físico e diagnóstico/evolução, em texto livre",
+  ajuda:
+    "Ex: Doente refere cansaço ligeiro, nega dor abdominal. ECOG 0, abdómen mole e indolor. Adenocarcinoma do " +
+    "cólon estádio III sob vigilância, boa evolução.",
+};
+
+const SECAO_PLANO = {
+  chave: "p" as const,
+  titulo: "P — Plano Terapêutico & Pedidos Pós-Consulta",
+  subtitulo: "Exames, análises, consultas de revisão e interconsultas a outros serviços",
+  ajuda: "O Agente Oasis analisa este plano para extrair pedidos, marcar no serviço e enviar a triagem.",
+};
 
 export function OasisConsulta() {
   const { atoId } = useParams<{ atoId: string }>();
   const navigate = useNavigate();
   const [dados, setDados] = useState<RespostaConsulta | null>(null);
-  const [campos, setCampos] = useState({ s: "", o: "", a: "", p: "" });
+  const [campos, setCampos] = useState({ soa: "", p: "" });
   const [erro, setErro] = useState<string | null>(null);
   const [aGuardar, setAGuardar] = useState(false);
   const [resultado, setResultado] = useState<RespostaGuardar | null>(null);
@@ -125,7 +120,8 @@ export function OasisConsulta() {
       .then((r) => {
         setDados(r);
         if (r.nota) {
-          setCampos({ s: r.nota.s, o: r.nota.o, a: r.nota.a, p: r.nota.p });
+          const soa = [r.nota.s, r.nota.o, r.nota.a].filter((texto) => texto.trim()).join("\n\n");
+          setCampos({ soa, p: r.nota.p });
         }
         if (r.pedidosExistentes && r.pedidosExistentes.length > 0) {
           setResultado({
@@ -145,7 +141,14 @@ export function OasisConsulta() {
     setErro(null);
     setResultado(null);
     try {
-      const r = await apiPost<RespostaGuardar>(`/oasis/consulta/${atoId}/guardar`, campos);
+      // O S/O/A fica junto num único campo de escrita livre; o servidor continua a guardar
+      // s/o/a/p em separado, por isso todo o texto clínico vai para "s" e o P fica à parte.
+      const r = await apiPost<RespostaGuardar>(`/oasis/consulta/${atoId}/guardar`, {
+        s: campos.soa,
+        o: "",
+        a: "",
+        p: campos.p,
+      });
       setResultado(r);
       setConfirmacaoPendente(true);
     } catch (e) {
@@ -158,7 +161,10 @@ export function OasisConsulta() {
   function avancarParaAgenda() {
     setConfirmacaoPendente(false);
     const dia = dados?.ato.data_hora.slice(0, 10);
-    navigate(dia ? `/oasis/medico?data=${dia}` : "/oasis/medico");
+    const destino = dia ? `/oasis/medico?data=${dia}` : "/oasis/medico";
+    navigate(destino, {
+      state: resultado?.notificacaoAdministrativa ? { toastAdministrativo: resultado.notificacaoAdministrativa } : undefined,
+    });
   }
 
   return (
@@ -326,34 +332,43 @@ export function OasisConsulta() {
             {modoFormulario === "soap" && (
               <OasisPainel titulo="Folha Clínica de Registo Médico (SOAP)">
                 <div className="space-y-4">
-                  {SECOES_SOAP.map((secao) => (
-                    <div key={secao.chave} className="rounded-lg border border-slate-200 bg-white p-3 shadow-2xs">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div>
-                          <label className="text-xs font-bold text-slate-800">{secao.titulo}</label>
-                          <span className="text-[11px] text-slate-400 block">{secao.subtitulo}</span>
-                        </div>
-                        {secao.chave === "p" && (
-                          <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800 flex items-center gap-1">
-                            <Sparkles className="h-3 w-3" />
-                            <span>Lido pelo Agente Oasis</span>
-                          </span>
-                        )}
-                      </div>
-                      <textarea
-                        id={`campo-soap-${secao.chave}`}
-                        className={`w-full rounded border p-2.5 text-xs text-slate-800 transition-colors focus:outline-none ${
-                          secao.chave === "p"
-                            ? "border-sky-300 bg-sky-50/20 focus:border-sky-600 focus:bg-white font-mono leading-relaxed"
-                            : "border-slate-300 bg-white focus:border-oasis-accent"
-                        }`}
-                        rows={secao.chave === "p" ? 5 : 2}
-                        value={campos[secao.chave]}
-                        onChange={(e) => setCampos((c) => ({ ...c, [secao.chave]: e.target.value }))}
-                        placeholder={secao.ajuda}
-                      />
+                  {/* S/O/A num único campo de escrita livre */}
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-2xs">
+                    <div className="mb-1.5">
+                      <label className="text-xs font-bold text-slate-800">{SECAO_CLINICA.titulo}</label>
+                      <span className="text-[11px] text-slate-400 block">{SECAO_CLINICA.subtitulo}</span>
                     </div>
-                  ))}
+                    <textarea
+                      id="campo-soap-soa"
+                      className="w-full rounded border border-slate-300 bg-white p-2.5 text-xs text-slate-800 transition-colors focus:outline-none focus:border-oasis-accent"
+                      rows={5}
+                      value={campos.soa}
+                      onChange={(e) => setCampos((c) => ({ ...c, soa: e.target.value }))}
+                      placeholder={SECAO_CLINICA.ajuda}
+                    />
+                  </div>
+
+                  {/* P — Plano, à parte e por último: é o campo que o Agente Oasis lê */}
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-2xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div>
+                        <label className="text-xs font-bold text-slate-800">{SECAO_PLANO.titulo}</label>
+                        <span className="text-[11px] text-slate-400 block">{SECAO_PLANO.subtitulo}</span>
+                      </div>
+                      <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-800 flex items-center gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        <span>Lido pelo Agente Oasis</span>
+                      </span>
+                    </div>
+                    <textarea
+                      id="campo-soap-p"
+                      className="w-full rounded border border-sky-300 bg-sky-50/20 p-2.5 text-xs text-slate-800 font-mono leading-relaxed transition-colors focus:outline-none focus:border-sky-600 focus:bg-white"
+                      rows={5}
+                      value={campos.p}
+                      onChange={(e) => setCampos((c) => ({ ...c, p: e.target.value }))}
+                      placeholder={SECAO_PLANO.ajuda}
+                    />
+                  </div>
                 </div>
 
                 <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-200">
