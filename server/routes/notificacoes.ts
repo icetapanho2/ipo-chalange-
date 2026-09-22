@@ -6,6 +6,17 @@ import type { TipoNotificacao } from "../types.ts";
 export function criarRotasNotificacoes(store: typeof StoreType) {
   const router = Router();
 
+  // Contagem de notificações por ler, por utilizador — para o trocador de perfil mostrar de
+  // relance quem tem notificações pendentes, sem ter de mudar de perfil para descobrir.
+  router.get("/resumo", (_req, res) => {
+    const contagens = new Map<string, number>();
+    for (const n of store.notificacoes) {
+      if (n.lida) continue;
+      contagens.set(n.destinatario_utilizador_id, (contagens.get(n.destinatario_utilizador_id) ?? 0) + 1);
+    }
+    res.json(store.utilizadores.map((u) => ({ utilizador_id: u.utilizador_id, naoLidas: contagens.get(u.utilizador_id) ?? 0 })));
+  });
+
   // Lista as notificações do utilizador activo (mais recentes primeiro) e os tipos que silenciou.
   router.get("/", (req, res) => {
     const minhas = store.notificacoes

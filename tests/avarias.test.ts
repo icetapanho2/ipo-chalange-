@@ -71,6 +71,10 @@ describe("Avarias e remarcação (Prompt N2)", () => {
 
     const avisoMedico = store.notificacoes.filter((n) => n.destinatario_utilizador_id === p4.medico_requisitante_id && n.pedido_id === "P00004");
     expect(avisoMedico.some((n) => n.tipo === "PEDIDO_MARCADO" || n.tipo === "PEDIDO_SEM_VAGA")).toBe(true);
+
+    // o técnico que reportou a avaria é avisado de que foi seguida
+    const avisoTecnico = store.notificacoes.filter((n) => n.destinatario_utilizador_id === "U13" && n.tipo === "AVARIA_RESOLVIDA");
+    expect(avisoTecnico).toHaveLength(1);
   });
 
   it("'Repor demo' limpa as avarias", () => {

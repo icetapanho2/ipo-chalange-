@@ -1,8 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
-import { usePerfil } from "../lib/PerfilContext";
 import { apiPost } from "../lib/api";
-import { NotificacoesSino } from "./NotificacoesSino";
+import { TrocadorUtilizador } from "./TrocadorUtilizador";
 import {
   Stethoscope,
   RotateCcw,
@@ -16,7 +15,6 @@ import {
   Building2,
   BarChart3,
   HelpCircle,
-  UserCheck,
   Wrench,
 } from "lucide-react";
 
@@ -40,7 +38,6 @@ const ICONES_NAV: Record<string, React.ElementType> = {
 };
 
 export function Cabecalho({ itens }: { itens: ItemNav[] }) {
-  const { utilizadores, utilizadorId, definirUtilizadorId, aCarregar } = usePerfil();
   const [aRepor, setARepor] = useState(false);
   const [mensagem, setMensagem] = useState<string | null>(null);
 
@@ -100,26 +97,9 @@ export function Cabecalho({ itens }: { itens: ItemNav[] }) {
           })}
         </nav>
 
-        {/* Perfil Ativo & Ações */}
-        <div className="flex items-center gap-2.5">
-          <NotificacoesSino />
-
-          <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1">
-            <UserCheck className="h-3.5 w-3.5 text-oasis-header shrink-0" />
-            <select
-              aria-label="Perfil do Utilizador"
-              className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
-              value={utilizadorId}
-              disabled={aCarregar}
-              onChange={(e) => definirUtilizadorId(e.target.value)}
-            >
-              {utilizadores.map((u) => (
-                <option key={u.utilizador_id} value={u.utilizador_id}>
-                  {u.nome} ({u.perfil})
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* Perfil Ativo, Notificações & Ações */}
+        <div className="flex items-center gap-2">
+          <TrocadorUtilizador />
 
           <button
             type="button"

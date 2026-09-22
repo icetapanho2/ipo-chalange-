@@ -109,6 +109,17 @@ export function resolverAvaria(
   for (const pedido of pendentes) agendar(pedido, quando);
 
   avaria.pedidos_afetados = nAfetados;
+
+  notificar({
+    tipo: "AVARIA_RESOLVIDA",
+    destinatarios: [avaria.reportado_por],
+    titulo: `Avaria resolvida: ${descreverEspecialidade(avaria.especialidade_codigo)}`,
+    mensagem: `A administração aplicou ${
+      decisao === "REMARCACAO_TOTAL" ? "remarcação total do serviço" : "remarcação parcial"
+    } (${nAfetados} marcação(ões) afectada(s)). A sua avaria reportada foi seguida.`,
+    quando,
+  });
+
   recalcularAlertas(quando);
   return avaria;
 }
