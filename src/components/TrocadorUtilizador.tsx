@@ -35,6 +35,11 @@ interface ResumoUtilizador {
   naoLidas: number;
 }
 
+interface Especialidade {
+  codigo: string;
+  descricao: string;
+}
+
 const ROTA_POR_TIPO: Record<TipoNotificacao, string> = {
   CONSULTA_SUBMETIDA: "/validacao",
   PEDIDO_EM_TRIAGEM: "/triagem",
@@ -92,7 +97,19 @@ export function TrocadorUtilizador() {
   const [separador, setSeparador] = useState<"notificacoes" | "trocar">("notificacoes");
   const [notifs, setNotifs] = useState<RespostaNotificacoes | null>(null);
   const [resumo, setResumo] = useState<ResumoUtilizador[]>([]);
+  const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    apiGet<{ especialidades: Especialidade[] }>("/catalogo")
+      .then((r) => setEspecialidades(r.especialidades))
+      .catch(() => {});
+  }, []);
+
+  function servicoDe(especialidadeCodigo: string): string {
+    if (!especialidadeCodigo) return "";
+    return especialidades.find((e) => e.codigo === especialidadeCodigo)?.descricao ?? especialidadeCodigo;
+  }
 
   function carregarNotifs() {
     apiGet<RespostaNotificacoes>("/notificacoes")
@@ -169,7 +186,13 @@ export function TrocadorUtilizador() {
         type="button"
         onClick={() => setAberto((v) => !v)}
         className="relative flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 py-1 pl-1 pr-2 hover:bg-slate-100 transition-colors max-w-[160px]"
-        title={utilizador ? `${utilizador.nome} (${NOME_PERFIL[utilizador.perfil] ?? utilizador.perfil})` : "Perfil"}
+        title={
+          utilizador
+            ? `${utilizador.nome} — ${NOME_PERFIL[utilizador.perfil] ?? utilizador.perfil}${
+                utilizador.especialidade_codigo ? ` · ${servicoDe(utilizador.especialidade_codigo)}` : ""
+              }`
+            : "Perfil"
+        }
       >
         <span className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-oasis-header text-[10px] font-bold text-white">
           {utilizador ? iniciais(utilizador.nome) : <UserCircle2 className="h-4 w-4" />}
@@ -299,6 +322,9 @@ export function TrocadorUtilizador() {
                           <span className={`block truncate text-xs font-semibold ${activo ? "text-oasis-header" : "text-slate-800"}`}>
                             {u.nome}
                           </span>
+                          {u.especialidade_codigo && (
+                            <span className="block truncate text-[10px] text-slate-400">{servicoDe(u.especialidade_codigo)}</span>
+                          )}
                           {activo && <span className="block text-[10px] text-oasis-accent font-medium">Perfil activo</span>}
                         </span>
                         {n > 0 && (

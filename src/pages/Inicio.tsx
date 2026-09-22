@@ -73,6 +73,7 @@ export function Inicio() {
   const [modalDoenteId, setModalDoenteId] = useState<string | null>(null);
 
   const [cartoesMedico, setCartoesMedico] = useState<CartaoDoenteMedico[] | null>(null);
+  const [mostrarTodosDoentes, setMostrarTodosDoentes] = useState(false);
   const [filaValidacao, setFilaValidacao] = useState<ConsultaValidacaoResumo[] | null>(null);
   const [overbookingN, setOverbookingN] = useState<number | null>(null);
   const [avariasAbertasN, setAvariasAbertasN] = useState<number | null>(null);
@@ -212,7 +213,7 @@ export function Inicio() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {cartoesMedico.map((c) => (
+                  {(mostrarTodosDoentes ? cartoesMedico : cartoesMedico.slice(0, 6)).map((c) => (
                     <button
                       key={c.doente_id}
                       type="button"
@@ -233,11 +234,20 @@ export function Inicio() {
                   ))}
                 </div>
               )}
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex items-center justify-between">
+                {cartoesMedico && cartoesMedico.length > 6 && (
+                  <button
+                    type="button"
+                    onClick={() => setMostrarTodosDoentes((v) => !v)}
+                    className="text-xs font-semibold text-oasis-accent hover:underline"
+                  >
+                    {mostrarTodosDoentes ? "Mostrar menos" : `Mostrar todos (${cartoesMedico.length})`}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => navigate("/oasis/medico")}
-                  className="text-xs font-semibold text-slate-500 hover:text-slate-800 inline-flex items-center gap-1"
+                  className="ml-auto text-xs font-semibold text-slate-500 hover:text-slate-800 inline-flex items-center gap-1"
                 >
                   <Calendar className="h-3.5 w-3.5" />
                   <span>Ver agenda geral</span>

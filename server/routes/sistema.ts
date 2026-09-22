@@ -21,6 +21,9 @@ export function criarRotasSistema(store: typeof StoreType) {
   });
 
   router.get("/estado", (_req, res) => {
+    const contarEstado = (...estados: string[]) =>
+      store.pedidos.filter((p) => (estados as string[]).includes(p.estado)).length;
+
     res.json({
       demoDate: store.parametros.DEMO_DATE,
       contagens: {
@@ -29,6 +32,13 @@ export function criarRotasSistema(store: typeof StoreType) {
         eventos: store.eventos.length,
         dependencias: store.dependencias.length,
         alertas: store.alertas.length,
+        // Faixa "Estado Geral dos Pedidos em Circulação" do Início — por estado do pedido.
+        pedidos_total: store.pedidos.length,
+        pedidos_em_triagem: contarEstado("EM_TRIAGEM"),
+        pedidos_aceites: contarEstado("ACEITE"),
+        pedidos_marcados: contarEstado("MARCADO"),
+        pedidos_sem_vaga: contarEstado("SEM_VAGA"),
+        pedidos_devolvidos: contarEstado("DEVOLVIDO"),
       },
     });
   });
