@@ -71,6 +71,12 @@ o dicionário).
 2. **Add New → Project** → importar `ipo-chalange-` → **Deploy** (o `vercel.json` já diz tudo).
 3. O site fica em `https://ipo-chalange-….vercel.app`; cada push para a `main` publica de novo.
 
+## Ou no GitHub Pages (grátis; em conta gratuita o repositório tem de ser público)
+
+O workflow `.github/workflows/pages.yml` compila o site estático e publica-o a cada push para a `main`.
+Uma vez só: **Settings → Pages → Source: GitHub Actions**. O site fica em
+`https://<utilizador>.github.io/<repositório>/` (o nome do repositório é lido automaticamente).
+
 ## Alternativa com servidor: Render
 
 1. Entrar em https://render.com com a conta do GitHub.

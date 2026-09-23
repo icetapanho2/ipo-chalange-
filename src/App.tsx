@@ -31,7 +31,7 @@ export function App() {
   // Trocar de utilizador remonta a página: cada perfil vê os seus dados, mesmo sem mudar de endereço.
   const { utilizadorId } = usePerfil();
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
       <Cabecalho />
       <GavetaDoente />
       <Tutorial />
