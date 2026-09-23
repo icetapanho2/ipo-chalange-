@@ -1,4 +1,4 @@
-import { CASOS } from "./casosDemo";
+import { CASOS, DIARIO_MARIA } from "./casosDemo";
 
 /**
  * Modo tutorial do Guião: escurece o ecrã menos o elemento de que se está a falar, com um cartão a
@@ -45,12 +45,6 @@ export function iniciarTutorial(id: string, passo = 0) {
   window.dispatchEvent(new CustomEvent(EVENTO_TUTORIAL, { detail: { id, passo } }));
 }
 
-const DIARIO_MARIA =
-  "Doente de 66 anos com adenocarcinoma do cólon, em vigilância após quimioterapia adjuvante. Sem queixas de novo desde a última avaliação; " +
-  "peso estável, bom estado geral. Exame objectivo sem alterações. Diabetes tipo 2 medicada com metformina.\n" +
-  "Plano: análises de controlo em jejum com marcadores (CEA, CA 19.9) e creatinina; TC tórax, abdómen e pélvis com contraste; " +
-  "avaliação por Oncologia Médica; consulta de revisão comigo depois dos resultados.";
-
 const CASO_1: PassoTutorial[] = [
   {
     titulo: "A agenda do Dr. Pedro",
@@ -87,41 +81,41 @@ const CASO_1: PassoTutorial[] = [
   },
   {
     titulo: "O diário da consulta",
-    texto: "O médico escreve o diário como sempre. Copie este texto e cole-o no diário.",
+    texto:
+      "O médico escreve o diário como sempre e, no fim, o plano em abreviaturas depois de \"P/\". Copie este texto e cole-o no diário.",
     alvo: "#campo-diario",
     copiar: [{ rotulo: "Diário da consulta", texto: DIARIO_MARIA }],
   },
   {
+    titulo: "O assistente viu o plano",
+    texto:
+      "Assim que há um \"P/\", o assistente avisa que vai ler o plano. Ele só pré-selecciona: o médico confirma tudo no ecrã seguinte. Cada médico pode desligá-lo em Definições.",
+    alvo: '[data-tour="assistente-plano"]',
+  },
+  {
     titulo: "Guardar e seguir para os pedidos",
-    texto: "\"Guardar & Seguinte\" grava o diário e abre o assistente onde o médico declara os pedidos — uma vez, sem papel.",
+    texto: "\"Guardar & Seguinte\" grava o diário, o assistente lê o P/ e abre o ecrã dos pedidos.",
     alvo: "#btn-guardar-consulta",
     avancarAoClicar: true,
   },
   {
-    titulo: "Que pedidos?",
+    titulo: "O plano já traduzido",
     texto:
-      "Escolha Análises, Exames, Próxima consulta e Pedido de consulta e carregue em Seguinte. Só aparecem serviços com quem dê seguimento ao pedido. (Ou deixe o tutorial preencher tudo.)",
+      "O assistente traduziu o P/: Análises, Exames, Próxima consulta e Pedido de consulta já vêm seleccionados (marcados \"do plano\"). O médico pode tirar ou juntar tipos. Carregue em Seguinte.",
     alvo: '[data-tour="tipos-pedido"]',
     avancarQuando: '[data-tour="preenchimento"]',
-    acao: { rotulo: "Preencher o plano da Maria por mim", nome: "preencher-maria" },
+    acao: { rotulo: "Não veio pré-seleccionado? Preencher o plano da Maria", nome: "preencher-maria" },
   },
   {
-    titulo: "Preencher cada pedido",
+    titulo: "Cada pedido já preenchido",
     texto:
-      "Análises: Patologia Clínica, colheita com jejum — hemograma, bioquímica, creatinina, CEA, CA 19.9.\n" +
-      "Exames: Radiologia (TAC), TC corpo — TC tórax, abdominal e pélvica.\n" +
-      "Próxima consulta: já vem no serviço do Dr. Pedro; marcar \"depende dos exames\" e a continuidade.\n" +
-      "Pedido de consulta: Oncologia Médica.\n" +
-      "As observações são obrigatórias em cada pedido. A prioridade fica automática (a equação do serviço decide). Depois, Seguinte.",
+      "\"hemog, bioq, creat, CEA, CA 19.9\" → colheita com jejum com as 5 análises.\n" +
+      "\"TC TAP c/ contraste\" → TC corpo: tórax, abdominal e pélvica, com contraste.\n" +
+      "\"cons. Onco\" → pedido de consulta de Oncologia Médica.\n" +
+      "\"rev c/ exames comigo\" → próxima consulta no serviço do Dr. Pedro, depois dos exames, com ele.\n" +
+      "Cada bloco diz de que pedaço do plano veio. Tudo se pode alterar; a prioridade fica automática. Depois, Seguinte.",
     alvo: '[data-tour="preenchimento"]',
     avancarQuando: '[data-tour="resumo"]',
-    copiar: [
-      { rotulo: "Observações — análises", texto: "Controlo de vigilância, em jejum; creatinina antes do TC com contraste." },
-      { rotulo: "Observações — TC", texto: "TC TAP com contraste — reavaliação de vigilância." },
-      { rotulo: "Observações — próxima consulta", texto: "Revisão com os resultados das análises e do TC." },
-      { rotulo: "Observações — Oncologia Médica", texto: "Avaliação por Oncologia Médica." },
-    ],
-    acao: { rotulo: "Preencher por mim", nome: "preencher-maria" },
   },
   {
     titulo: "Resumo e submissão",
@@ -202,7 +196,7 @@ export function obterTutorial(id: string): Tutorial | null {
       id: "1",
       titulo: geral.titulo,
       passos,
-      inicioPorPassoGuiao: [0, 11, fimMaria, fimMaria + (geral.inicioPorPassoGuiao[3] - geral.inicioPorPassoGuiao[2]), passos.length - 1],
+      inicioPorPassoGuiao: [0, CASO_1.findIndex((p) => p.titulo.startsWith("Na triagem")), fimMaria, fimMaria + (geral.inicioPorPassoGuiao[3] - geral.inicioPorPassoGuiao[2]), passos.length - 1],
     };
   }
   return tutorialDoGuiao(id);

@@ -14,6 +14,7 @@ import { MeusPedidos } from "./pages/MeusPedidos";
 import { Servico } from "./pages/Servico";
 import { Doente } from "./pages/Doente";
 import { Guiao } from "./pages/Guiao";
+import { DefinicoesMedico } from "./pages/DefinicoesMedico";
 import { Tecnico } from "./pages/Tecnico";
 import { GestaoPrioridade } from "./pages/GestaoPrioridade";
 import { LaboratorioPrioridades } from "./pages/LaboratorioPrioridades";
@@ -53,6 +54,7 @@ export function App() {
           }
         />
         <Route path="/guiao" element={<Guiao />} />
+        <Route path="/definicoes" element={<DefinicoesMedico />} />
       </Routes>
     </BrowserRouter>
   );

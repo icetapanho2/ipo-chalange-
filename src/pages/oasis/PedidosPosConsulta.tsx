@@ -13,6 +13,8 @@ import {
   Plus,
   Trash2,
   User,
+  Sparkles,
+  AlertTriangle,
 } from "lucide-react";
 
 /** Cartão no estilo usado no resto do site (Triagem, Serviço): branco, cabeçalho leve. */
@@ -87,6 +89,17 @@ interface PedidoForm {
   nao_antes: string;
   depende_exames_consulta: boolean;
   continuidade_medico: boolean;
+  /** Pedaço do "P/" de onde o assistente o pré-seleccionou. */
+  pre_selecionado?: string;
+}
+
+/** O que o assistente leu no "P/" do diário (vem da consulta, por sessionStorage). */
+interface PreSelecao {
+  ativo: boolean;
+  plano: string | null;
+  pedidos: (Omit<PedidoForm, "id" | "prioridade"> & { prioridade: Prioridade | ""; texto_origem: string })[];
+  avisos: string[];
+  fonte: string;
 }
 
 interface PedidoSubmetido {
@@ -141,6 +154,8 @@ export function OasisPedidosPosConsulta() {
   const proximoId = useRef(0);
   const { utilizadores } = usePerfil();
   const [transporte, setTransporte] = useState<boolean | null>(null);
+  const [preSelecao, setPreSelecao] = useState<{ plano: string; n: number; avisos: string[]; tipos: TipoPedido[] } | null>(null);
+  const preAplicada = useRef(false);
 
   useEffect(() => {
     if (!atoId) return;
@@ -200,6 +215,47 @@ export function OasisPedidosPosConsulta() {
     window.addEventListener(EVENTO_ACAO_TUTORIAL, aoPedir);
     return () => window.removeEventListener(EVENTO_ACAO_TUTORIAL, aoPedir);
   });
+
+  // Pré-selecção do assistente: aplica-se uma vez, quando o catálogo e a consulta já chegaram.
+  useEffect(() => {
+    if (preAplicada.current || !catalogo || !dados || !atoId) return;
+    preAplicada.current = true;
+    let r: PreSelecao | null = null;
+    try {
+      r = JSON.parse(sessionStorage.getItem(`oasis2:preselecao:${atoId}`) ?? "null");
+    } catch {
+      r = null;
+    }
+    if (!r?.ativo || !r.plano) return;
+    const avisos = [...r.avisos];
+    const novos: PedidoForm[] = [];
+    for (const x of r.pedidos) {
+      // Só o que este assistente pode pedir (serviços com quem dê seguimento); o resto fica avisado.
+      if (!especialidadesParaTipo(x.tipo_pedido).some((e) => e.codigo === x.especialidade_destino)) {
+        avisos.push(`"${x.texto_origem}": esse serviço não recebe este tipo de pedido aqui — escolha à mão.`);
+        continue;
+      }
+      const base = novoPedido(x.tipo_pedido);
+      novos.push({
+        ...base,
+        especialidade_destino: x.especialidade_destino,
+        ato_codigo: x.ato_codigo || base.ato_codigo,
+        exames: x.exames,
+        analises: x.analises,
+        especificacao: x.especificacao,
+        prioridade: x.prioridade,
+        nao_antes: x.nao_antes,
+        depende_exames_consulta: x.depende_exames_consulta,
+        continuidade_medico: x.continuidade_medico,
+        pre_selecionado: x.texto_origem,
+      });
+    }
+    const tipos = [...new Set(novos.map((p) => p.tipo_pedido))];
+    setPedidos(novos);
+    setTiposSelecionados(tipos);
+    setPreSelecao({ plano: r.plano, n: novos.length, avisos, tipos });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogo, dados, atoId]);
 
   function alternarTipo(tipo: TipoPedido) {
     setTiposSelecionados((atual) => (atual.includes(tipo) ? atual.filter((t) => t !== tipo) : [...atual, tipo]));
@@ -268,12 +324,18 @@ export function OasisPedidosPosConsulta() {
           nao_antes: p.nao_antes,
           depende_exames_consulta: p.depende_exames_consulta,
           continuidade_medico: p.continuidade_medico,
+          pre_selecionado: p.pre_selecionado,
         })),
         ...(transporte !== null ? { transporte_nao_urgente: transporte } : {}),
       };
       const r = await apiPost<RespostaSubmissao>(`/oasis/consulta/${atoId}/pedidos`, corpo);
       setResultado(r);
       setEtapa("confirmacao");
+      try {
+        sessionStorage.removeItem(`oasis2:preselecao:${atoId}`);
+      } catch {
+        // idem
+      }
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     } finally {
@@ -322,32 +384,9 @@ export function OasisPedidosPosConsulta() {
   const voltarAgenda = () => navigate(dia ? `/oasis/medico?data=${dia}` : "/oasis/medico");
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
-      {/* Cabeçalho da página, igual ao resto do site */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-800">Pedidos Pós-Consulta</h1>
-          <p className="mt-1 text-xs text-slate-500">Escolha o que pretende pedir. Os pedidos seguem logo para triagem ou marcação, com as dependências entre eles.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {dados?.doente && (
-            <span className="hidden sm:flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs">
-              <User className="h-3.5 w-3.5 text-oasis-accent" />
-              <span>{dados.doente.nome}</span>
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => atoId && navigate(`/oasis/medico/${atoId}`)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
-          >
-            ← Voltar à consulta
-          </button>
-        </div>
-      </div>
-
-      {/* Barra de progresso das 4 etapas */}
-      <div className="mt-4 mb-4 flex items-center gap-1.5">
+    <div className="mx-auto max-w-7xl px-4 py-3">
+      {/* Barra de progresso das 4 etapas (com o regresso à consulta no fim da linha) */}
+      <div className="mb-3 flex items-center gap-1.5">
         {(
           [
             { chave: "tipos" as const, titulo: "Tipo de pedidos" },
@@ -379,7 +418,36 @@ export function OasisPedidosPosConsulta() {
             </div>
           );
         })}
+        {dados?.doente && (
+          <span className="ml-2 hidden shrink-0 items-center gap-1 text-[11px] font-semibold text-slate-700 sm:flex">
+            <User className="h-3.5 w-3.5 text-oasis-accent" /> {dados.doente.nome}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => atoId && navigate(`/oasis/medico/${atoId}`)}
+          className="ml-2 shrink-0 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+        >
+          ← Consulta
+        </button>
       </div>
+
+      {preSelecao && (etapa === "tipos" || etapa === "preenchimento") && (
+        <div data-tour="pre-selecao" className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+          <p className="flex items-start gap-1.5">
+            <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-oasis-accent" />
+            <span>
+              <strong>O assistente leu o plano</strong> <span className="font-mono">P/ {preSelecao.plano}</span> e pré-seleccionou{" "}
+              <strong>{preSelecao.n} pedido(s)</strong>. Confira, altere ou retire — nada segue sem a sua confirmação.
+            </span>
+          </p>
+          {preSelecao.avisos.map((a) => (
+            <p key={a} className="mt-1 flex items-start gap-1.5 text-amber-800">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {a}
+            </p>
+          ))}
+        </div>
+      )}
 
       {erro && (
         <div className="mb-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
@@ -414,7 +482,12 @@ export function OasisPedidosPosConsulta() {
                       onChange={() => alternarTipo(t.valor)}
                     />
                     <div>
-                      <p className="text-sm font-bold text-slate-800">{t.titulo}</p>
+                      <p className="text-sm font-bold text-slate-800">
+                        {t.titulo}
+                        {preSelecao?.tipos.includes(t.valor) && tiposSelecionados.includes(t.valor) && (
+                          <span className="ml-1.5 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-800">do plano</span>
+                        )}
+                      </p>
                       <p className="text-xs text-slate-500">{t.subtitulo}</p>
                     </div>
                   </label>
@@ -468,6 +541,9 @@ export function OasisPedidosPosConsulta() {
                               <div className="flex items-center justify-between mb-2.5">
                                 <span className="text-xs font-bold text-slate-700">
                                   Pedido {indiceGlobal || "—"} — {tituloTipo(tipo)}
+                                  {p.pre_selecionado && (
+                                    <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800">do plano: «{p.pre_selecionado}»</span>
+                                  )}
                                 </span>
                                 <button
                                   type="button"

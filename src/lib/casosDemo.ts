@@ -16,7 +16,15 @@ export interface Passo {
   acoes: AcaoPasso[];
   /** O que dizer ao júri neste passo. */
   fala?: string;
+  /** Texto pronto a copiar (ex.: o diário da consulta com o plano P/). */
+  copiar?: { rotulo: string; texto: string };
 }
+
+/** Diário da Maria no Caso 1: o assistente lê o "P/" e pré-selecciona os 4 pedidos. */
+export const DIARIO_MARIA =
+  "Doente de 66 anos com adenocarcinoma do cólon, em vigilância após quimioterapia adjuvante. Sem queixas de novo desde a última avaliação; " +
+  "peso estável, bom estado geral. Exame objectivo sem alterações. Diabetes tipo 2 medicada com metformina.\n" +
+  "P/ colheita c/ jejum: hemog, bioq, creat, CEA, CA 19.9; TC TAP c/ contraste; cons. Onco; rev c/ exames comigo";
 
 export interface Caso {
   id: string;
@@ -43,9 +51,10 @@ export const CASOS: Caso[] = [
       {
         titulo: "Maria Fernandes — da consulta às marcações",
         descricao:
-          "Dr. Pedro, primeira doente do dia (08:30; sem pedidos pendentes). Os ícones ao lado abrem o perfil, os pedidos, a folha clínica e os exames. Escrever no Diário Clínico e \"Guardar & Seguinte\". No assistente escolher Análises, Exames, Próxima consulta (já vem no serviço dele) e Pedido de consulta (Oncologia Médica). Colheita com jejum (hemograma, bioquímica com creatinina, CEA, CA 19.9); TC TAP com contraste; próxima consulta que depende dos exames, com continuidade. Observações obrigatórias em cada pedido. Submeter.",
+          "Dr. Pedro, primeira doente do dia (08:30; sem pedidos pendentes). Os ícones ao lado abrem o perfil, os pedidos, a folha clínica e os exames. Colar o diário abaixo: termina com o plano em abreviaturas depois de \"P/\". Em \"Guardar & Seguinte\" o assistente lê o P/ e o ecrã seguinte já traz os 4 pedidos seleccionados e preenchidos (colheita com jejum com hemograma, bioquímica, creatinina, CEA e CA 19.9; TC TAP com contraste; Oncologia Médica; próxima consulta que depende dos exames, com continuidade). O médico confere, pode mudar o que quiser, e submete.",
         resultado:
-          "A confirmação mostra o que aconteceu a cada pedido: colheita 24/09 07:30 → TC 14/10 08:20 (regra R1: creatinina antes do contraste) → próxima consulta com o Dr. Pedro 21/10 08:30 (7 dias depois do TC); a interconsulta segue para a triagem da Oncologia Médica. O perfil da Maria fica logo com 3 marcados e 1 em triagem.",
+          "A confirmação mostra o que aconteceu a cada pedido: colheita 24/09 07:30 → TC 14/10 08:20 (regra R1: creatinina antes do contraste) → próxima consulta com o Dr. Pedro 21/10 08:30 (7 dias depois do TC); a interconsulta segue para a triagem da Oncologia Médica. O perfil da Maria fica logo com 3 marcados e 1 em triagem. (O assistente desliga-se em Definições.)",
+        copiar: { rotulo: "Diário da consulta (com o plano P/)", texto: DIARIO_MARIA },
         acoes: [{ etiqueta: "Agenda do Dr. Pedro", utilizadorId: "U01", caminho: "/oasis/medico" }],
         fala: "O médico declara os pedidos uma vez. O sistema percebe as dependências e marca tudo pela ordem certa, sem papel.",
       },

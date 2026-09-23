@@ -17,6 +17,7 @@ import {
   BarChart3,
   HelpCircle,
   Wrench,
+  Settings2,
 } from "lucide-react";
 
 const ICONES_NAV: Record<string, React.ElementType> = {
@@ -29,6 +30,7 @@ const ICONES_NAV: Record<string, React.ElementType> = {
   "/tecnico": Wrench,
   "/gestao": BarChart3,
   "/guiao": HelpCircle,
+  "/definicoes": Settings2,
 };
 
 const ITEM_GUIAO: ItemNav = { caminho: "/guiao", etiqueta: "Guião" };

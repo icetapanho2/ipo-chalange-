@@ -399,3 +399,23 @@ Pedido do utilizador depois da revisão:
    a fala. Alvos marcados com `data-tour` nos componentes.
 4. Trocar de utilizador remonta a página (a triagem de Onc. Médica → Radioterapia no mesmo endereço
    mostrava a fila antiga); mudar de página fecha a ficha lateral.
+
+## 2026-09-23 — Assistente que lê o "P/" do diário; consulta sem cabeçalho
+
+1. **Consulta e assistente de pedidos sem título de página:** o diário, o "Guardar & Seguinte" e os
+   atalhos cabem no ecrã sem scroll; "← Agenda" passou para o painel do doente. No assistente, o
+   título e a descrição deram lugar à barra das etapas, com o nome do doente e "← Consulta" na mesma linha.
+2. **Assistente de pedidos (volta a haver agente, só para pré-seleccionar):** quando o diário tem um
+   plano depois de `P/`, o assistente lê-o e o ecrã seguinte já traz os tipos marcados ("do plano") e
+   cada pedido preenchido, com o pedaço do plano de onde veio. O médico altera ou retira o que quiser;
+   nada segue sem ele. O evento do pedido regista que foi pré-seleccionado e confirmado.
+   - Leitura: dicionário primeiro (abreviaturas, determinístico, instantâneo, sem rede); se sobrar texto
+     que o dicionário não percebe e houver LLM configurado (`EXTRACTOR`/`GEMINI_API_KEY`), o LLM lê o
+     plano (mesmo prompt/schema, 15 s) e o resultado é validado contra o catálogo. O que não percebe
+     aparece como aviso ("Não percebi 'fisioterapia'…"), nunca como palpite.
+   - **Definições** (nova aba do médico): ligar/desligar o assistente (por médico; volta a ligado ao
+     "Repor demo") e ver as abreviaturas que ele conhece.
+3. **Guião, Caso 1:** o diário da Maria vem pronto a copiar, com o plano
+   `P/ colheita c/ jejum: hemog, bioq, creat, CEA, CA 19.9; TC TAP c/ contraste; cons. Onco; rev c/ exames comigo`
+   → os 4 pedidos pré-seleccionados, com as mesmas marcações do guião (24/09 07:30, 14/10 08:20,
+   21/10 08:30 e a interconsulta em triagem). O tutorial do Caso 1 mostra este passo.

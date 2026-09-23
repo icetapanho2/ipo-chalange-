@@ -15,7 +15,6 @@ import {
   ClipboardList,
   Clock,
   ExternalLink,
-  Info,
   Pencil,
   Stethoscope,
   ShieldAlert,
@@ -101,10 +100,10 @@ interface RespostaConsulta {
 
 const SECAO_DIARIO = {
   titulo: "Diário Clínico",
-  subtitulo: "Registo livre da consulta: sintomas, achados, avaliação e orientação. É só documentação — não gera pedidos automaticamente.",
+  subtitulo: "Registo livre da consulta: sintomas, achados, avaliação e orientação.",
   ajuda:
     "Ex: Doente refere cansaço ligeiro, nega dor abdominal. ECOG 0, abdómen mole e indolor. Adenocarcinoma do " +
-    "cólon estádio III sob vigilância, boa evolução. Vigilância pós-adjuvante; rever com TC de reestadiamento e analítica.",
+    "cólon estádio III sob vigilância, boa evolução.\nP/ TC TAP c/ contraste; ana c/ marcadores; rev c/ exames comigo",
 };
 
 /** Cartão no estilo usado no resto do site (Triagem, Serviço): branco, cabeçalho leve. */
@@ -127,6 +126,14 @@ export function OasisConsulta() {
   const navigate = useNavigate();
   const [dados, setDados] = useState<RespostaConsulta | null>(null);
   const [diario, setDiario] = useState("");
+  // Assistente de pedidos (Definições do médico): lê o que vem depois de "P/" e pré-selecciona.
+  const [assistenteLigado, setAssistenteLigado] = useState(true);
+  useEffect(() => {
+    apiGet<{ assistente_plano: boolean }>("/oasis/medico/definicoes")
+      .then((d) => setAssistenteLigado(d.assistente_plano))
+      .catch(() => undefined);
+  }, []);
+  const temPlano = /(^|[\s(])P\//.test(diario);
   const [erro, setErro] = useState<string | null>(null);
   const [aGuardar, setAGuardar] = useState(false);
   const [modalDoenteAberto, setModalDoenteAberto] = useState(false);
@@ -186,6 +193,16 @@ export function OasisConsulta() {
     setErro(null);
     try {
       await apiPost(`/oasis/consulta/${atoId}/guardar`, { s: diario, o: "", a: "", p: "" });
+      // O assistente lê o "P/" e a pré-selecção segue para o ecrã seguinte (se falhar, segue sem ela).
+      try {
+        sessionStorage.removeItem(`oasis2:preselecao:${atoId}`);
+        if (assistenteLigado && temPlano) {
+          const r = await apiPost<unknown>(`/oasis/consulta/${atoId}/interpretar-plano`, { diario });
+          sessionStorage.setItem(`oasis2:preselecao:${atoId}`, JSON.stringify(r));
+        }
+      } catch {
+        // sem pré-selecção: o médico escolhe à mão, como sempre
+      }
       navigate(`/oasis/medico/${atoId}/pedidos`);
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
@@ -194,46 +211,7 @@ export function OasisConsulta() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
-      {/* Cabeçalho da página, igual ao resto do site */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-800">Diário Clínico</h1>
-            <div className="group relative">
-              <button
-                type="button"
-                className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100 transition-colors"
-                title="Como funciona este registo"
-              >
-                <Info className="h-3 w-3" />
-              </button>
-              <div className="invisible absolute left-0 top-full z-20 mt-2 w-72 rounded-lg border border-slate-200 bg-white p-3 text-left text-slate-700 opacity-0 shadow-xl transition-opacity group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
-                <h4 className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                  <Sparkles className="h-3.5 w-3.5 text-oasis-accent" />
-                  <span>Como funciona</span>
-                </h4>
-                <p className="text-[11px] leading-relaxed text-slate-600">1. Registe o diário da consulta em texto livre.</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
-                  2. Em <strong>Guardar & Seguinte</strong>, escolhe os tipos de pedido (consulta, exame, análises…) e preenche cada um.
-                </p>
-                <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
-                  3. Reveja o resumo e submeta: os pedidos seguem de imediato para agendamento ou triagem do serviço.
-                </p>
-              </div>
-            </div>
-          </div>
-          <p className="mt-1 text-xs text-slate-500">{dados?.doente?.nome ?? "A carregar…"} · {dados?.ato.especialidade_descricao}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => navigate("/oasis/medico")}
-          className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
-        >
-          ← Voltar à agenda
-        </button>
-      </div>
-
+    <div className="mx-auto max-w-7xl px-4 py-3">
       {erro && (
         <div className="mt-4 rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           <strong>Erro:</strong> {erro}
@@ -246,10 +224,17 @@ export function OasisConsulta() {
           <span>A carregar consulta e prontuário do utente…</span>
         </div>
       ) : (
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
           {/* PAINEL ESQUERDO: DOENTE E DADOS DO ATO */}
           <div className="space-y-3">
-            <Painel titulo="Identificação do Utente">
+            <Painel
+              titulo="Identificação do Utente"
+              acoes={
+                <button type="button" onClick={() => navigate("/oasis/medico")} className="text-[11px] font-semibold text-slate-500 hover:text-oasis-header">
+                  ← Agenda
+                </button>
+              }
+            >
               <div className="space-y-3">
                 <div
                   onClick={() => setModalDoenteAberto(true)}
@@ -490,8 +475,24 @@ export function OasisConsulta() {
                 />
               </div>
 
-              <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-100">
-                <div className="text-xs text-slate-500">O que pretende pedir a seguir escolhe-se no ecrã seguinte.</div>
+              <div className="mt-3 flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                <div className="text-xs text-slate-500" data-tour="assistente-plano">
+                  {assistenteLigado ? (
+                    <span className="inline-flex items-start gap-1.5">
+                      <Sparkles className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${temPlano ? "text-oasis-accent" : "text-slate-400"}`} />
+                      <span>
+                        {temPlano ? (
+                          <strong className="text-oasis-header">Plano (P/) detectado: os pedidos vêm pré-seleccionados no ecrã seguinte.</strong>
+                        ) : (
+                          <>Escreva o plano depois de <strong>P/</strong> e os pedidos vêm pré-seleccionados no ecrã seguinte.</>
+                        )}{" "}
+                        <span className="text-slate-400">(Desligar em Definições.)</span>
+                      </span>
+                    </span>
+                  ) : (
+                    "O que pretende pedir escolhe-se no ecrã seguinte."
+                  )}
+                </div>
                 <button
                   id="btn-guardar-consulta"
                   type="button"

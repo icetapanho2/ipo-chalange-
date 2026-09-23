@@ -8,6 +8,7 @@ import { aplicarR1, criarDependencia, intervaloResultado } from "../motor/depend
 import { aprovarPedidos } from "../motor/fluxo.ts";
 import { calcularPrazo, calcularPrioridadeSistema } from "../motor/prioridade.ts";
 import type { Pedido, Prioridade, TipoPedido } from "../types.ts";
+import { interpretarPlano } from "../extracao/planoMedico.ts";
 
 export function criarRotasOasis(store: typeof StoreType) {
   const router = Router();
@@ -76,6 +77,40 @@ export function criarRotasOasis(store: typeof StoreType) {
   // Guardar a nota SOAP (S/O/A/P em texto livre). Já não chama o Agente Oasis: o P deixou de
   // ser interpretado automaticamente — os pedidos passam a ser declarados directamente pelo
   // médico no assistente "Tipo de pedidos" → "Preenchimento" → "Resumo" (ver /consulta/:atoId/pedidos).
+  // Definições do médico: o assistente que lê o "P/" do diário e pré-selecciona os pedidos.
+  router.get("/medico/definicoes", (req, res) => {
+    res.json({
+      assistente_plano: !store.assistentePlanoDesligado.includes(req.utilizadorId),
+      // O que o assistente reconhece no "P/" (só leitura): abreviaturas globais e as deste médico.
+      abreviaturas: store.dicionario
+        .filter((d) => d.estado === "ATIVA" && (d.ambito === "GLOBAL" || d.ambito === req.utilizadorId))
+        .map((d) => ({ termo: d.termo, significado: d.significado })),
+    });
+  });
+  router.post("/medico/definicoes", (req, res) => {
+    const ligado = req.body?.assistente_plano !== false;
+    store.assistentePlanoDesligado = store.assistentePlanoDesligado.filter((id) => id !== req.utilizadorId);
+    if (!ligado) store.assistentePlanoDesligado.push(req.utilizadorId);
+    res.json({ assistente_plano: ligado });
+  });
+
+  // Assistente de pedidos: lê o que vem depois de "P/" no diário e devolve uma pré-selecção para o
+  // ecrã seguinte. Não cria nada — o médico confirma ou altera no assistente.
+  router.post("/consulta/:atoId/interpretar-plano", async (req, res) => {
+    const ato = store.atosMedicos.find((a) => a.mvp_ato_id === req.params.atoId);
+    if (!ato) {
+      res.status(404).json({ erro: "Consulta não encontrada." });
+      return;
+    }
+    const medicoId = req.utilizadorId || ato.mvp_medico_id;
+    if (store.assistentePlanoDesligado.includes(medicoId)) {
+      res.json({ ativo: false, plano: null, pedidos: [], avisos: [], fonte: "nenhuma" });
+      return;
+    }
+    const r = await interpretarPlano(String(req.body?.diario ?? ""), medicoId, ato.especialidade_codigo, agora());
+    res.json({ ativo: true, ...r });
+  });
+
   router.post("/consulta/:atoId/guardar", (req, res) => {
     const ato = store.atosMedicos.find((a) => a.mvp_ato_id === req.params.atoId);
     if (!ato) {
@@ -117,6 +152,7 @@ export function criarRotasOasis(store: typeof StoreType) {
     nao_antes?: string; // "aaaa-mm-dd" ou ""
     depende_exames_consulta?: boolean; // só relevante para tipo_pedido "consulta"
     continuidade_medico?: boolean; // "comigo": tenta agendar com o médico requisitante (só tipo "consulta")
+    pre_selecionado?: string; // pedaço do "P/" de onde o assistente o pré-seleccionou (o médico confirmou)
   }
 
   // Cria pedidos directamente a partir do que o médico declarou no assistente (etapas 2-4):
@@ -204,7 +240,9 @@ export function criarRotasOasis(store: typeof StoreType) {
       };
       store.pedidos.push(pedido);
       registarEvento(pedido, "CORRECAO", "EXTRAIDO", medicoId, {
-        detalhe: "Pedido declarado directamente pelo médico (sem Agente Oasis)",
+        detalhe: item.pre_selecionado
+          ? `Pedido declarado pelo médico; pré-seleccionado pelo assistente a partir do plano ("P/ ${item.pre_selecionado}") e confirmado no assistente`
+          : "Pedido declarado directamente pelo médico (sem Agente Oasis)",
         dataHora: quando,
       });
       criados.push(pedido);

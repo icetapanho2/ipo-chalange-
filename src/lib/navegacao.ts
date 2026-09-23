@@ -10,7 +10,7 @@ const INICIO: ItemNav = { caminho: "/", etiqueta: "Início" };
  * aconteceria já integrado num sistema hospitalar real. O Guião fica de fora (sempre visível).
  */
 export const NAV_POR_PERFIL: Record<string, ItemNav[]> = {
-  MEDICO: [INICIO, { caminho: "/oasis/medico", etiqueta: "Oasis · Médico" }, { caminho: "/meus-pedidos", etiqueta: "Meus Pedidos" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }],
+  MEDICO: [INICIO, { caminho: "/oasis/medico", etiqueta: "Oasis · Médico" }, { caminho: "/meus-pedidos", etiqueta: "Meus Pedidos" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }, { caminho: "/definicoes", etiqueta: "Definições" }],
   ADMINISTRATIVO: [INICIO, { caminho: "/servico", etiqueta: "Serviço" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }],
   TRIADOR: [INICIO, { caminho: "/triagem", etiqueta: "Triagem" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }],
   GESTAO: [INICIO, { caminho: "/gestao", etiqueta: "Gestão" }],

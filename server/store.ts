@@ -94,6 +94,8 @@ class Store {
   comunicacoesDoente: ComunicacaoDoente[] = [];
   chamadas: ChamadaRegistada[] = [];
   propostasRemarcacao: PropostaRemarcacao[] = [];
+  /** Médicos que desligaram o assistente que lê o "P/" do diário (ligado por omissão). */
+  assistentePlanoDesligado: string[] = [];
 
   private contadores: Record<string, number> = {
     pedido: 0,
@@ -350,6 +352,7 @@ class Store {
     this.avarias = [];
     this.pesosPrioridadePorServico = {};
     this.indicePorServico = {};
+    this.assistentePlanoDesligado = [];
     this.vagasLibertadas = [];
     this.ofertasAntecipacao = [];
     this.comunicacoesDoente = [];

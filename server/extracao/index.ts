@@ -81,7 +81,12 @@ async function chamarFornecedor(nome: NomeFornecedor, prompt: string): Promise<R
   }
 }
 
-function fornecedorDisponivel(nome: NomeFornecedor): boolean {
+/** Chama o fornecedor de LLM com o limite de 15 s (usado também pelo assistente do plano). */
+export function chamarFornecedorComTempoLimite(nome: NomeFornecedor, prompt: string): Promise<RespostaProvider> {
+  return comTimeout(chamarFornecedor(nome, prompt), TEMPO_LIMITE_MS);
+}
+
+export function fornecedorDisponivel(nome: NomeFornecedor): boolean {
   if (nome === "gemini") return geminiDisponivel();
   if (nome === "anthropic") return anthropicDisponivel();
   if (nome === "local") return ollamaDisponivel();
@@ -157,7 +162,7 @@ function semReconhecimento(
   return { pedidos: [], alertas: [alerta.descricao], fornecedorUsado: fornecedor, usouFallback };
 }
 
-function codigoValido(base: PedidoExtraido): { valido: boolean; motivo?: string } {
+export function codigoValido(base: PedidoExtraido): { valido: boolean; motivo?: string } {
   const catalogo = store.catalogoAtos.find(
     (c) => c.especialidade_codigo === base.especialidade_destino && c.ato_codigo === base.ato_codigo,
   );

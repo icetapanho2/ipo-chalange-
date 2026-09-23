@@ -35,7 +35,8 @@ O projecto vai ser importado mais tarde para o **Google AI Studio (Build mode)**
 8. Etiqueta visível **"Dados simulados"** no dashboard de gestão.
 
 ## Extracção
-> **Desde 23/09/2026** o médico declara os pedidos no assistente da consulta: a extracção por IA, a Validação e o Dicionário saíram da interface (decisão do utilizador, ver `DECISOES.md`). `server/extracao/` fica com os seus testes, sem uso nos ecrãs. Não voltar a pôr estas páginas sem perguntar.
+> **Desde 23/09/2026** o médico declara os pedidos no assistente da consulta: a Validação e o Dicionário saíram da interface (decisão do utilizador, ver `DECISOES.md`). Não voltar a pôr estas páginas sem perguntar.
+> O **assistente de pedidos** (pedido do utilizador) lê só o que vem depois de `P/` no diário e **pré-selecciona** os pedidos no ecrã seguinte — não cria nada, o médico confirma ou altera; desliga-se nas Definições do médico. `server/extracao/planoMedico.ts`: dicionário primeiro (determinístico, sem rede); LLM configurado só para o texto que o dicionário não percebe; tudo validado contra o catálogo; o que não percebe é avisado, nunca adivinhado.
 
 - Interface única: `extrair(texto, medicoId, doenteId) → { pedidos[], alertas[] }`.
 - Pipeline: dicionário (global + do médico) → LLM → validação contra o catálogo → regras R1–R3 → confiança.

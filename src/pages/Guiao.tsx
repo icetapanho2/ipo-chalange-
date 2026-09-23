@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   Search,
   GraduationCap,
+  Copy,
 } from "lucide-react";
 
 import { CASOS, type AcaoPasso } from "../lib/casosDemo";
@@ -36,6 +37,34 @@ interface DoenteCompleto {
   total_pedidos?: number;
   total_alertas?: number;
   pedidos_em_curso?: number;
+}
+
+function BlocoCopiar({ rotulo, texto }: { rotulo: string; texto: string }) {
+  const [copiado, setCopiado] = useState(false);
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(texto);
+    } catch {
+      const t = document.createElement("textarea");
+      t.value = texto;
+      document.body.appendChild(t);
+      t.select();
+      document.execCommand("copy");
+      t.remove();
+    }
+    setCopiado(true);
+  }
+  return (
+    <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{rotulo}</span>
+        <button type="button" onClick={copiar} className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100">
+          {copiado ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />} {copiado ? "Copiado" : "Copiar"}
+        </button>
+      </div>
+      <p className="mt-1 whitespace-pre-line font-mono text-[11px] leading-snug text-slate-700">{texto}</p>
+    </div>
+  );
 }
 
 export function Guiao() {
@@ -268,6 +297,7 @@ export function Guiao() {
                       <div className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-1.5 text-xs font-medium text-emerald-800">
                         <strong className="text-emerald-900">Resultado esperado:</strong> {passo.resultado}
                       </div>
+                      {passo.copiar && <BlocoCopiar rotulo={passo.copiar.rotulo} texto={passo.copiar.texto} />}
                       {passo.fala && (
                         <div className="mt-2 rounded-lg border border-sky-100 bg-sky-50/70 px-3 py-1.5 text-xs italic text-sky-900">
                           <strong className="not-italic">Dizer ao júri:</strong> “{passo.fala}”
