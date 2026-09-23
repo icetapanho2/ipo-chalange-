@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { apiGet } from "../lib/api";
 import { VagasLibertadas } from "../components/VagasLibertadas";
 import { ListaChamadas } from "../components/ListaChamadas";
 import { ParaDecidir } from "../components/servico/ParaDecidir";
 import { PedidosServico } from "../components/servico/PedidosServico";
-import { EstatisticasServico } from "../components/servico/EstatisticasServico";
+// Os gráficos (recharts) só carregam quando se abre este separador.
+const EstatisticasServico = lazy(() => import("../components/servico/EstatisticasServico").then((m) => ({ default: m.EstatisticasServico })));
 import { EquacaoPrioridade } from "../components/servico/EquacaoPrioridade";
 import { BarChart3, CalendarX2, Check, ClipboardList, Inbox, Phone, Settings2 } from "lucide-react";
 
@@ -126,7 +127,11 @@ export function Servico() {
       {aba === "vagas" && <VagasLibertadas aoMudar={aoMudar} />}
       {aba === "chamadas" && <ListaChamadas aoMudar={aoMudar} />}
       {aba === "pedidos" && <PedidosServico aoMudar={aoMudar} />}
-      {aba === "estatisticas" && <EstatisticasServico />}
+      {aba === "estatisticas" && (
+        <Suspense fallback={<p className="mt-5 text-sm text-slate-400">A carregar…</p>}>
+          <EstatisticasServico />
+        </Suspense>
+      )}
       {aba === "definicoes" && <EquacaoPrioridade aoMudar={aoMudar} />}
     </div>
   );

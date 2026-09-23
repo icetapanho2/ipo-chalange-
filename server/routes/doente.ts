@@ -1,13 +1,14 @@
 import { Router } from "express";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
-import { apenasData, parseIso } from "../util.ts";
+import { apenasData, formatarDataHoraPt, isoData, parseIso } from "../util.ts";
 import { adiarConsulta, remarcarPedido } from "../motor/fluxo.ts";
 import { avaliarDependenciasDetalhado, calcularSemaforo } from "../motor/semaforo.ts";
 import { idadeDoente, remarcacoesHospital } from "../motor/remarcacao.ts";
 import { aceitarPropostaRemarcacao, propostaFaltaPendente } from "../motor/propostasRemarcacao.ts";
 import {
   descreverEspecialidade,
+  descreverEstadioCuidado,
   descreverEstado,
   descreverPedido,
   descreverUtilizador,
@@ -297,7 +298,98 @@ export function criarRotasDoente(store: typeof StoreType) {
         calculado_em: p.indice_calculado_em ?? "",
       }));
 
-    res.json({ doente, timeline, marcacoesFuturas, todosPedidos, alertas, oQueFalta, agenda, comunicacoes, ofertas, logistica, indices });
+    // Percurso: um item por pedido, pela ordem das datas, com tudo o que a ficha precisa de mostrar num
+    // só sítio (data, prazo, dependências com nome, problema, proposta em curso, índice).
+    const semaforoLargo = (p: Pedido) => calcularSemaforo(p, hoje, 3650);
+    const percurso = pedidos
+      .map((p) => {
+        const ato = p.ato_id ? store.atosMedicos.find((a) => a.mvp_ato_id === p.ato_id) : undefined;
+        const dataMarcada = ato && ["MARCADO", "REALIZADO", "FALTOU"].includes(p.estado) ? ato.data_hora : "";
+        const sem = semaforoLargo(p);
+        const deps = ato && p.estado === "MARCADO" ? avaliarDependenciasDetalhado(p, apenasData(parseIso(ato.data_hora))) : [];
+        const proposta = store.propostasRemarcacao.find((r) => r.pedido_id === p.pedido_id && (r.estado === "PENDENTE" || r.estado === "AGUARDA_MEDICO"));
+        const troca = store.propostasTroca.find((t) => t.pedido_urgente === p.pedido_id && t.estado === "PENDENTE");
+        const oferta = store.ofertasAntecipacao.find((o) => o.pedido_id === p.pedido_id && o.estado === "PENDENTE");
+        const foraDoPrazo = !!dataMarcada && p.estado === "MARCADO" && dataMarcada.slice(0, 10) > p.prazo_limite;
+        const problema =
+          p.estado === "FALTOU"
+            ? "O doente faltou"
+            : p.estado === "SEM_VAGA"
+              ? "Sem vaga no prazo"
+              : p.estado === "DEVOLVIDO"
+                ? `Devolvido pela triagem: "${p.pergunta_triagem || "falta informação"}"`
+                : sem?.cor === "vermelho"
+                  ? sem.porque
+                  : foraDoPrazo
+                    ? "Marcado depois do prazo"
+                    : "";
+        const emCurso = proposta
+          ? proposta.estado === "AGUARDA_MEDICO"
+            ? "Sem vaga a tempo: à espera da decisão do médico"
+            : proposta.sem_vaga_a_tempo
+              ? "Sem vaga a tempo: a administrativa está a resolver (vaga extra, outsourcing ou médico)"
+              : `Remarcação proposta para ${proposta.data_hora_sugerida ? formatarDataHoraPt(parseIso(proposta.data_hora_sugerida)) : "—"}, à espera de validação`
+          : troca
+            ? "Troca de vaga proposta, à espera de aprovação do serviço"
+            : oferta
+              ? "Vaga mais cedo oferecida ao doente, à espera de resposta"
+              : "";
+        const marcacao = [...store.eventos].reverse().find((e) => e.pedido_id === p.pedido_id && e.tipo === "MARCACAO");
+        return {
+          pedido_id: p.pedido_id,
+          descricao: descreverPedido(p),
+          tipo_pedido: p.tipo_pedido,
+          especialidade_legivel: descreverEspecialidade(p.especialidade_destino),
+          estado: p.estado,
+          estado_legivel: descreverEstado(p.estado),
+          prioridade: p.prioridade,
+          prazo_limite: p.prazo_limite,
+          criado_em: p.criado_em,
+          pedido_por: descreverUtilizador(p.medico_requisitante_id),
+          data_marcada: dataMarcada,
+          local: ato?.gabinete_descricao ?? "",
+          medico: ato ? descreverUtilizador(ato.mvp_medico_id) : "",
+          fora_do_prazo: foraDoPrazo,
+          motivo_marcacao: marcacao?.motivo ?? "",
+          dependencias: deps.map(({ requisito, estado }) => ({ pedido_id: requisito.pedido_id, descricao: descreverPedido(requisito), cor: estado.cor, porque: estado.porque })),
+          semaforo: sem ? { cor: sem.cor, porque: sem.porque } : null,
+          problema,
+          em_curso: emCurso,
+          pode_aceitar_remarcacao: !!proposta && proposta.origem === "FALTA" && proposta.estado === "PENDENTE" && !proposta.sem_vaga_a_tempo,
+          indice: ["REALIZADO", "CANCELADO", "RECUSADO"].includes(p.estado) ? null : p.indice_prioridade ?? null,
+          indice_parcelas: p.indice_parcelas ?? [],
+        };
+      })
+      .sort((a, b) => (a.data_marcada || `${a.prazo_limite}T99`).localeCompare(b.data_marcada || `${b.prazo_limite}T99`));
+
+    const contar = (f: (x: (typeof percurso)[number]) => boolean) => percurso.filter(f).length;
+    const progresso = {
+      total: percurso.length,
+      realizados: contar((x) => x.estado === "REALIZADO"),
+      marcados: contar((x) => x.estado === "MARCADO"),
+      por_marcar: contar((x) => ["EXTRAIDO", "VALIDADO", "EM_TRIAGEM", "ACEITE", "SEM_VAGA", "FALTOU", "DEVOLVIDO"].includes(x.estado)),
+      fechados: contar((x) => ["RECUSADO", "CANCELADO"].includes(x.estado)),
+      problemas: contar((x) => !!x.problema),
+    };
+    const proxima = percurso.find((x) => x.estado === "MARCADO" && x.data_marcada >= isoData(hoje)) ?? null;
+
+    res.json({
+      hoje: isoData(hoje),
+      doente: { ...doente, estadio_cuidado_legivel: descreverEstadioCuidado(doente.estadio_cuidado) },
+      percurso,
+      progresso,
+      proxima: proxima ? { data_hora: proxima.data_marcada, descricao: proxima.descricao, local: proxima.local } : null,
+      timeline,
+      marcacoesFuturas,
+      todosPedidos,
+      alertas,
+      oQueFalta,
+      agenda,
+      comunicacoes,
+      ofertas,
+      logistica,
+      indices,
+    });
   });
 
   router.post("/:id/pedidos/:pedidoId/remarcar-exame", (req, res) => {

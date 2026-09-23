@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { NomeDoente } from "../NomeDoente";
 import { apiGet, apiPost } from "../../lib/api";
 import { dataPT } from "../../lib/datas";
 import { ArrowDown, ArrowUp, RotateCcw, Save, Settings2 } from "lucide-react";
@@ -6,6 +7,7 @@ import { ArrowDown, ArrowUp, RotateCcw, Save, Settings2 } from "lucide-react";
 type Variaveis = Record<string, number>;
 
 interface LinhaFila {
+  doente_id: string;
   pedido_id: string;
   doente_nome: string;
   prioridade: string;
@@ -305,7 +307,7 @@ export function EquacaoPrioridade({ aoMudar }: { aoMudar?: (mensagem: string) =>
                     )}
                   </span>
                   <span className="flex-1 truncate">
-                    <span className="font-semibold text-slate-800">{l.doente_nome}</span>
+                    <span className="font-semibold text-slate-800"><NomeDoente id={l.doente_id} nome={l.doente_nome} /></span>
                     <span className="text-slate-500"> · {l.estadio} · prazo {dataPT(l.prazo_limite)}</span>
                   </span>
                   <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${COR_NIVEL[l.prioridade] ?? ""}`}>{l.prioridade}</span>

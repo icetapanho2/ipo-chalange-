@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { NomeDoente } from "./NomeDoente";
 import { apiGet, apiPost } from "../lib/api";
 import { dataHoraCurta } from "./PorqueEstaEscolha";
 import { AlertTriangle, ArrowRight, Building2, CalendarOff, CalendarPlus, Check, CheckCheck, ChevronDown, ChevronUp, Stethoscope, Shuffle, UserX, Wrench } from "lucide-react";
@@ -64,7 +65,7 @@ function OutraSolucao({ p, accoes, aoFechar }: { p: Proposta; accoes: AccoesSemV
   return (
     <div className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50/60 p-2.5">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-[11px] font-bold text-indigo-900">Outra solução para {p.doente_nome}</span>
+        <span className="text-[11px] font-bold text-indigo-900">Outra solução para <NomeDoente id={p.doente_id} nome={p.doente_nome} /></span>
         <button type="button" onClick={aoFechar} className="text-[11px] text-slate-500 hover:underline">
           Fechar
         </button>
@@ -244,7 +245,7 @@ function LinhaProposta({
         )}
         <div className={mostrarOrdem ? "" : "md:col-span-2"}>
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-sm font-bold text-slate-800">{p.doente_nome}</span>
+            <span className="text-sm font-bold text-slate-800"><NomeDoente id={p.doente_id} nome={p.doente_nome} /></span>
             {p.prioridade && <span className={`rounded px-1.5 text-[10px] font-bold ${COR_PRIORIDADE[p.prioridade] ?? ""}`}>{p.prioridade}</span>}
           </div>
           <div className="text-[11px] text-slate-500">

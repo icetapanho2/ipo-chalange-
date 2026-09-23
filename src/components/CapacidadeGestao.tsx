@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { NomeDoente } from "./NomeDoente";
 import { apiGet, apiPost } from "../lib/api";
 import { dataHoraCurta } from "./PorqueEstaEscolha";
 import { AlarmClock, CalendarPlus } from "lucide-react";
 
 interface ItemPrazo {
+  doente_id: string;
   pedido_id: string;
   doente_nome: string;
   especialidade_legivel: string;
@@ -79,7 +81,7 @@ export function PrazosEmRisco() {
               <tr key={i.pedido_id} className="border-b border-amber-100 align-top">
                 <td className="py-1.5 pr-2">
                   <div className="font-semibold text-slate-800">
-                    {i.doente_nome} <span className="text-[10px] font-bold text-red-700">{i.prioridade}</span>
+                    <NomeDoente id={i.doente_id} nome={i.doente_nome} /> <span className="text-[10px] font-bold text-red-700">{i.prioridade}</span>
                   </div>
                   <div className="text-[10px] text-slate-500">{i.especialidade_legivel}</div>
                 </td>
@@ -105,7 +107,7 @@ export function PrazosEmRisco() {
 
 interface Previsao {
   vagas: number;
-  doentes: { pedido_id: string; doente_nome: string; data_hora_nova: string; data_hora_atual: string; dias_ganhos: number | null; motivo: string }[];
+  doentes: { pedido_id: string; doente_id: string; doente_nome: string; data_hora_nova: string; data_hora_atual: string; dias_ganhos: number | null; motivo: string }[];
   dias_ganhos: number;
   dentro_do_prazo: number;
 }
@@ -193,7 +195,7 @@ export function SessaoExtra() {
             {previsao.doentes.map((d, i) => (
               <li key={d.pedido_id} className="rounded bg-white px-2 py-1 text-slate-700">
                 <strong>
-                  {i + 1}. {d.doente_nome}
+                  {i + 1}. <NomeDoente id={d.doente_id} nome={d.doente_nome} />
                 </strong>{" "}
                 — {dataHoraCurta(d.data_hora_atual)} → <strong className="text-sky-800">{dataHoraCurta(d.data_hora_nova)}</strong>
                 <span className="text-slate-500"> · {d.motivo}</span>

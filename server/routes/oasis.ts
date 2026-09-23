@@ -137,6 +137,8 @@ export function criarRotasOasis(store: typeof StoreType) {
     const quando = agora();
     const medicoId = ato.mvp_medico_id;
     const doente = store.doentes.find((d) => d.doente_id === ato.doente_id) ?? null;
+    // O médico indica se o doente precisa de transporte não urgente (entra no custo de remarcar e no dia único).
+    if (doente && typeof req.body?.transporte_nao_urgente === "boolean") doente.transporte_nao_urgente = req.body.transporte_nao_urgente;
     const criados: Pedido[] = [];
     const dependeExamesConsulta: Pedido[] = [];
 
@@ -256,6 +258,7 @@ export function criarRotasOasis(store: typeof StoreType) {
           gabinete_descricao: gabinete?.descricao ?? v.gabinete_codigo,
           medico_nome: medico?.nome ?? "",
           livre: !v.ato_id,
+          doente_id: doente?.doente_id,
           doente_nome: doente?.nome,
           ato_descricao: ato?.ato_descricao,
           ato_estado: ato?.estado,

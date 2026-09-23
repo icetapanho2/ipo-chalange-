@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { NomeDoente } from "../../components/NomeDoente";
 import { OasisPainel, OasisShell } from "../../oasis/OasisShell";
 import { apiGet } from "../../lib/api";
 
@@ -14,6 +15,7 @@ interface Vaga {
   gabinete_descricao: string;
   medico_nome: string;
   livre: boolean;
+  doente_id?: string;
   doente_nome?: string;
   ato_descricao?: string;
   ato_estado?: string;
@@ -137,7 +139,7 @@ export function OasisAgendas() {
                   <td className="py-1 pr-2 text-slate-500">{v.medico_nome}</td>
                   <td className="py-1 pr-2 font-medium">{v.livre ? "Livre" : v.ato_estado ?? "Ocupada"}</td>
                   <td className="py-1 pr-2">
-                    {v.livre ? <span className="text-slate-400">—</span> : `${v.doente_nome} · ${v.ato_descricao}`}
+                    {v.livre ? <span className="text-slate-400">—</span> : <><NomeDoente id={v.doente_id} nome={v.doente_nome ?? ""} /> · {v.ato_descricao}</>}
                   </td>
                 </tr>
               ))}

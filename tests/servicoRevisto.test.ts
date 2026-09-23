@@ -96,6 +96,27 @@ describe("Serviço revisto", () => {
     expect(agenda.some((m) => m.data_hora.startsWith("2026-09-24") && m.especialidade_legivel.includes("Eco"))).toBe(false);
   });
 
+  it("estatísticas: filtrar por estádio e nível restringe tudo, e há comparação com o período anterior", async () => {
+    type E = { geral: { pedidos: number }; anterior: { pedidos: number } | null; serie: unknown[]; porEstadio: { chave: string; pedidos: number }[]; maisLentos: { doente_id: string }[] };
+    const todos = (await api<E>("/api/servico/estatisticas?periodo=trimestre", "U07")).json;
+    const diag = (await api<E>("/api/servico/estatisticas?periodo=trimestre&estadio=PRE_TRATAMENTO&nivel=MP", "U07")).json;
+    expect(todos.serie.length).toBeGreaterThan(5);
+    expect(todos.anterior).not.toBeNull();
+    expect(diag.geral.pedidos).toBeLessThan(todos.geral.pedidos);
+    expect(diag.porEstadio.filter((e) => e.chave !== "PRE_TRATAMENTO").every((e) => e.pedidos === 0)).toBe(true);
+    expect(todos.maisLentos.every((m) => m.doente_id)).toBe(true);
+  });
+
+  it("ficha: percurso único com progresso e a remarcação da falta pronta a aceitar", async () => {
+    await api("/api/repor-demo", "U12", {});
+    type F = { progresso: { total: number; problemas: number }; percurso: { estado: string; problema: string; pode_aceitar_remarcacao: boolean; dependencias: unknown[] }[] };
+    const f = (await api<F>("/api/doente/100102", "U08")).json;
+    expect(f.progresso.total).toBe(f.percurso.length);
+    expect(f.progresso.problemas).toBeGreaterThan(0);
+    expect(f.percurso.some((e) => e.estado === "FALTOU" && e.pode_aceitar_remarcacao)).toBe(true);
+    expect(f.percurso.some((e) => e.dependencias.length > 0)).toBe(true);
+  });
+
   it("validação, dicionário e tradutor já não existem", async () => {
     expect((await api("/api/validacao/consultas", "U03")).status).toBe(404);
     expect((await api("/api/dicionario", "U03")).status).toBe(404);

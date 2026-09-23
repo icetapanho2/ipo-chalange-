@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { NomeDoente } from "../NomeDoente";
 import { apiGet, apiPost } from "../../lib/api";
 import { dataHoraPT, dataPT } from "../../lib/datas";
 import { PlanoRemarcacoes } from "../PlanoRemarcacoes";
@@ -9,6 +10,7 @@ interface PropostaTroca {
   proposta_id: string;
   justificacao: string;
   pedido_urgente_doente: string;
+  pedido_urgente_doente_id: string;
   avaliacao: CandidatoTroca[];
 }
 
@@ -56,7 +58,7 @@ function SemVaga({ p, aoMudar, aoErro }: { p: PedidoSemVaga; aoMudar: (m: string
     <div className="rounded-lg border border-amber-200 bg-white p-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm font-semibold text-slate-800">
-          {p.doente_nome} <span className="font-normal text-slate-500">· {p.descricao}</span>
+          <NomeDoente id={p.doente_id} nome={p.doente_nome} /> <span className="font-normal text-slate-500">· {p.descricao}</span>
         </p>
         <span className="text-[11px] text-slate-500">
           {p.prioridade_legivel} · prazo {dataPT(p.prazo_limite)} · pedido por {p.medico_requisitante_nome}
@@ -205,7 +207,7 @@ export function ParaDecidir({ aoMudar }: { aoMudar: (mensagem: string) => void }
           <div className="space-y-2">
             {trocas.map((p) => (
               <div key={p.proposta_id} className="rounded-lg border border-indigo-200 bg-white p-3">
-                <p className="text-sm font-semibold text-slate-800">Vaga para {p.pedido_urgente_doente}</p>
+                <p className="text-sm font-semibold text-slate-800">Vaga para <NomeDoente id={p.pedido_urgente_doente_id} nome={p.pedido_urgente_doente} /></p>
                 <p className="mt-0.5 text-xs text-slate-600">{p.justificacao}</p>
                 <PorqueEstaEscolha candidatos={p.avaliacao} />
                 <div className="mt-2 flex gap-2">

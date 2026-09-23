@@ -1,7 +1,7 @@
 import { Router } from "express";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
-import { apenasData, diferencaDias, formatarDataPt, parseIso, somarDias } from "../util.ts";
+import { apenasData, diferencaDias, formatarDataPt, isoData, parseIso, somarDias } from "../util.ts";
 import { aprovarPropostaTroca, rejeitarPropostaTroca, contarVagasLivres, encontrarVagaLivre, janelaAgendamento, marcarPedidoNaVaga } from "../motor/agendamento.ts";
 import { recalcularAlertas, resolverAlerta } from "../motor/alertas.ts";
 import { VARIAVEIS_INDICE_OMISSAO, calcularIndice, variaveisIndice, type VariaveisIndice } from "../motor/indice.ts";
@@ -159,6 +159,7 @@ export function criarRotasServico(store: typeof StoreType) {
         criado_em: p.criado_em,
         pedido_urgente: p.pedido_urgente,
         pedido_urgente_doente: descreverDoente(store.pedidos.find((x) => x.pedido_id === p.pedido_urgente)?.doente_id ?? ""),
+        pedido_urgente_doente_id: store.pedidos.find((x) => x.pedido_id === p.pedido_urgente)?.doente_id ?? "",
         avaliacao: p.avaliacao ?? [],
         escolhido_regra_antiga: p.escolhido_regra_antiga ?? "",
       }));
@@ -172,6 +173,7 @@ export function criarRotasServico(store: typeof StoreType) {
     return {
       ...p,
       doente_nome: doente?.nome ?? p.doente_id,
+      doente_id: p.doente_id,
       estadio_cuidado: doente?.estadio_cuidado ?? "",
       descricao: pedido ? descreverPedido(pedido) : "Marcação sem pedido no sistema",
       prioridade: pedido?.prioridade ?? "",
@@ -341,6 +343,7 @@ export function criarRotasServico(store: typeof StoreType) {
     return {
       ...o,
       doente_nome: descreverDoente(o.doente_id),
+      doente_id: o.doente_id,
       pedido_descricao: descreverPedido(store.pedidos.find((p) => p.pedido_id === o.pedido_id)!),
     };
   }
@@ -605,6 +608,7 @@ export function criarRotasServico(store: typeof StoreType) {
         return {
           pedido_id: p.pedido_id,
           doente_nome: descreverDoente(p.doente_id),
+          doente_id: p.doente_id,
           prioridade: p.prioridade,
           estadio: descreverEstadioCuidado(doente?.estadio_cuidado ?? ""),
           prazo_limite: p.prazo_limite,
@@ -677,6 +681,8 @@ export function criarRotasServico(store: typeof StoreType) {
 
   // Estatísticas do serviço: tempo até agendamento (mediana + outliers), filtrável por estádio
   // do percurso oncológico do doente e por período (última semana/mês/todos).
+  // Estatísticas do serviço: filtráveis por período, estádio do doente e nível de prioridade, com
+  // comparação com o período anterior, evolução no tempo, cortes por estádio/nível e os casos mais lentos.
   router.get("/estatisticas", (req, res) => {
     const especialidade = especialidadeDoUtilizador(req.utilizadorId);
     if (!especialidade) {
@@ -684,80 +690,112 @@ export function criarRotasServico(store: typeof StoreType) {
       return;
     }
     const hoje = apenasData(agora());
-    const periodo = String(req.query.periodo ?? "mes"); // "semana" | "mes" | "todos"
-    const desde = periodo === "semana" ? somarDias(hoje, -7) : periodo === "mes" ? somarDias(hoje, -30) : null;
-    const estadiosFiltro = String(req.query.estadio ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const DIAS: Record<string, number | null> = { semana: 7, mes: 30, trimestre: 90, todos: null };
+    const periodo = String(req.query.periodo ?? "mes") in DIAS ? String(req.query.periodo ?? "mes") : "mes";
+    const nDias = DIAS[periodo];
+    const lista = (q: unknown) => String(q ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+    const estadios = lista(req.query.estadio);
+    const niveis = lista(req.query.nivel);
 
-    let pedidos = store.pedidos.filter((p) => p.especialidade_destino === especialidade);
-    if (desde) pedidos = pedidos.filter((p) => apenasData(parseIso(p.criado_em)).getTime() >= desde.getTime());
-    if (estadiosFiltro.length > 0) {
-      pedidos = pedidos.filter((p) => {
-        const doente = store.doentes.find((d) => d.doente_id === p.doente_id);
-        return doente && estadiosFiltro.includes(doente.estadio_cuidado || "");
-      });
-    }
+    const doDoente = new Map(store.doentes.map((d) => [d.doente_id, d]));
+    const base = store.pedidos.filter(
+      (p) =>
+        p.especialidade_destino === especialidade &&
+        (estadios.length === 0 || estadios.includes(doDoente.get(p.doente_id)?.estadio_cuidado ?? "")) &&
+        (niveis.length === 0 || niveis.includes(p.prioridade)),
+    );
+    const criado = (p: Pedido) => apenasData(parseIso(p.criado_em)).getTime();
+    const primeiro = base.reduce((m, p) => Math.min(m, criado(p)), hoje.getTime());
+    const inicio = nDias ? somarDias(hoje, -nDias) : new Date(primeiro);
+    const inicioAnterior = nDias ? somarDias(inicio, -nDias) : null;
 
-    interface Amostra {
-      pedido: Pedido;
-      dias: number;
-      dentroPrazo: boolean;
-      estadioCuidado: string;
+    interface Amostra { pedido: Pedido; dias: number; dentroPrazo: boolean; faltou: boolean; estadio: string }
+    function amostrasDe(pedidos: Pedido[]): Amostra[] {
+      const r: Amostra[] = [];
+      for (const p of pedidos) {
+        const ato = p.ato_id ? store.atosMedicos.find((a) => a.mvp_ato_id === p.ato_id) : undefined;
+        if (!ato) continue;
+        r.push({
+          pedido: p,
+          dias: diferencaDias(parseIso(ato.data_hora), parseIso(p.criado_em)),
+          dentroPrazo: parseIso(ato.data_hora).getTime() <= parseIso(p.prazo_limite).getTime(),
+          faltou: p.estado === "FALTOU" || ato.estado === "FALTOU",
+          estadio: doDoente.get(p.doente_id)?.estadio_cuidado ?? "",
+        });
+      }
+      return r;
     }
-    // Tempo de espera real = da criação do pedido até à data da consulta/exame marcado (não até
-    // ao instante em que o sistema processou a marcação, que é quase sempre no mesmo dia).
-    const amostras: Amostra[] = [];
-    for (const p of pedidos) {
-      if (!p.ato_id) continue;
-      const ato = store.atosMedicos.find((a) => a.mvp_ato_id === p.ato_id);
-      if (!ato) continue;
-      const doente = store.doentes.find((d) => d.doente_id === p.doente_id);
-      amostras.push({
-        pedido: p,
-        dias: diferencaDias(parseIso(ato.data_hora), parseIso(p.criado_em)),
-        dentroPrazo: parseIso(ato.data_hora).getTime() <= parseIso(p.prazo_limite).getTime(),
-        estadioCuidado: doente?.estadio_cuidado || "",
-      });
-    }
-
-    function resumoDe(lista: Amostra[]) {
-      const dias = lista.map((a) => a.dias);
+    const percent = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : null);
+    function resumo(pedidos: Pedido[]) {
+      const a = amostrasDe(pedidos);
       return {
-        total: lista.length,
-        medianaDias: mediana(dias),
-        percentDentroPrazo: lista.length > 0 ? Math.round((lista.filter((a) => a.dentroPrazo).length / lista.length) * 100) : null,
+        pedidos: pedidos.length,
+        marcados: a.length,
+        medianaDias: mediana(a.map((x) => x.dias)),
+        percentDentroPrazo: percent(a.filter((x) => x.dentroPrazo).length, a.length),
+        taxaFaltas: percent(a.filter((x) => x.faltou).length, a.length),
+        remarcados: pedidos.filter((p) => p.n_remarcacoes > 0).length,
       };
+    }
+
+    const doPeriodo = base.filter((p) => criado(p) >= inicio.getTime() && criado(p) <= hoje.getTime());
+    const anterior = inicioAnterior ? base.filter((p) => criado(p) >= inicioAnterior.getTime() && criado(p) < inicio.getTime()) : [];
+    const amostras = amostrasDe(doPeriodo);
+
+    // Evolução: por dia na última semana, por semana nos outros períodos.
+    const passo = nDias === 7 ? 1 : 7;
+    const serie: { rotulo: string; pedidos: number; marcados: number; percentDentroPrazo: number | null; medianaDias: number | null }[] = [];
+    for (let t = new Date(inicio); t.getTime() <= hoje.getTime(); t = somarDias(t, passo)) {
+      const fim = somarDias(t, passo);
+      const fatia = doPeriodo.filter((p) => criado(p) >= t.getTime() && criado(p) < fim.getTime());
+      const r = resumo(fatia);
+      serie.push({ rotulo: formatarDataPt(t).slice(0, 5), pedidos: r.pedidos, marcados: r.marcados, percentDentroPrazo: r.percentDentroPrazo, medianaDias: r.medianaDias });
     }
 
     const porEstadio = ["NOVO", "PRE_TRATAMENTO", "EM_TRATAMENTO", "FOLLOW_UP"].map((chave) => ({
       chave,
       legivel: descreverEstadioCuidado(chave),
-      ...resumoDe(amostras.filter((a) => a.estadioCuidado === chave)),
+      ...resumo(doPeriodo.filter((p) => (doDoente.get(p.doente_id)?.estadio_cuidado ?? "") === chave)),
     }));
+    const porNivel = (["MP", "P", "N"] as const).map((chave) => ({
+      chave,
+      legivel: descreverPrioridade(chave),
+      ...resumo(doPeriodo.filter((p) => p.prioridade === chave)),
+    }));
+    const faixas = [
+      { rotulo: "0–3 dias", min: 0, max: 3 },
+      { rotulo: "4–7", min: 4, max: 7 },
+      { rotulo: "8–14", min: 8, max: 14 },
+      { rotulo: "15–30", min: 15, max: 30 },
+      { rotulo: "> 30", min: 31, max: Infinity },
+    ].map((f) => ({ rotulo: f.rotulo, n: amostras.filter((a) => a.dias >= f.min && a.dias <= f.max).length }));
 
-    // Outliers: os casos mais demorados a agendar (mediana + desvio grande é menos legível numa
-    // demo do que simplesmente mostrar os piores casos concretos, com nome e justificação).
-    const outliers = [...amostras]
+    const maisLentos = [...amostras]
       .sort((a, b) => b.dias - a.dias)
-      .slice(0, 5)
+      .slice(0, 8)
       .map((a) => ({
         pedido_id: a.pedido.pedido_id,
+        doente_id: a.pedido.doente_id,
         doente_nome: descreverDoente(a.pedido.doente_id),
         descricao: descreverPedido(a.pedido),
+        prioridade: a.pedido.prioridade,
         dias: a.dias,
         dentro_prazo: a.dentroPrazo,
-        estadio_cuidado_legivel: descreverEstadioCuidado(a.estadioCuidado),
+        estadio_cuidado_legivel: descreverEstadioCuidado(a.estadio),
       }));
 
     res.json({
-      especialidade,
       especialidade_legivel: descreverEspecialidade(especialidade),
       periodo,
-      geral: resumoDe(amostras),
+      desde: isoData(inicio),
+      geral: resumo(doPeriodo),
+      anterior: inicioAnterior ? resumo(anterior) : null,
+      pendentesAgora: base.filter((p) => ["ACEITE", "SEM_VAGA", "EM_TRIAGEM", "FALTOU"].includes(p.estado)).length,
+      serie,
       porEstadio,
-      outliers,
+      porNivel,
+      faixas,
+      maisLentos,
     });
   });
 

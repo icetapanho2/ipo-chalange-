@@ -56,7 +56,7 @@ const CASOS: Caso[] = [
       {
         titulo: "Maria Fernandes — da consulta às marcações",
         descricao:
-          "Dr. Pedro, consulta das 09:30: escrever no Diário Clínico e \"Guardar & Seguinte\". No assistente escolher Análises, Exames e Consulta de revisão. Colheita com jejum (hemograma, bioquímica com creatinina, CEA, CA 19.9); TC TAP com contraste; revisão que depende dos exames desta consulta, com continuidade. Submeter.",
+          "Dr. Pedro, consulta das 09:30: escrever no Diário Clínico e \"Guardar & Seguinte\". No assistente escolher Análises, Exames e Próxima consulta (já vem no serviço dele). Colheita com jejum (hemograma, bioquímica com creatinina, CEA, CA 19.9); TC TAP com contraste; revisão que depende dos exames desta consulta, com continuidade. Submeter.",
         resultado:
           "Marcado automaticamente: colheita 24/09 07:30 → TC 14/10 08:20 (regra R1: creatinina antes do contraste) → revisão com o Dr. Pedro 21/10 08:30 (7 dias depois do TC, para haver resultado).",
         acoes: [{ etiqueta: "Agenda do Dr. Pedro", utilizadorId: "U01", caminho: "/oasis/medico" }],

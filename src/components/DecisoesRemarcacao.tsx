@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { NomeDoente } from "./NomeDoente";
 import { apiGet, apiPost } from "../lib/api";
 import { dataHoraCurta } from "./PorqueEstaEscolha";
 import { CalendarClock, FastForward, Stethoscope } from "lucide-react";
@@ -20,7 +21,7 @@ function Cartao({ d, aoDecidir }: { d: Decisao; aoDecidir: (id: string, decisao:
   return (
     <div className="rounded-lg border border-rose-300 bg-white p-3">
       <p className="text-sm font-semibold text-slate-800">
-        {d.doente_nome} — {d.consulta.descricao} de {dataHoraCurta(d.consulta.data_hora)}
+        <NomeDoente id={d.doente_id} nome={d.doente_nome} /> — {d.consulta.descricao} de {dataHoraCurta(d.consulta.data_hora)}
       </p>
       <p className="mt-0.5 text-xs text-slate-600">
         O exame de que esta consulta depende ({d.exame}) ficou sem vaga a tempo {d.origem === "AVARIA" ? "depois de uma avaria" : "depois de uma falta"}. A

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { NomeDoente } from "./NomeDoente";
 import { apiGet, apiPost } from "../lib/api";
 import { dataHoraCurta } from "./PorqueEstaEscolha";
 import { Phone, PhoneOff, Check, CalendarX2 } from "lucide-react";
@@ -107,7 +108,7 @@ export function ListaChamadas({ aoMudar }: { aoMudar?: (mensagem: string) => voi
             <div key={i.ato_id} className="flex flex-wrap items-start justify-between gap-2 px-4 py-2.5">
               <div className="text-xs">
                 <div className="font-semibold text-slate-800">
-                  {i.doente_nome} <span className="font-normal text-slate-500">· {i.contacto}</span>
+                  <NomeDoente id={i.doente_id} nome={i.doente_nome} /> <span className="font-normal text-slate-500">· {i.contacto}</span>
                 </div>
                 <div className="text-slate-500">
                   {dataHoraCurta(i.data_hora)} · {i.ato_descricao}
@@ -181,7 +182,7 @@ export function ListaChamadas({ aoMudar }: { aoMudar?: (mensagem: string) => voi
           <ul className="space-y-1 text-xs text-slate-600">
             {feitas.map((i) => (
               <li key={i.ato_id}>
-                <strong className="text-slate-800">{i.doente_nome}</strong> — {RESULTADO[i.chamada!.resultado] ?? i.chamada!.resultado}
+                <strong className="text-slate-800"><NomeDoente id={i.doente_id} nome={i.doente_nome} /></strong> — {RESULTADO[i.chamada!.resultado] ?? i.chamada!.resultado}
               </li>
             ))}
           </ul>

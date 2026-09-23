@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { apiGet, apiPost } from "../../lib/api";
+import { usePerfil } from "../../lib/PerfilContext";
 import { DoenteModal } from "../../components/DoenteModal";
 import {
   CheckCircle2,
@@ -57,11 +58,15 @@ interface Catalogo {
 interface Ato {
   mvp_ato_id: string;
   data_hora: string;
+  especialidade_codigo: string;
+  ato_codigo: string;
 }
 interface Doente {
   doente_id: string;
   nome: string;
   n_utente: string;
+  transporte_nao_urgente?: boolean;
+  distancia_km?: number;
 }
 interface RespostaConsulta {
   ato: Ato;
@@ -100,7 +105,7 @@ interface RespostaSubmissao {
 }
 
 const TIPOS_PEDIDO: { valor: TipoPedido; titulo: string; subtitulo: string }[] = [
-  { valor: "consulta", titulo: "Consulta de revisão", subtitulo: "Revisão no mesmo serviço" },
+  { valor: "consulta", titulo: "Próxima consulta", subtitulo: "No seu serviço" },
   { valor: "pedido_consulta", titulo: "Pedido de consulta", subtitulo: "Interconsulta a outra especialidade" },
   { valor: "pedido_hd", titulo: "Hospital de Dia / Tratamento", subtitulo: "Sessão de Hospital de Dia" },
   { valor: "exame", titulo: "Exames", subtitulo: "Imagiologia (TC, ecografia…)" },
@@ -130,6 +135,8 @@ export function OasisPedidosPosConsulta() {
   const [resultado, setResultado] = useState<RespostaSubmissao | null>(null);
   const [modalDoenteAberto, setModalDoenteAberto] = useState(false);
   const proximoId = useRef(0);
+  const { utilizadores } = usePerfil();
+  const [transporte, setTransporte] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!atoId) return;
@@ -145,11 +152,21 @@ export function OasisPedidosPosConsulta() {
   }
 
   function novoPedido(tipo: TipoPedido): PedidoForm {
+    // Serviço já escolhido quando só há um possível (a próxima consulta é sempre no serviço desta consulta).
+    const unicos = especialidadesParaTipo(tipo);
+    const especialidade = unicos.length === 1 ? unicos[0].codigo : "";
+    const atos = especialidade ? atosParaTipoEEspecialidade(tipo, especialidade) : [];
     return {
       id: gerarId(),
       tipo_pedido: tipo,
-      especialidade_destino: "",
-      ato_codigo: "",
+      especialidade_destino: especialidade,
+      // Próxima consulta: o mesmo tipo de consulta que está a decorrer (o médico pode mudar).
+      ato_codigo:
+        atos.length === 1
+          ? atos[0].ato_codigo
+          : tipo === "consulta"
+            ? (atos.find((a) => a.ato_codigo === dados?.ato.ato_codigo) ?? atos[0])?.ato_codigo ?? ""
+            : "",
       exames: [],
       analises: [],
       especificacao: "",
@@ -224,6 +241,7 @@ export function OasisPedidosPosConsulta() {
           depende_exames_consulta: p.depende_exames_consulta,
           continuidade_medico: p.continuidade_medico,
         })),
+        ...(transporte !== null ? { transporte_nao_urgente: transporte } : {}),
       };
       const r = await apiPost<RespostaSubmissao>(`/oasis/consulta/${atoId}/pedidos`, corpo);
       setResultado(r);
@@ -235,9 +253,22 @@ export function OasisPedidosPosConsulta() {
     }
   }
 
+  /**
+   * Só se oferecem serviços que dão seguimento ao pedido: os que passam por triagem precisam de um
+   * triador nesse serviço; os restantes, de uma administrativa que trate das marcações. A próxima
+   * consulta é sempre no serviço desta consulta. Uma interconsulta nunca é para o próprio serviço.
+   */
   function especialidadesParaTipo(tipo: TipoPedido): Especialidade[] {
     if (!catalogo) return [];
-    const codigos = new Set(catalogo.catalogoAtos.filter((a) => a.tipo_pedido === tipo).map((a) => a.especialidade_codigo));
+    const servicoConsulta = dados?.ato.especialidade_codigo ?? "";
+    const perfilNecessario = tipo === "pedido_consulta" || tipo === "pedido_hd" ? "TRIADOR" : "ADMINISTRATIVO";
+    const comEquipa = new Set(utilizadores.filter((u) => u.perfil === perfilNecessario).map((u) => u.especialidade_codigo));
+    const codigos = new Set(
+      catalogo.catalogoAtos
+        .filter((a) => a.tipo_pedido === tipo && comEquipa.has(a.especialidade_codigo))
+        .filter((a) => (tipo === "consulta" ? a.especialidade_codigo === servicoConsulta : tipo === "pedido_consulta" ? a.especialidade_codigo !== servicoConsulta : true))
+        .map((a) => a.especialidade_codigo),
+    );
     return catalogo.especialidades.filter((e) => codigos.has(e.codigo));
   }
 
@@ -341,7 +372,7 @@ export function OasisPedidosPosConsulta() {
                 Escolha uma ou várias opções (equivalente ao Modelo 234). Pode juntar vários tipos na mesma submissão.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {TIPOS_PEDIDO.map((t) => (
+                {TIPOS_PEDIDO.filter((t) => especialidadesParaTipo(t.valor).length > 0).map((t) => (
                   <label
                     key={t.valor}
                     className={`flex items-start gap-2.5 rounded-lg border p-3 cursor-pointer transition-colors ${
@@ -651,12 +682,28 @@ export function OasisPedidosPosConsulta() {
 
               <button
                 type="button"
-                onClick={() => setEtapa("preenchimento")}
+                onClick={() => setEtapa("tipos")}
                 className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-oasis-accent hover:underline"
+                title="Voltar à escolha dos pedidos a fazer"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>Adicionar pedido</span>
               </button>
+
+              {/* Transporte: entra no custo de remarcar e na escolha do dia (dia único para quem vem de longe) */}
+              <label className="mt-4 flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={transporte ?? !!dados.doente?.transporte_nao_urgente}
+                  onChange={(e) => setTransporte(e.target.checked)}
+                />
+                <span>
+                  <strong>O doente precisa de transporte não urgente</strong> (ambulância/táxi)
+                  {dados.doente?.distancia_km ? ` · mora a ${dados.doente.distancia_km} km` : ""}. O sistema evita mudar-lhe marcações e junta-as no mesmo dia
+                  sempre que possível.
+                </span>
+              </label>
 
               <div className="mt-5 flex items-center justify-between pt-3 border-t border-slate-200">
                 <button

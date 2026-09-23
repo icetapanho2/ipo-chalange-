@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { NomeDoente } from "../components/NomeDoente";
 import { dataHoraPT, dataPT } from "../lib/datas";
 import { Link } from "react-router-dom";
 import { apiGet, apiPost } from "../lib/api";
@@ -11,6 +12,7 @@ interface Peso {
 }
 
 interface Outcome {
+  doente_id: string;
   pedido_id: string;
   doente_nome: string;
   tipo_pedido_legivel: string;
@@ -205,7 +207,7 @@ export function GestaoPrioridade() {
                     <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${COR_PRIORIDADE[o.prioridade]}`}>
                       {o.prioridade_legivel}
                     </span>
-                    <span className="text-xs font-bold text-slate-800 truncate">{o.doente_nome}</span>
+                    <span className="text-xs font-bold text-slate-800 truncate"><NomeDoente id={o.doente_id} nome={o.doente_nome} /></span>
                     <span className="text-xs text-slate-500 truncate">{o.descricao}</span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

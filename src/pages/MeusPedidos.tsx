@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { NomeDoente } from "../components/NomeDoente";
 import { Link } from "react-router-dom";
 import { dataHoraPT, dataPT } from "../lib/datas";
 import { apiGet, apiPost } from "../lib/api";
@@ -6,6 +7,7 @@ import { DecisoesRemarcacao } from "../components/DecisoesRemarcacao";
 import { AlertTriangle, CalendarCheck2, CheckCircle2, Clock, ExternalLink, HelpCircle, Hourglass, Search, XCircle } from "lucide-react";
 
 interface ResumoPedido {
+  doente_id: string;
   pedido_id: string;
   doente_nome: string;
   descricao: string;
@@ -79,7 +81,7 @@ function Percurso({ d }: { d: DoenteAcompanhado }) {
     <div className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-lg font-bold text-slate-900">{d.doente_nome}</h2>
+          <h2 className="text-lg font-bold text-slate-900"><NomeDoente id={d.doente_id} nome={d.doente_nome} /></h2>
           <p className="text-xs text-slate-500">
             {d.estadio_cuidado_legivel} · {d.percurso.length} pedido(s) seus
           </p>
@@ -204,7 +206,7 @@ export function MeusPedidos() {
           {dados.semVagaDecisao.map((p) => (
             <div key={p.pedido_id} className="rounded-lg border border-amber-200 bg-white p-3">
               <p className="text-sm font-semibold text-slate-800">
-                {p.doente_nome} — {p.descricao}
+                <NomeDoente id={p.doente_id} nome={p.doente_nome} /> — {p.descricao}
               </p>
               <p className="mt-0.5 text-xs text-slate-600">Sem vaga no prazo; a administração não conseguiu vaga interna nem externa. Manter em espera ou cancelar?</p>
               <div className="mt-2 flex gap-2">
@@ -220,7 +222,7 @@ export function MeusPedidos() {
           {dados.devolvidos.map((p) => (
             <div key={p.pedido_id} className="rounded-lg border border-amber-200 bg-white p-3">
               <p className="text-sm font-semibold text-slate-800">
-                {p.doente_nome} — {p.descricao}
+                <NomeDoente id={p.doente_id} nome={p.doente_nome} /> — {p.descricao}
               </p>
               <p className="mt-0.5 text-xs text-amber-800">Pergunta do triador: {p.pergunta_triagem}</p>
               <div className="mt-2 flex gap-2">
@@ -244,7 +246,7 @@ export function MeusPedidos() {
           <ul className="mt-1.5 space-y-1 text-slate-600">
             {dados.recusados.map((p) => (
               <li key={p.pedido_id}>
-                <strong>{p.doente_nome}</strong> — {p.descricao}
+                <strong><NomeDoente id={p.doente_id} nome={p.doente_nome} /></strong> — {p.descricao}
                 {p.motivo_recusa && <span className="text-slate-500"> · {p.motivo_recusa}</span>}
               </li>
             ))}

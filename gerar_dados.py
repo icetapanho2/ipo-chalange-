@@ -112,6 +112,8 @@ UTILIZADORES = [
     ("U11", "Tiago Neves", "ADMINISTRATIVO", "7000_3", 0),
     ("U12", "Dr. Nuno Reis", "GESTAO", "", 0),
     ("U13", "Vítor Amaral", "TECNICO", "", 0),
+    # Administrativa da Oncologia Médica: dá seguimento às próximas consultas e remarcações do serviço.
+    ("U14", "Sara Lopes", "ADMINISTRATIVO", "1300", 0),
 ]
 
 # ---------------------------------------------------------------- regras

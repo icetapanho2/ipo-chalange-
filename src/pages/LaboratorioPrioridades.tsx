@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { NomeDoente } from "../components/NomeDoente";
 import { Link } from "react-router-dom";
 import { apiGet, apiPost } from "../lib/api";
 import { PorqueEstaEscolha, type CandidatoTroca } from "../components/PorqueEstaEscolha";
@@ -158,7 +159,7 @@ export function LaboratorioPrioridades() {
           <div className="space-y-3">
             {editaveis.map((c) => (
               <div key={c.doente_id} className="rounded-lg border border-slate-100 p-2.5 text-xs">
-                <div className="mb-1.5 font-semibold text-slate-800">{c.doente_nome}</div>
+                <div className="mb-1.5 font-semibold text-slate-800"><NomeDoente id={c.doente_id} nome={c.doente_nome} /></div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-slate-600">
                   <label className="flex items-center gap-1">
                     Idade

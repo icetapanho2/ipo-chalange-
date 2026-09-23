@@ -22,6 +22,7 @@ export function criarRotasMeusPedidos(store: typeof StoreType) {
     return {
       pedido_id: p.pedido_id,
       doente_nome: store.doentes.find((d) => d.doente_id === p.doente_id)?.nome ?? p.doente_id,
+      doente_id: p.doente_id,
       tipo_pedido_legivel: descreverTipoPedido(p.tipo_pedido),
       especialidade_destino_legivel: descreverEspecialidade(p.especialidade_destino),
       descricao: descreverPedido(p),

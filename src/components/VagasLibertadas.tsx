@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { NomeDoente } from "./NomeDoente";
 import { apiGet, apiPost } from "../lib/api";
 import { dataHoraCurta } from "./PorqueEstaEscolha";
 import { CalendarX2, Check, ChevronDown, ChevronUp, MessageSquare, Search, Sparkles, X } from "lucide-react";
@@ -14,6 +15,7 @@ interface Marcacao {
 }
 
 interface CandidatoAntecipacao {
+  doente_id: string;
   pedido_id: string;
   doente_nome: string;
   estadio_cuidado: string;
@@ -24,6 +26,7 @@ interface CandidatoAntecipacao {
 }
 
 interface Oferta {
+  doente_id: string;
   oferta_id: string;
   doente_nome: string;
   pedido_descricao: string;
@@ -133,7 +136,7 @@ export function VagasLibertadas({ aoMudar }: { aoMudar?: (mensagem: string) => v
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h4 className="text-sm font-bold text-slate-800">
-                    {o.doente_nome}: {dataHoraCurta(o.data_hora_atual)} → <span className="text-emerald-700">{dataHoraCurta(o.data_hora_vaga)}</span>
+                    <NomeDoente id={o.doente_id} nome={o.doente_nome} />: {dataHoraCurta(o.data_hora_atual)} → <span className="text-emerald-700">{dataHoraCurta(o.data_hora_vaga)}</span>
                   </h4>
                   <p className="text-xs text-slate-600">{o.pedido_descricao}</p>
                   <p className="mt-1 text-xs text-slate-700">
@@ -172,7 +175,7 @@ export function VagasLibertadas({ aoMudar }: { aoMudar?: (mensagem: string) => v
                 <ol className="mt-2 space-y-1 text-xs">
                   {o.candidatos.map((c, i) => (
                     <li key={c.pedido_id} className={`rounded px-2 py-1 ${i === 0 ? "bg-emerald-50 font-semibold text-emerald-900" : "text-slate-600"}`}>
-                      {i + 1}. {c.doente_nome} — {c.motivo}
+                      {i + 1}. <NomeDoente id={c.doente_id} nome={c.doente_nome} /> — {c.motivo}
                     </li>
                   ))}
                 </ol>
@@ -205,7 +208,7 @@ export function VagasLibertadas({ aoMudar }: { aoMudar?: (mensagem: string) => v
             <div key={m.pedido_id} className="py-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs">
-                  <span className="font-semibold text-slate-800">{m.doente_nome}</span>
+                  <span className="font-semibold text-slate-800"><NomeDoente id={m.doente_id} nome={m.doente_nome} /></span>
                   <span className="text-slate-500"> · {dataHoraCurta(m.data_hora)} · {m.descricao}</span>
                 </div>
                 <button
@@ -248,7 +251,7 @@ export function VagasLibertadas({ aoMudar }: { aoMudar?: (mensagem: string) => v
             {vagas.historico.map((o) => (
               <li key={o.oferta_id} className="flex flex-wrap items-center gap-2">
                 <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${ESTADO_OFERTA[o.estado] ?? "bg-slate-100"}`}>{o.estado}</span>
-                <span className="font-semibold text-slate-800">{o.doente_nome}</span>
+                <span className="font-semibold text-slate-800"><NomeDoente id={o.doente_id} nome={o.doente_nome} /></span>
                 <span className="text-slate-500">
                   {dataHoraCurta(o.data_hora_atual)} → {dataHoraCurta(o.data_hora_vaga)}
                   {o.nivel_cascata > 0 ? ` · cascata nível ${o.nivel_cascata}` : ""}

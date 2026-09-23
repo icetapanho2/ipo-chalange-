@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { NomeDoente } from "../components/NomeDoente";
 import { dataPT } from "../lib/datas";
 import { apiGet, apiPost } from "../lib/api";
 import { usePerfil } from "../lib/PerfilContext";
@@ -374,7 +375,7 @@ export function Triagem() {
             </div>
 
             <p className="text-xs text-slate-600 mb-2">
-              Utente: <strong className="text-slate-800">{aberto.item.doente_nome}</strong> · Pedido: {aberto.item.descricao}
+              Utente: <strong className="text-slate-800"><NomeDoente id={aberto.item.doente_id} nome={aberto.item.doente_nome} /></strong> · Pedido: {aberto.item.descricao}
             </p>
 
             {aberto.accao === "reencaminhar" && (

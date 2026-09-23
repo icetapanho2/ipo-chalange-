@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NomeDoente } from "./NomeDoente";
 import { CheckCircle2, ChevronDown, ChevronUp, History, ShieldCheck, XCircle } from "lucide-react";
 
 /** Um candidato avaliado pelas regras de remarcação (server/motor/remarcacao.ts). */
@@ -76,7 +77,7 @@ export function PorqueEstaEscolha({
         <span className="flex items-center gap-1.5">
           <ShieldCheck className="h-4 w-4 text-indigo-600" />
           Porquê esta escolha? — {candidatos.length} doentes avaliados
-          {escolhido && <span className="font-normal text-slate-600">· escolhido: {escolhido.doente_nome}</span>}
+          {escolhido && <span className="font-normal text-slate-600">· escolhido: <NomeDoente id={escolhido.doente_id} nome={escolhido.doente_nome} /></span>}
         </span>
         {aberto ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
       </button>
@@ -87,7 +88,7 @@ export function PorqueEstaEscolha({
             <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               <History className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
               <span>
-                <strong>Pela regra antiga (só a folga até ao prazo) seria escolhido {antigo.doente_nome}</strong>
+                <strong>Pela regra antiga (só a folga até ao prazo) seria escolhido <NomeDoente id={antigo.doente_id} nome={antigo.doente_nome} /></strong>
                 {antigo.parcelas.length > 0 && <> — {antigo.parcelas.filter((p) => p.pontos > 0).map((p) => p.rotulo).join(", ")}</>}
                 . As regras de prioridade evitam mexer em quem tem mais a perder com uma remarcação.
               </span>
@@ -111,7 +112,7 @@ export function PorqueEstaEscolha({
                     <td className="py-2 pr-2">
                       <div className="flex items-center gap-1 font-semibold text-slate-800">
                         {c.escolhido && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />}
-                        {c.doente_nome}
+                        <NomeDoente id={c.doente_id} nome={c.doente_nome} />
                       </div>
                       {c.escolhido && <div className="text-[10px] font-bold uppercase text-emerald-700">Cede a vaga → {dataHoraCurta(c.data_destino)}</div>}
                       {c.escolhido_regra_antiga && !c.escolhido && (
@@ -152,7 +153,7 @@ export function PorqueEstaEscolha({
                     <td className="py-2 pr-2">
                       <div className="flex items-center gap-1 font-semibold">
                         <XCircle className="h-3.5 w-3.5" />
-                        {c.doente_nome}
+                        <NomeDoente id={c.doente_id} nome={c.doente_nome} />
                       </div>
                       {c.escolhido_regra_antiga && <div className="text-[10px] font-bold uppercase text-amber-700">Escolha da regra antiga</div>}
                     </td>

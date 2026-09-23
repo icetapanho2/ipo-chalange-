@@ -1,6 +1,7 @@
 import { Suspense, lazy } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Cabecalho } from "./components/Cabecalho";
+import { GavetaDoente } from "./components/NomeDoente";
 import { Inicio } from "./pages/Inicio";
 import { OasisMedico } from "./pages/oasis/Medico";
 import { OasisConsulta } from "./pages/oasis/Consulta";
@@ -24,6 +25,7 @@ export function App() {
   return (
     <BrowserRouter>
       <Cabecalho />
+      <GavetaDoente />
       <Routes>
         <Route path="/" element={<Inicio />} />
         <Route path="/oasis/medico" element={<OasisMedico />} />

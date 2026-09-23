@@ -163,6 +163,7 @@ export function criarRotasGestao(store: typeof StoreType) {
       .map((p) => ({
         pedido_id: p.pedido_id,
         doente_nome: descreverDoente(p.doente_id),
+        doente_id: p.doente_id,
         tipo_pedido_legivel: descreverTipoPedido(p.tipo_pedido),
         descricao: descreverPedido(p),
         especialidade_destino_legivel: descreverEspecialidade(p.especialidade_destino),

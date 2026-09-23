@@ -321,3 +321,20 @@ Pedido do utilizador depois da revisão:
    cumprem o prazo e se chegam a tempo da consulta), vaga extra, outsourcing ou, se houver consulta
    dependente, enviar ao médico. A escolha fica registada com quem e porquê. Rejeitar uma troca passa o
    pedido para "Sem vaga no prazo", com as opções para o resolver.
+
+## 2026-09-23 — Ficha do doente, nomes clicáveis, estatísticas e assistente do médico
+
+1. **Uma só ficha do doente** (`FichaDoente`), na página e num painel lateral que abre ao clicar em
+   qualquer nome de doente (em todo o site), sem sair do que se está a fazer. Em cima: estádio,
+   alergias, contacto, distância/transporte, próxima marcação e barra de progresso; depois o
+   **percurso** (cada pedido pela ordem das datas, com prazo, dependências, problema e o que está em
+   curso); ao lado notas e mensagens; em baixo o histórico completo. Saíram os separadores e as três
+   listas que repetiam as mesmas marcações, e o botão que adiava uma consulta sem proposta.
+2. **Estatísticas do serviço** filtráveis por período (7/30/90 dias, tudo), estádio e nível, com
+   variação face ao período anterior, evolução, cortes por estádio e nível, distribuição da espera e
+   os casos mais demorados. Um gráfico por medida (sem dois eixos); recharts só carrega neste separador.
+3. **Assistente do médico:** só oferece serviços com seguimento (triador para interconsultas e Hospital
+   de Dia, administrativa para o resto); "Consulta de revisão" passou a **"Próxima consulta"**, já no
+   serviço da consulta e com o mesmo acto; opção de **transporte não urgente** no resumo; o "+" do
+   resumo volta à escolha dos pedidos. Nova utilizadora **U14 Sara Lopes**, administrativa da Oncologia
+   Médica (a única especialidade com consultas sem ninguém para lhes dar seguimento).
