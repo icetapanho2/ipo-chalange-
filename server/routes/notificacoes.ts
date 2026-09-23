@@ -30,6 +30,21 @@ export function criarRotasNotificacoes(store: typeof StoreType) {
     });
   });
 
+  // Todas as notificações do sistema (para a demo: mostrar que chegam a quem devem, na hora).
+  router.get("/todas", (_req, res) => {
+    const nomes = new Map(store.utilizadores.map((u) => [u.utilizador_id, u]));
+    res.json(
+      [...store.notificacoes]
+        .sort((a, b) => b.criado_em.localeCompare(a.criado_em) || b.notificacao_id.localeCompare(a.notificacao_id))
+        .slice(0, 200)
+        .map((n) => ({
+          ...n,
+          destinatario_nome: nomes.get(n.destinatario_utilizador_id)?.nome ?? n.destinatario_utilizador_id,
+          destinatario_perfil: nomes.get(n.destinatario_utilizador_id)?.perfil ?? "",
+        })),
+    );
+  });
+
   router.post("/:id/marcar-lida", (req, res) => {
     const notificacao = store.notificacoes.find(
       (n) => n.notificacao_id === req.params.id && n.destinatario_utilizador_id === req.utilizadorId,

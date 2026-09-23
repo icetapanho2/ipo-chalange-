@@ -1,5 +1,8 @@
 export const PERFIL_STORAGE_KEY = "oasis2:utilizadorId";
 
+/** Disparado depois de cada acção bem-sucedida na API. */
+export const EVENTO_MUDANCA = "oasis:mudanca";
+
 function utilizadorIdActual(): string {
   try {
     return localStorage.getItem(PERFIL_STORAGE_KEY) ?? "";
@@ -21,6 +24,8 @@ export async function api<T>(caminho: string, opcoes: RequestInit = {}): Promise
     const corpo = await resposta.text();
     throw new Error(`Erro ${resposta.status} em ${caminho}: ${corpo}`);
   }
+  // Qualquer acção (POST/PUT) pode gerar notificações: avisa quem estiver à escuta para refrescar já.
+  if (opcoes.method && opcoes.method !== "GET") window.dispatchEvent(new Event(EVENTO_MUDANCA));
   if (resposta.status === 204) return undefined as T;
   return (await resposta.json()) as T;
 }

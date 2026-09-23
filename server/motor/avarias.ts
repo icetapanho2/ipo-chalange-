@@ -53,7 +53,7 @@ export function reportarAvaria(
     mensagem:
       `${alvo} indisponível ${periodo}: ${opts.descricao}. ` +
       (plano.length
-        ? `Plano de remarcação pronto (${plano.length} proposta(s)${foraDoPrazo ? `, ${foraDoPrazo} fora do prazo` : ""}) — rever e validar em Serviço → Remarcações.`
+        ? `Plano de remarcação pronto (${plano.length} proposta(s)${foraDoPrazo ? `, ${foraDoPrazo} fora do prazo` : ""}) — rever e validar em Serviço → Para decidir.`
         : "Não há marcações afectadas."),
     quando,
   });

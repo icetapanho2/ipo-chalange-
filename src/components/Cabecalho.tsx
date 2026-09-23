@@ -3,6 +3,7 @@ import { useState } from "react";
 import { apiPost } from "../lib/api";
 import { usePerfil } from "../lib/PerfilContext";
 import { TrocadorUtilizador } from "./TrocadorUtilizador";
+import { PainelNotificacoes } from "./PainelNotificacoes";
 import { ITENS_INICIO, NAV_POR_PERFIL, type ItemNav } from "../lib/navegacao";
 import {
   Stethoscope,
@@ -111,6 +112,7 @@ export function Cabecalho() {
 
         {/* Perfil Ativo, Notificações & Ações */}
         <div className="flex items-center gap-2">
+          <PainelNotificacoes />
           <TrocadorUtilizador />
 
           <button
