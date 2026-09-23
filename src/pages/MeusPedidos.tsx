@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { NomeDoente } from "../components/NomeDoente";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { dataHoraPT, dataPT } from "../lib/datas";
 import { apiGet, apiPost } from "../lib/api";
 import { DecisoesRemarcacao } from "../components/DecisoesRemarcacao";
@@ -137,7 +137,17 @@ export function MeusPedidos() {
   const [situacao, setSituacao] = useState<Situacao | "todos">("todos");
   const [estadio, setEstadio] = useState("");
   const [pesquisa, setPesquisa] = useState("");
-  const [selecionado, setSelecionado] = useState<string | null>(null);
+  const [params] = useSearchParams();
+  const [selecionado, setSelecionado] = useState<string | null>(params.get("doente"));
+  // Uma notificação pode trazer o doente (?doente=): abre-o logo.
+  useEffect(() => {
+    const d = params.get("doente");
+    if (d) {
+      setSelecionado(d);
+      setSituacao("todos");
+      setEstadio("");
+    }
+  }, [params]);
 
   function recarregar() {
     apiGet<Resposta>("/meus-pedidos").then(setDados).catch((e) => setErro(String(e)));

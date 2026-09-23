@@ -45,18 +45,35 @@ const COR: Record<string, string> = {
   REMARCACAO_SUGERIDA: "bg-sky-100 text-sky-800",
 };
 
-const ROTA: Record<string, string> = {
-  CONSULTA_SUBMETIDA: "/servico",
-  PEDIDO_EM_TRIAGEM: "/triagem",
-  PEDIDO_MARCADO: "/meus-pedidos",
-  PEDIDO_SEM_VAGA: "/servico?aba=decidir",
-  PEDIDO_DEVOLVIDO: "/meus-pedidos",
-  PEDIDO_RECUSADO: "/meus-pedidos",
-  AVARIA_SERVICO: "/servico?aba=decidir",
-  AVARIA_RESOLVIDA: "/tecnico",
-  PEDIDO_DECISAO_NECESSARIA: "/meus-pedidos",
-  REMARCACAO_SUGERIDA: "/servico?aba=decidir",
-};
+/**
+ * Para onde leva uma notificação: sempre para o sítio onde se age sobre ela (nunca só para a ficha).
+ * Depende do tipo e de quem a recebe (a mesma "marcado" é informação para o médico e carteira para a
+ * administrativa).
+ */
+function rotaDaNotificacao(n: Notificacao): string {
+  const medico = n.destinatario_perfil === "MEDICO";
+  const doMedico = `/meus-pedidos${n.doente_id ? `?doente=${n.doente_id}` : ""}`;
+  switch (n.tipo) {
+    case "PEDIDO_EM_TRIAGEM":
+      return `/triagem${n.doente_id ? `?doente=${n.doente_id}` : ""}`;
+    case "AVARIA_SERVICO":
+    case "REMARCACAO_SUGERIDA":
+      return "/servico?aba=decidir";
+    case "PEDIDO_SEM_VAGA":
+      return medico ? doMedico : "/servico?aba=decidir";
+    case "PEDIDO_MARCADO":
+    case "CONSULTA_SUBMETIDA":
+      return medico ? doMedico : "/servico?aba=pedidos";
+    case "PEDIDO_DEVOLVIDO":
+    case "PEDIDO_RECUSADO":
+    case "PEDIDO_DECISAO_NECESSARIA":
+      return doMedico;
+    case "AVARIA_RESOLVIDA":
+      return "/tecnico";
+    default:
+      return "/";
+  }
+}
 
 const CHAVE_FIXO = "oasis2:notificacoesFixas";
 const CHAVE_FILTRO = "oasis2:notificacoesFiltro";
@@ -157,8 +174,7 @@ export function PainelNotificacoes() {
     }).catch(() => undefined);
     carregar();
     if (!fixo) setAberto(false);
-    const paraDoente = n.doente_id && !["REMARCACAO_SUGERIDA", "PEDIDO_DECISAO_NECESSARIA", "AVARIA_SERVICO"].includes(n.tipo);
-    navigate(paraDoente ? `/doente/${n.doente_id}` : ROTA[n.tipo] ?? "/");
+    navigate(rotaDaNotificacao(n));
   }
 
   async function marcarTodasLidas() {

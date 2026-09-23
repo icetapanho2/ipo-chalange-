@@ -60,13 +60,13 @@ export function Cabecalho() {
         {/* Marca & Identidade */}
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-oasis-header text-white font-black text-sm tracking-wider shadow-sm">
-            O2
+            IPO
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-900 text-sm tracking-tight">OASIS 2.0</span>
+              <span className="font-bold text-slate-900 text-sm tracking-tight">IPO-2030</span>
             </div>
-            <p className="text-[11px] text-slate-500 leading-none">Pedidos pós-consulta</p>
+            <p className="text-[11px] text-slate-500 leading-none">Servir é dever</p>
           </div>
         </div>
 

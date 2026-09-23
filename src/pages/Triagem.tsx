@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { NomeDoente } from "../components/NomeDoente";
 import { dataPT } from "../lib/datas";
 import { apiGet, apiPost } from "../lib/api";
@@ -59,6 +60,9 @@ export function Triagem() {
   const [filtroPrioridade, setFiltroPrioridade] = useState<string>("TODAS");
   const [pesquisa, setPesquisa] = useState("");
   const [aProcessar, setAProcessar] = useState(false);
+  // Vindo de uma notificação (?doente=): esse pedido aparece destacado e em primeiro.
+  const [params] = useSearchParams();
+  const doenteDestacado = params.get("doente");
 
   function recarregar() {
     apiGet<RespostaFila>("/triagem/fila")
@@ -224,10 +228,14 @@ export function Triagem() {
       )}
 
       <div className="mt-4 space-y-3.5">
-        {filaFiltrada.map((item) => (
+        {[...filaFiltrada]
+          .sort((x, y) => Number(y.doente_id === doenteDestacado) - Number(x.doente_id === doenteDestacado))
+          .map((item) => (
           <div
             key={item.pedido_id}
-            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 transition-all"
+            className={`rounded-xl border bg-white p-4 shadow-sm transition-all ${
+              item.doente_id === doenteDestacado ? "border-amber-400 ring-2 ring-amber-200" : "border-slate-200 hover:border-slate-300"
+            }`}
           >
             {/* Topo do Cartão de Triagem */}
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
