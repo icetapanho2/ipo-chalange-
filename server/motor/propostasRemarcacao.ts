@@ -282,7 +282,7 @@ function consultaDependente(pedido: Pedido): { pedido: Pedido; ato: AtoMedico; i
   for (const d of store.dependencias.filter((x) => x.depende_de_pedido_id === pedido.pedido_id)) {
     const dep = store.pedidos.find((p) => p.pedido_id === d.pedido_id);
     const ato = dep?.estado === "MARCADO" ? store.atosMedicos.find((a) => a.mvp_ato_id === dep.ato_id) : undefined;
-    if (dep && ato) return { pedido: dep, ato, intervalo: d.intervalo_min_dias || intervaloResultado(pedido.especialidade_destino) };
+    if (dep && ato) return { pedido: dep, ato, intervalo: d.intervalo_min_dias ?? intervaloResultado(pedido.especialidade_destino) };
   }
   return null;
 }

@@ -68,33 +68,14 @@ export const CASOS: Caso[] = [
           { etiqueta: "Triagem (Onc. Médica)", utilizadorId: "U04", caminho: "/triagem?doente=100101", alvo: '[data-tour="triagem-100101"]' },
           { etiqueta: "Pedidos (TAC)", utilizadorId: "U07", caminho: "/servico?aba=pedidos" },
           { etiqueta: "Os meus pedidos (Dr. Pedro)", utilizadorId: "U01", caminho: "/meus-pedidos?doente=100101" },
-          { etiqueta: "Ficha da Maria", utilizadorId: "U01", caminho: "/doente/100101", alvo: '[data-tour="ficha-resumo"]' },
         ],
       },
       {
-        titulo: "Luísa Martins — pedido para outro serviço",
-        descricao: "O triador de Oncologia Médica vê que o pedido é para Radioterapia e reencaminha-o; a triadora de Radioterapia aceita.",
-        resultado: "1.ª consulta de Radioterapia a 30/09 09:00, marcada no momento em que é aceite.",
-        acoes: [
-          { etiqueta: "Reencaminhar (Onc. Médica)", utilizadorId: "U04", caminho: "/triagem?doente=100103", alvo: '[data-tour="triagem-100103"]' },
-          { etiqueta: "Aceitar (Radioterapia)", utilizadorId: "U06", caminho: "/triagem?doente=100103", alvo: '[data-tour="triagem-100103"]' },
-        ],
-      },
-      {
-        titulo: "Fernando Lopes — Hospital de Dia",
-        descricao: "A triadora de Hospital de Dia aceita a sessão de quimioterapia.",
-        resultado: "Sessão a 25/09 08:30; as análises pré-quimioterapia são criadas e marcadas sozinhas para 24/09 07:30 (regra R2: 1 a 3 dias antes).",
-        acoes: [{ etiqueta: "Aceitar (Hospital de Dia)", utilizadorId: "U10", caminho: "/triagem?doente=100108", alvo: '[data-tour="triagem-100108"]' }],
-      },
-      {
-        titulo: "Ver tudo na ficha do doente",
+        titulo: "Maria — tudo na ficha",
         descricao:
-          "Abrir a ficha da Maria: em \"Marcações do doente\" aparece cada marcação, com a indicação de que está dentro do prazo, e as mensagens que ela recebeu (aviso com a preparação do exame e lembrete a D-3).",
-        resultado: "Tudo o que foi pedido está marcado, dentro do prazo, e o doente já sabe o que tem de fazer.",
-        acoes: [
-          { etiqueta: "Ficha da Maria", utilizadorId: "U03", caminho: "/doente/100101", alvo: '[data-tour="ficha-resumo"]' },
-          { etiqueta: "Ficha do Fernando", utilizadorId: "U03", caminho: "/doente/100108", alvo: '[data-tour="ficha-resumo"]' },
-        ],
+          "Abrir a ficha da Maria: o percurso dos pedidos com cada marcação (e a dependência da consulta em relação ao TC), a folha clínica com o diário de hoje e as mensagens que ela recebeu (aviso com a preparação do exame e lembretes a D-3).",
+        resultado: "\"Tudo em ordem · 3 marcados\": tudo o que foi pedido está marcado, dentro do prazo, e a doente já sabe o que tem de fazer.",
+        acoes: [{ etiqueta: "Ficha da Maria", utilizadorId: "U01", caminho: "/doente/100101", alvo: '[data-tour="ficha-resumo"]' }],
         fala: "Fim do circuito normal: pedido, triagem, marcação e aviso ao doente, sem papel e sem telefonemas.",
       },
     ],

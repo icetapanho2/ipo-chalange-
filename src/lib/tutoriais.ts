@@ -186,16 +186,12 @@ function tutorialDoGuiao(casoId: string): Tutorial | null {
 
 export function obterTutorial(id: string): Tutorial | null {
   if (id === "1") {
-    // 1.1 e 1.2 (a Maria) guiados clique a clique; 1.3 e 1.4 pela página; 1.5 volta à ficha da Maria.
-    const geral = tutorialDoGuiao("1")!;
-    const fimMaria = CASO_1.length - 1;
-    const outros = geral.passos.slice(geral.inicioPorPassoGuiao[2], geral.inicioPorPassoGuiao[4]);
-    const passos = [...CASO_1.slice(0, fimMaria), ...outros, CASO_1[fimMaria]];
+    // Sempre a Maria: 1.1 a consulta, 1.2 a triagem e o aviso ao médico, 1.3 a ficha.
     return {
       id: "1",
-      titulo: geral.titulo,
-      passos,
-      inicioPorPassoGuiao: [0, CASO_1.findIndex((p) => p.titulo.startsWith("Na triagem")), fimMaria, fimMaria + (geral.inicioPorPassoGuiao[3] - geral.inicioPorPassoGuiao[2]), passos.length - 1],
+      titulo: CASOS.find((c) => c.id === "1")!.titulo,
+      passos: CASO_1,
+      inicioPorPassoGuiao: [0, CASO_1.findIndex((p) => p.titulo.startsWith("Na triagem")), CASO_1.length - 1],
     };
   }
   return tutorialDoGuiao(id);

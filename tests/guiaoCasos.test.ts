@@ -41,18 +41,12 @@ async function correrCasos() {
   const maria = await get<Agenda>("/api/doente/100101", "U03");
   r.maria = maria.agenda.map((m) => `${m.especialidade_legivel} ${m.data_hora}`);
 
-  // A2: Luísa — triagem reencaminha Onc. Médica → Radioterapia, RT aceita
-  const filaOM = await get<{ fila: { pedido_id: string; doente_nome: string }[] }>("/api/triagem/fila", "U04");
-  const pLuisa = filaOM.fila.find((f) => f.doente_nome.includes("Luísa"))!;
-  await post(`/api/triagem/${pLuisa.pedido_id}/reencaminhar`, "U04", { especialidade: "2300", motivo: "Pertence a Radioterapia" });
-  await post(`/api/triagem/${pLuisa.pedido_id}/aceitar`, "U06", {});
-  r.luisa = (await get<Agenda>("/api/doente/100103", "U04")).agenda.map((m) => m.data_hora);
-
-  // A3: Fernando — HD aceite → colheita pré-QT (R2)
-  const filaHd = await get<{ fila: { pedido_id: string; doente_nome: string }[] }>("/api/triagem/fila", "U10");
-  const pFernando = filaHd.fila.find((f) => f.doente_nome.includes("Fernando"))!;
-  await post(`/api/triagem/${pFernando.pedido_id}/aceitar`, "U10", {});
-  r.fernando = (await get<Agenda>("/api/doente/100108", "U10")).agenda.map((m) => `${m.especialidade_legivel} ${m.data_hora}`);
+  // A2: a triagem de Oncologia Médica recebe o pedido da Maria em primeiro e aceita-o
+  const filaOM = await get<{ fila: { pedido_id: string; doente_id: string }[] }>("/api/triagem/fila", "U04");
+  r.maria_primeira_na_triagem = filaOM.fila[0].doente_id === "100101";
+  await post(`/api/triagem/${filaOM.fila[0].pedido_id}/aceitar`, "U04", {});
+  const fichaMaria = await get<{ progresso: { marcados: number; problemas: number } }>("/api/doente/100101", "U01");
+  r.maria_ficha = `${fichaMaria.progresso.marcados} marcados, ${fichaMaria.progresso.problemas} problemas`;
 
   // Caso B — TAC cheio: quem cede a vaga ao José?
   // O TC do José (P00007) segue o circuito no arranque: sem vaga, a proposta de troca já está à espera da Radiologia.
@@ -218,8 +212,8 @@ describe("Guião por casos (caso normal + casos em que a prioridade decide)", ()
       "Radiologia-Geral (TAC) 2026-10-14T08:20",
       "Onc. Cirúrgica-C. Digestivo 2026-10-21T08:30",
     ]);
-    expect(primeira.luisa).toEqual(["2026-09-30T09:00"]);
-    expect(primeira.fernando).toEqual(["Patologia Clínica-Geral 2026-09-24T07:30", "Hospital de Dia-Oncologia 2026-09-25T08:30"]);
+    expect(primeira.maria_primeira_na_triagem).toBe(true);
+    expect(primeira.maria_ficha).toBe("3 marcados, 0 problemas");
 
     // Caso B — TAC cheio: as regras escolhem o Manuel; a regra antiga teria escolhido o Joaquim
     expect(primeira.jose_escolhido).toBe("Manuel Costa Ferreira");
@@ -299,5 +293,21 @@ describe("Guião por casos (caso normal + casos em que a prioridade decide)", ()
     const p = plano.avarias.find((a) => a.tipo === "AUSENCIA_MEDICO")!;
     expect(p.propostas).toHaveLength(7);
     expect(p.propostas.every((x) => x.data_hora_sugerida)).toBe(true);
+  });
+
+  // Luísa (reencaminhamento) e Fernando (Hospital de Dia + R2) saíram do guião, mas continuam a funcionar.
+  it("reencaminhar para Radioterapia e Hospital de Dia com a colheita pré-QT a tempo (sem semáforo vermelho)", async () => {
+    await post("/api/repor-demo", "U12");
+    const filaOM = await get<{ fila: { pedido_id: string; doente_nome: string }[] }>("/api/triagem/fila", "U04");
+    const pLuisa = filaOM.fila.find((f) => f.doente_nome.includes("Luísa"))!;
+    await post(`/api/triagem/${pLuisa.pedido_id}/reencaminhar`, "U04", { especialidade: "2300", motivo: "Pertence a Radioterapia" });
+    await post(`/api/triagem/${pLuisa.pedido_id}/aceitar`, "U06", {});
+    expect((await get<Agenda>("/api/doente/100103", "U04")).agenda.map((m) => m.data_hora)).toEqual(["2026-09-30T09:00"]);
+    const filaHd = await get<{ fila: { pedido_id: string; doente_nome: string }[] }>("/api/triagem/fila", "U10");
+    const pFernando = filaHd.fila.find((f) => f.doente_nome.includes("Fernando"))!;
+    await post(`/api/triagem/${pFernando.pedido_id}/aceitar`, "U10", {});
+    const ficha = await get<{ agenda: { especialidade_legivel: string; data_hora: string }[]; percurso: { problema: string }[] }>("/api/doente/100108", "U10");
+    expect(ficha.agenda.map((m) => `${m.especialidade_legivel} ${m.data_hora}`)).toEqual(["Patologia Clínica-Geral 2026-09-24T07:30", "Hospital de Dia-Oncologia 2026-09-25T08:30"]);
+    expect(ficha.percurso.every((e) => !e.problema)).toBe(true);
   });
 });

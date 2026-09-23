@@ -119,7 +119,7 @@ export function Inicio() {
             <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">Dados simulados</span>
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
-            {utilizador ? `Olá, ${utilizador.nome}` : "IPO-2030"}
+            {utilizador ? `Olá, ${utilizador.nome}` : "I.POnte"}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
             O médico declara os pedidos na consulta; seguem para triagem e marcação automática, com as regras de prioridade à vista.

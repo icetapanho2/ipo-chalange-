@@ -452,3 +452,14 @@ Pedido do utilizador depois da revisão:
    período anterior, mediana, faltas, por marcar), com os mesmos filtros das administrativas (período,
    estádio, nível); clicar num serviço mostra o detalhe igual ao da administrativa. Saíram os gráficos
    estáticos antigos.
+
+## 2026-09-23 — Caso 1 só com a Maria; semáforo da R2; logo I.POnte
+
+1. **Semáforo da R2 corrigido:** a dependência sessão de HD → colheita pré-QT tem intervalo 0 (resultado
+   no próprio dia), mas o semáforo tratava o 0 como "sem valor" e usava os 2 dias genéricos das análises —
+   a colheita da véspera aparecia "sem tempo para o resultado" (a vermelho), no Fernando e na Maria
+   reencaminhada para o Hospital de Dia. Agora 0 vale 0 (também nas remarcações).
+2. **Caso 1 é sempre sobre a Maria:** 1.1 consulta e P/, 1.2 triagem de Oncologia Médica (aceitar ou
+   reencaminhar) e notificações ao Dr. Pedro, 1.3 a ficha dela. Luísa (reencaminhamento) e Fernando
+   (Hospital de Dia + R2) saíram do guião; continuam a funcionar e têm teste próprio.
+3. **Logo I.POnte** no cabeçalho (em vez do quadrado "IPO" e do título/subtítulo) e no título do separador.

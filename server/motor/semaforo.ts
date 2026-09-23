@@ -45,7 +45,7 @@ export function avaliarDependenciasDetalhado(pedido: Pedido, dataConsulta: Date)
     if (!requisito) continue;
     // O intervalo é o da própria dependência (o mesmo que o agendamento usa): a creatinina da R1 tem
     // resultado no dia seguinte, não nos 2 dias genéricos das análises.
-    const intervalo = dep.intervalo_min_dias || intervaloResultado(requisito.especialidade_destino);
+    const intervalo = dep.intervalo_min_dias ?? intervaloResultado(requisito.especialidade_destino);
     resultado.push({ requisito, estado: avaliarDependencia(requisito, dataConsulta, descreverPedido(requisito), intervalo) });
   }
   return resultado;

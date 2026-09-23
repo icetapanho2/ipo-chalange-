@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { EVENTO_INSTANCIA, apiPost } from "../lib/api";
 import { usePerfil } from "../lib/PerfilContext";
 import { TrocadorUtilizador } from "./TrocadorUtilizador";
+import { Logo } from "./Logo";
 import { PainelNotificacoes } from "./PainelNotificacoes";
 import { ITENS_INICIO, NAV_POR_PERFIL, type ItemNav } from "../lib/navegacao";
 import {
@@ -73,17 +74,9 @@ export function Cabecalho() {
       )}
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2.5">
         {/* Marca & Identidade */}
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-oasis-header text-white font-black text-sm tracking-wider shadow-sm">
-            IPO
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-900 text-sm tracking-tight">IPO-2030</span>
-            </div>
-            <p className="text-[11px] text-slate-500 leading-none">Servir é dever</p>
-          </div>
-        </div>
+        <NavLink to="/" className="flex items-center" title="I.POnte — Início">
+          <Logo className="h-10" />
+        </NavLink>
 
         {/* Navegação — específica do perfil activo (o Guião fica sempre visível, à parte) */}
         <nav className="-mx-4 order-last flex w-full items-center gap-1 overflow-x-auto px-4 pb-1 md:order-none md:mx-0 md:w-auto md:flex-1 md:justify-center md:overflow-visible md:px-2 md:pb-0">
