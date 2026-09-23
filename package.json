@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "avaliar-extracao": "tsx server/extracao/avaliar.ts",
-    "gerar-dados": "python3 gerar_dados.py && python3 verificar_dados.py"
+    "gerar-dados": "python3 gerar_dados.py && python3 verificar_dados.py",
+    "build:estatico": "vite build --mode navegador"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

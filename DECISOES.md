@@ -463,3 +463,13 @@ Pedido do utilizador depois da revisão:
    reencaminhar) e notificações ao Dr. Pedro, 1.3 a ficha dela. Luísa (reencaminhamento) e Fernando
    (Hospital de Dia + R2) saíram do guião; continuam a funcionar e têm teste próprio.
 3. **Logo I.POnte** no cabeçalho (em vez do quadrado "IPO" e do título/subtítulo) e no título do separador.
+
+## 2026-09-23 — Site estático para publicar grátis (Vercel)
+
+O servidor guarda o estado em memória, o que não funciona em plataformas serverless (Vercel): cada
+pedido pode ir a uma instância diferente. Para publicar grátis, sem subscrições e sem adormecer, há um
+**modo navegador** (`npm run build:estatico`): o mesmo código de `server/` é empacotado para o browser
+(Express, fs, path e url substituídos por versões mínimas em `src/navegador/shims/`; os CSV/JSON de
+`dados/` embutidos) e os pedidos a `/api/…` são respondidos dentro da página. Nada foi duplicado: o
+modo servidor (`npm start`, testes, Render/Railway/Cloud Run) continua igual. Sem IA no site estático
+(as chaves seriam públicas) — o assistente do P/ usa o dicionário. `vercel.json` configura a Vercel.

@@ -59,7 +59,19 @@ autoscaling ir a zero perderia as alterações feitas ao vivo na demo (voltaria 
 inicial dos CSV). O botão "Repor demo" recarrega os dados originais a qualquer momento, em
 menos de 5 segundos.
 
-## Publicar online (o mais simples): Render
+## Publicar online, grátis e permanente: Vercel (site estático)
+
+O site pode correr **inteiro no browser**: o mesmo servidor (rotas e motor de `server/`) corre dentro da
+página e os dados de `dados/` vão embutidos (`npm run build:estatico`, ver `src/navegador/`). Não há
+servidor, por isso não adormece, não tem instâncias nem custos. Cada pessoa que abre o site tem a sua
+própria demo; recarregar a página (ou "Repor demo") volta ao início. Não há IA (o assistente do P/ usa
+o dicionário).
+
+1. Entrar em https://vercel.com com a conta do GitHub (plano Hobby, grátis).
+2. **Add New → Project** → importar `ipo-chalange-` → **Deploy** (o `vercel.json` já diz tudo).
+3. O site fica em `https://ipo-chalange-….vercel.app`; cada push para a `main` publica de novo.
+
+## Alternativa com servidor: Render
 
 1. Entrar em https://render.com com a conta do GitHub.
 2. **New → Blueprint** → escolher o repositório `ipo-chalange-` → **Apply**. O `render.yaml` cria o
