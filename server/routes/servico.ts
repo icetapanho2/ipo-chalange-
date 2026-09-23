@@ -66,6 +66,7 @@ export function criarRotasServico(store: typeof StoreType) {
       primeira_vaga: p.estado === "SEM_VAGA" ? primeiraVagaForaDoPrazo(p) : null,
       sem_sugestao: p.estado === "SEM_VAGA" && !primeiraVagaForaDoPrazo(p) ? porqueSemVaga(p) : "",
       data_marcada: p.ato_id ? store.atosMedicos.find((a) => a.mvp_ato_id === p.ato_id)?.data_hora ?? "" : "",
+      criado_em: p.criado_em,
     };
   }
 

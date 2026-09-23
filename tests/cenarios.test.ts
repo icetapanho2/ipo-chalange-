@@ -61,7 +61,7 @@ describe("Cenários da demo (secção 15 da especificação)", () => {
   });
 
   it("1. Maria Fernandes (100101): plano A → análises → TC → revisão", async () => {
-    const consulta = atoDeHoje("100101", "09:30");
+    const consulta = atoDeHoje("100101", "08:30");
     const { pedidos } = await extrairPlanoDemo("100101", "U01", consulta.mvp_ato_id, "2102", agora());
     expect(pedidos).toHaveLength(3);
 

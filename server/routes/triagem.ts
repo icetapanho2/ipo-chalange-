@@ -1,7 +1,7 @@
 import { Router } from "express";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
-import { apenasData } from "../util.ts";
+import { apenasData, isoData } from "../util.ts";
 import { aceitarTriagem, pedirInformacao, recusarTriagem, reencaminharTriagem } from "../motor/fluxo.ts";
 import { dependenciasDe, dependenciasProntas } from "../motor/dependencias.ts";
 import { janelaAgendamento } from "../motor/agendamento.ts";
@@ -56,8 +56,13 @@ export function criarRotasTriagem(store: typeof StoreType) {
         texto_plano: nota?.p || pedido.texto_origem,
         dependencias: deps.filter((d): d is NonNullable<typeof d> => !!d),
         pronto_a_agendar: dependenciasProntas(pedido),
+        criado_em: pedido.criado_em,
+        recebido_hoje: pedido.criado_em.slice(0, 10) === isoData(hoje),
       };
     });
+    // O que chegou hoje aparece primeiro (precisa de um primeiro olhar); dentro de cada grupo mantém-se
+    // a ordem de prioridade da fila.
+    fila.sort((x, y) => Number(y.recebido_hoje) - Number(x.recebido_hoje));
     res.json({ especialidade, especialidade_legivel: descreverEspecialidade(especialidade), fila });
   });
 

@@ -30,6 +30,8 @@ interface ItemFila {
   texto_plano: string;
   dependencias: { descricao: string; estado: string }[];
   pronto_a_agendar: boolean;
+  criado_em: string;
+  recebido_hoje: boolean;
 }
 
 interface RespostaFila {
@@ -241,9 +243,14 @@ export function Triagem() {
                     <span>{item.doente_nome}</span>
                     <Activity className="h-3.5 w-3.5 text-sky-600 opacity-70 group-hover:opacity-100" />
                     <span className="text-[10px] rounded bg-sky-50 text-sky-700 px-1.5 py-0.2 font-medium">
-                      Ver Prontidão
+                      Ver ficha
                     </span>
                   </button>
+                  {item.recebido_hoje && (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800" title="Pedido recebido hoje">
+                      Novo · {item.criado_em.slice(11, 16)}
+                    </span>
+                  )}
                   <span className="text-slate-300">·</span>
                   <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
                     {item.tipo_pedido_legivel}

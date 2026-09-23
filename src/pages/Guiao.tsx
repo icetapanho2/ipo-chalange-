@@ -56,11 +56,23 @@ const CASOS: Caso[] = [
       {
         titulo: "Maria Fernandes — da consulta às marcações",
         descricao:
-          "Dr. Pedro, consulta das 09:30: escrever no Diário Clínico e \"Guardar & Seguinte\". No assistente escolher Análises, Exames e Próxima consulta (já vem no serviço dele). Colheita com jejum (hemograma, bioquímica com creatinina, CEA, CA 19.9); TC TAP com contraste; revisão que depende dos exames desta consulta, com continuidade. Submeter.",
+          "Dr. Pedro, primeira doente do dia (08:30; sem pedidos pendentes). Os ícones ao lado abrem o perfil, os pedidos, a folha clínica e os exames. Escrever no Diário Clínico e \"Guardar & Seguinte\". No assistente escolher Análises, Exames, Próxima consulta (já vem no serviço dele) e Pedido de consulta (Oncologia Médica). Colheita com jejum (hemograma, bioquímica com creatinina, CEA, CA 19.9); TC TAP com contraste; próxima consulta que depende dos exames, com continuidade. Observações obrigatórias em cada pedido. Submeter.",
         resultado:
-          "Marcado automaticamente: colheita 24/09 07:30 → TC 14/10 08:20 (regra R1: creatinina antes do contraste) → revisão com o Dr. Pedro 21/10 08:30 (7 dias depois do TC, para haver resultado).",
+          "A confirmação mostra o que aconteceu a cada pedido: colheita 24/09 07:30 → TC 14/10 08:20 (regra R1: creatinina antes do contraste) → próxima consulta com o Dr. Pedro 21/10 08:30 (7 dias depois do TC); a interconsulta segue para a triagem da Oncologia Médica. O perfil da Maria fica logo com 3 marcados e 1 em triagem.",
         acoes: [{ etiqueta: "Agenda do Dr. Pedro", utilizadorId: "U01", caminho: "/oasis/medico" }],
         fala: "O médico declara os pedidos uma vez. O sistema percebe as dependências e marca tudo pela ordem certa, sem papel.",
+      },
+      {
+        titulo: "Maria — cada serviço recebe o que é seu",
+        descricao:
+          "Triador de Oncologia Médica: a Maria está em primeiro na fila (\"Novo\") → Aceitar & Agendar. Ver também as administrativas da Patologia, do TAC e da Oncologia Médica (Serviço → Pedidos e avisos): o pedido da Maria aparece em primeiro, marcado como novo.",
+        resultado:
+          "Consulta de Oncologia Médica marcada; o Dr. Pedro recebe as notificações e a ficha da Maria passa a \"Tudo em ordem · 4 marcados\".",
+        acoes: [
+          { etiqueta: "Triagem (Onc. Médica)", utilizadorId: "U04", caminho: "/triagem" },
+          { etiqueta: "Pedidos (TAC)", utilizadorId: "U07", caminho: "/servico?aba=pedidos" },
+          { etiqueta: "Ficha da Maria", utilizadorId: "U01", caminho: "/doente/100101" },
+        ],
       },
       {
         titulo: "Luísa Martins — pedido para outro serviço",

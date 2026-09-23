@@ -232,7 +232,10 @@ export function criarRotasOasis(store: typeof StoreType) {
       protocolo: `${ato.mvp_ato_id}-${isoDataHora(quando).replace(/[-:T]/g, "")}`,
       criadoEm: isoDataHora(quando),
       medicoNome: descreverUtilizador(medicoId),
-      pedidos: criados.map((pedido) => pedidoParaJson(pedido, store.parametros.limiar_confianca)),
+      pedidos: criados.map((pedido) => ({
+        ...pedidoParaJson(pedido, store.parametros.limiar_confianca),
+        data_marcada: pedido.ato_id ? store.atosMedicos.find((a) => a.mvp_ato_id === pedido.ato_id)?.data_hora ?? "" : "",
+      })),
     });
   });
 

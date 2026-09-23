@@ -873,6 +873,18 @@ PREPARACOES = [
     ("2300", "1", "Traga os exames de imagem e relatórios anteriores.", 0),
 ]
 
+# A doente do caso ao vivo (Maria) é a primeira consulta do dia do Dr. Pedro: troca de hora com quem
+# estava às 08:30 (só as duas marcações mudam; o resto dos dados fica igual).
+_maria = next(a for a in atos if a["doente_id"] == D1 and a["data_hora"].date() == DEMO_DATE and a["esp"] == "2102")
+_primeira = min((a for a in atos if a["medico"] == "U01" and a["data_hora"].date() == DEMO_DATE and a["esp"] == "2102"),
+                key=lambda a: a["data_hora"])
+if _primeira is not _maria:
+    for campo in ("data_hora", "vaga_id", "gab"):
+        _maria[campo], _primeira[campo] = _primeira[campo], _maria[campo]
+    for v in vagas:
+        if v["vaga_id"] == _maria["vaga_id"]: v["ato_id"] = _maria["ato_id"]
+        elif v["vaga_id"] == _primeira["vaga_id"]: v["ato_id"] = _primeira["ato_id"]
+
 # ================================================================ ESCRITA
 def wcsv(name, rows, cols):
     with open(os.path.join(OUT, name), "w", newline="", encoding="utf-8-sig") as f:

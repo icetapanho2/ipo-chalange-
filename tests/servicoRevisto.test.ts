@@ -129,6 +129,30 @@ describe("Serviço revisto", () => {
     expect(f.arquivoExames.map((x) => x.estado)).toEqual(["FALTOU", "REALIZADA", "REALIZADA"]);
   });
 
+  it("ciclo da demo: a Maria é a primeira do Dr. Pedro e os pedidos chegam, em primeiro, a quem os trata", async () => {
+    await api("/api/repor-demo", "U12", {});
+    const agenda = (await api<{ atos: { ato_id: string; doente_id: string }[] }>("/api/oasis/medico/agenda", "U01")).json;
+    expect(agenda.atos[0].doente_id).toBe("100101");
+    type Ficha = { progresso: { total: number; marcados: number; por_marcar: number } };
+    expect((await api<Ficha>("/api/doente/100101", "U01")).json.progresso.total).toBe(0);
+    const r = await api<{ pedidos: { estado: string; data_marcada: string }[] }>(`/api/oasis/consulta/${agenda.atos[0].ato_id}/pedidos`, "U01", {
+      pedidos: [
+        { especialidade_destino: "6100", ato_codigo: "9", analises: ["A001", "A002", "A003"], especificacao: "Controlo" },
+        { especialidade_destino: "7000_2", ato_codigo: "1", exames: ["7000002"], especificacao: "com contraste" },
+        { especialidade_destino: "1300", ato_codigo: "1", especificacao: "Avaliação por Oncologia Médica" },
+      ],
+    });
+    expect(r.json.pedidos.filter((p) => p.data_marcada).length).toBe(2);
+    expect(r.json.pedidos.filter((p) => p.estado === "EM_TRIAGEM").length).toBe(1);
+    expect((await api<Ficha>("/api/doente/100101", "U01")).json.progresso).toMatchObject({ total: 3, marcados: 2, por_marcar: 1 });
+    const fila = (await api<{ fila: { pedido_id: string; doente_id: string; recebido_hoje: boolean }[] }>("/api/triagem/fila", "U04")).json.fila;
+    expect(fila[0]).toMatchObject({ doente_id: "100101", recebido_hoje: true });
+    await api(`/api/triagem/${fila[0].pedido_id}/aceitar`, "U04", {});
+    expect((await api<Ficha>("/api/doente/100101", "U01")).json.progresso).toMatchObject({ total: 3, marcados: 3, por_marcar: 0 });
+    const notifs = (await api<{ notificacoes: { tipo: string }[] }>("/api/notificacoes", "U01")).json.notificacoes;
+    expect(notifs.filter((n) => n.tipo === "PEDIDO_MARCADO").length).toBeGreaterThanOrEqual(3);
+  });
+
   it("validação, dicionário e tradutor já não existem", async () => {
     expect((await api("/api/validacao/consultas", "U03")).status).toBe(404);
     expect((await api("/api/dicionario", "U03")).status).toBe(404);

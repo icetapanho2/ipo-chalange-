@@ -45,7 +45,7 @@ async function correrGuiao() {
 
   // 1. Maria (100101)
   const agendaU01 = await get<{ atos: AtoAgenda[] }>("/api/oasis/medico/agenda", "U01");
-  const atoMaria = agendaU01.atos.find((a) => a.data_hora === "2026-09-23T09:30")!;
+  const atoMaria = agendaU01.atos.find((a) => a.data_hora === "2026-09-23T08:30")!;
   await post(`/api/oasis/consulta/${atoMaria.ato_id}/guardar`, "U01", {
     s: "",
     o: "",

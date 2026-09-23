@@ -16,6 +16,7 @@ interface ResumoPedido {
   estado: string;
   n_remarcacoes: number;
   data_marcada: string;
+  criado_em: string;
 }
 
 interface Aviso {
@@ -79,11 +80,14 @@ export function PedidosServico({ aoMudar }: { aoMudar: (mensagem: string) => voi
   const [pesquisa, setPesquisa] = useState("");
   const [doenteId, setDoenteId] = useState<string | null>(null);
   const [versao, setVersao] = useState(0);
+  const [ordem, setOrdem] = useState<"recentes" | "data">("recentes");
+  const [hoje, setHoje] = useState("");
 
   useEffect(() => {
     apiGet<{ porEstado: Record<string, ResumoPedido[]> }>("/servico/pedidos").then((r) => setPorEstado(r.porEstado));
     apiGet<Aviso[]>("/servico/alertas").then((l) => setAvisos(l.filter((a) => AVISOS[a.tipo])));
     apiGet<SinalCapacidade[]>("/servico/overbooking").then(setCapacidade);
+    apiGet<{ demoDate: string }>("/estado").then((e) => setHoje(e.demoDate)).catch(() => undefined);
   }, [versao]);
 
   async function visto(id: string) {
@@ -96,7 +100,11 @@ export function PedidosServico({ aoMudar }: { aoMudar: (mensagem: string) => voi
   const termo = pesquisa.trim().toLowerCase();
   const lista = (termo ? Object.values(porEstado).flat() : porEstado[estado] ?? []).filter(
     (p) => !termo || p.doente_nome.toLowerCase().includes(termo) || p.descricao.toLowerCase().includes(termo),
-  ).sort((a, b) => (a.data_marcada || a.prazo_limite).localeCompare(b.data_marcada || b.prazo_limite));
+  ).sort((a, b) =>
+    ordem === "recentes"
+      ? b.criado_em.localeCompare(a.criado_em)
+      : (a.data_marcada || a.prazo_limite).localeCompare(b.data_marcada || b.prazo_limite),
+  );
   const tiposAviso = [...new Set(avisos.map((a) => a.tipo))];
 
   return (
@@ -105,7 +113,11 @@ export function PedidosServico({ aoMudar }: { aoMudar: (mensagem: string) => voi
       <section className="min-w-0">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <h2 className="text-sm font-bold text-slate-800">Pedidos do serviço</h2>
-          <label className="relative ml-auto">
+          <select value={ordem} onChange={(e) => setOrdem(e.target.value as "recentes" | "data")} className="ml-auto rounded-lg border border-slate-300 px-2 py-1 text-xs">
+            <option value="recentes">Mais recentes primeiro</option>
+            <option value="data">Por data marcada</option>
+          </select>
+          <label className="relative">
             <Search className="pointer-events-none absolute left-2 top-1.5 h-3.5 w-3.5 text-slate-400" />
             <input
               value={pesquisa}
@@ -140,7 +152,12 @@ export function PedidosServico({ aoMudar }: { aoMudar: (mensagem: string) => voi
                 <li key={p.pedido_id}>
                   <button type="button" onClick={() => setDoenteId(p.doente_id)} className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50">
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-slate-800">{p.doente_nome}</span>
+                      <span className="block truncate text-sm font-semibold text-slate-800">
+                        {p.doente_nome}
+                        {hoje && p.criado_em.startsWith(hoje) && (
+                          <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">Novo · {p.criado_em.slice(11, 16)}</span>
+                        )}
+                      </span>
                       <span className="block truncate text-xs text-slate-500">
                         {p.descricao} · pedido por {p.medico_requisitante_nome}
                       </span>

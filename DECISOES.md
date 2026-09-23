@@ -350,3 +350,16 @@ Pedido do utilizador depois da revisão:
 3. **Diários das consultas passadas** gerados por `gerar_dados.py` em `dados/notas_consulta.csv`
    (determinísticos, a partir do estádio, diagnóstico e pedidos da consulta; dados simulados). Os
    restantes dados não mudaram.
+
+## 2026-09-23 — Ciclo da demo fechado de ponta a ponta
+
+1. **Consulta:** voltou a barra lateral anterior; os contadores pendentes/agendados/realizados deram
+   lugar a quatro atalhos para a ficha (Perfil — já em edição —, Pedidos, Folha clínica, Exames).
+2. **Observações obrigatórias** em cada pedido do assistente do médico.
+3. **A Maria é a primeira doente do Dr. Pedro** (08:30; troca de hora feita no gerador — só essas duas
+   marcações mudam) e não tem pedidos anteriores.
+4. **Os pedidos novos aparecem em primeiro** onde são tratados: a fila de triagem mostra primeiro o que
+   chegou hoje ("Novo · hh:mm"), e as listas das administrativas abrem por "mais recentes primeiro".
+5. **Confirmação da consulta** mostra o que aconteceu a cada pedido (marcado para quando / em triagem)
+   e como ficou o perfil do doente. Teste de ponta a ponta: consulta → pedidos → triagem em primeiro →
+   aceitação → ficha com tudo marcado e notificações ao médico.

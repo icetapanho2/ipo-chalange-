@@ -1,17 +1,25 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { dataHoraPT } from "../../lib/datas";
+import { dataHoraPT, dataPT } from "../../lib/datas";
 import { useNavigate, useParams } from "react-router-dom";
-import { apiGet, apiPost } from "../../lib/api";
+import { apiGet, apiPost, apiPut } from "../../lib/api";
+import { DoenteModal } from "../../components/DoenteModal";
 import { abrirDoente } from "../../components/NomeDoente";
 import {
   User,
+  UserCog,
   FileText,
+  FlaskConical,
+  Activity,
   Sparkles,
   ArrowRight,
   ClipboardList,
   Clock,
+  ExternalLink,
   Info,
+  Pencil,
+  Stethoscope,
   ShieldAlert,
+  Phone,
 } from "lucide-react";
 
 interface Ato {
@@ -121,6 +129,17 @@ export function OasisConsulta() {
   const [diario, setDiario] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [aGuardar, setAGuardar] = useState(false);
+  const [modalDoenteAberto, setModalDoenteAberto] = useState(false);
+  const [aEditarClinico, setAEditarClinico] = useState(false);
+  const [formClinico, setFormClinico] = useState({
+    diagnostico_principal: "",
+    estadiamento: "",
+    alergias: "",
+    contacto: "",
+    notas_clinicas: "",
+    estadio_cuidado: "",
+  });
+  const [aGuardarClinico, setAGuardarClinico] = useState(false);
 
   function carregar() {
     if (!atoId) return;
@@ -130,11 +149,34 @@ export function OasisConsulta() {
         if (r.nota) {
           setDiario([r.nota.s, r.nota.o, r.nota.a, r.nota.p].filter((texto) => texto.trim()).join("\n\n"));
         }
+        setFormClinico({
+          diagnostico_principal: r.doente?.diagnostico_principal ?? "",
+          estadiamento: r.doente?.estadiamento ?? "",
+          alergias: (r.doente?.alergias ?? []).join(", "),
+          contacto: r.doente?.contacto ?? "",
+          notas_clinicas: r.doente?.notas_clinicas ?? "",
+          estadio_cuidado: r.doente?.estadio_cuidado ?? "",
+        });
       })
       .catch((e) => setErro(e instanceof Error ? e.message : String(e)));
   }
 
   useEffect(carregar, [atoId]);
+
+  async function guardarClinico() {
+    if (!dados?.doente) return;
+    setErro(null);
+    setAGuardarClinico(true);
+    try {
+      await apiPut(`/doente/${dados.doente.doente_id}`, formClinico);
+      setAEditarClinico(false);
+      carregar();
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAGuardarClinico(false);
+    }
+  }
 
   // Grava o diário (documentação livre) e segue directamente para o
   // assistente de pedidos: o médico declara o que pretende, sem etapa intermédia.
@@ -204,46 +246,231 @@ export function OasisConsulta() {
           <span>A carregar consulta e prontuário do utente…</span>
         </div>
       ) : (
-        <div className="mt-4 space-y-4">
-          {/* Doente em poucas palavras; o perfil completo (editável), a folha clínica e os exames abrem ao lado */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-base font-bold text-slate-900">{dados.doente?.nome}</span>
-                {dados.doente?.estadio_cuidado && (
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700">
-                    {OPCOES_ESTADIO_CUIDADO.find((o) => o.valor === dados.doente?.estadio_cuidado)?.legivel}
-                  </span>
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
+          {/* PAINEL ESQUERDO: DOENTE E DADOS DO ATO */}
+          <div className="space-y-3">
+            <Painel titulo="Identificação do Utente">
+              <div className="space-y-3">
+                <div
+                  onClick={() => setModalDoenteAberto(true)}
+                  className="group -m-1 cursor-pointer rounded-lg p-2.5 transition-all hover:bg-slate-100 border border-transparent hover:border-slate-200"
+                  title="Clique para ver o que falta e o histórico completo do doente"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-oasis-header text-white font-bold shadow-2xs group-hover:bg-oasis-accent">
+                        <User className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900 group-hover:text-oasis-accent flex items-center gap-1.5">
+                          {dados.doente?.nome ?? "Sem nome"}
+                          <span
+                            id="icone-prontidao-doente"
+                            role="button"
+                            title="Ver prontidão e o que falta"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setModalDoenteAberto(true);
+                            }}
+                            className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-sky-100 text-sky-700 hover:bg-sky-200"
+                          >
+                            <Activity className="h-3 w-3" />
+                          </span>
+                        </p>
+                        <p className="text-xs text-slate-500">Nº {dados.doente?.n_utente}</p>
+                      </div>
+                    </div>
+                    <ExternalLink className="h-3.5 w-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-1.5 rounded border border-slate-200">
+                    <span>Nasc: {dataPT(dados.doente?.data_nascimento)}</span>
+                    <span>Sexo: {dados.doente?.sexo === "M" ? "Masc" : "Fem"}</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 pt-2 text-xs space-y-1 text-slate-700">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Especialidade:</span>
+                    <span className="font-semibold text-slate-800">{dados.ato.especialidade_descricao}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Tipo de Acto:</span>
+                    <span className="font-medium">{dados.ato.ato_descricao}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Gabinete:</span>
+                    <span>{dados.ato.gabinete_descricao}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Data e Hora:</span>
+                    <span className="font-mono text-slate-800">{dataHoraPT(dados.ato.data_hora)}</span>
+                  </div>
+                </div>
+
+                {dados.nota && (
+                  <div className="rounded bg-slate-50 p-2 text-[11px] text-slate-500 border border-slate-200">
+                    Última gravação: {dados.nota.guardado_em.replace("T", " às ")}
+                  </div>
                 )}
-                {(dados.doente?.alergias ?? []).map((a) => (
-                  <span key={a} className="flex items-center gap-1 rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-bold text-red-800">
-                    <ShieldAlert className="h-3 w-3" /> {a}
-                  </span>
-                ))}
+
+                {/* Atalhos para a ficha do doente (abre ao lado, sem sair da consulta) */}
+                {dados.doente && (
+                  <div className="grid grid-cols-4 gap-1.5 text-center">
+                    {(
+                      [
+                        ["perfil", UserCog, "Perfil", "Perfil completo — ver e editar os dados do doente"],
+                        ["percurso", ClipboardList, "Pedidos", "Todos os pedidos e o que está marcado, pendente ou em triagem"],
+                        ["folha", FileText, "Folha clínica", "Consultas anteriores com o diário de cada uma"],
+                        ["exames", FlaskConical, "Exames", "Arquivo dos exames e análises realizados"],
+                      ] as const
+                    ).map(([vista, Icone, rotulo, titulo]) => (
+                      <button
+                        key={vista}
+                        type="button"
+                        onClick={() => abrirDoente(dados.doente!.doente_id, vista)}
+                        title={titulo}
+                        className="flex flex-col items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 py-2 text-slate-700 hover:border-oasis-accent hover:bg-sky-50 hover:text-oasis-header"
+                      >
+                        <Icone className="h-4 w-4" />
+                        <span className="text-[10px] font-semibold leading-tight">{rotulo}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-slate-500">
-                {dados.doente?.diagnostico_principal || "Sem diagnóstico registado"} · {dados.ato.ato_descricao} ·{" "}
-                {dataHoraPT(dados.ato.data_hora)}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => dados.doente && abrirDoente(dados.doente.doente_id, "folha")}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                title="Consultas anteriores com o diário de cada uma"
-              >
-                <FileText className="h-3.5 w-3.5" /> Folha clínica
-              </button>
-              <button
-                type="button"
-                onClick={() => dados.doente && abrirDoente(dados.doente.doente_id, "percurso")}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-oasis-header px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-700"
-                title="Perfil completo: dados, pedidos, exames e histórico (editável)"
-              >
-                <User className="h-3.5 w-3.5" /> Perfil completo
-              </button>
-            </div>
+            </Painel>
+
+            {/* Perfil Clínico: mais detalhe + edição directa, sem sair da consulta */}
+            <Painel titulo="Perfil Clínico">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] text-slate-500">Usado no factor clínico da equação de prioridade</span>
+                {!aEditarClinico && (
+                  <button
+                    type="button"
+                    onClick={() => setAEditarClinico(true)}
+                    className="inline-flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 shrink-0"
+                  >
+                    <Pencil className="h-3 w-3" />
+                    <span>Editar</span>
+                  </button>
+                )}
+              </div>
+
+              {!aEditarClinico ? (
+                <div className="space-y-2 text-xs">
+                  {dados.doente?.estadio_cuidado && (
+                    <span className="inline-block rounded-full bg-oasis-header px-2.5 py-0.5 text-[10px] font-bold text-white">
+                      {OPCOES_ESTADIO_CUIDADO.find((o) => o.valor === dados.doente?.estadio_cuidado)?.legivel ?? dados.doente.estadio_cuidado}
+                    </span>
+                  )}
+                  <div className="flex items-start gap-1.5">
+                    <Stethoscope className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-slate-500">Diagnóstico: </span>
+                      <span className="text-slate-800 font-medium">{dados.doente?.diagnostico_principal || "— Não registado"}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <ShieldAlert className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-slate-500">Alergias: </span>
+                      <span className="text-slate-800">
+                        {dados.doente?.alergias && dados.doente.alergias.length > 0
+                          ? dados.doente.alergias.join(", ")
+                          : "— Nenhuma registada"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-1.5">
+                    <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-slate-500">Contacto: </span>
+                      <span className="text-slate-800">{dados.doente?.contacto || "— Não registado"}</span>
+                    </div>
+                  </div>
+                  {dados.doente?.notas_clinicas && (
+                    <p className="rounded bg-slate-50 p-2 text-[11px] text-slate-600 border border-slate-100 leading-relaxed">
+                      {dados.doente.notas_clinicas}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Estádio</label>
+                    <select
+                      value={formClinico.estadio_cuidado}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, estadio_cuidado: e.target.value }))}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                    >
+                      <option value="">— Não classificado</option>
+                      {OPCOES_ESTADIO_CUIDADO.map((op) => (
+                        <option key={op.valor} value={op.valor}>
+                          {op.legivel}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Diagnóstico principal</label>
+                    <input
+                      type="text"
+                      value={formClinico.diagnostico_principal}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, diagnostico_principal: e.target.value }))}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Alergias (vírgula)</label>
+                    <input
+                      type="text"
+                      value={formClinico.alergias}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, alergias: e.target.value }))}
+                      placeholder="Ex: Penicilina, Contraste iodado"
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Contacto</label>
+                    <input
+                      type="text"
+                      value={formClinico.contacto}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, contacto: e.target.value }))}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Notas clínicas</label>
+                    <textarea
+                      value={formClinico.notas_clinicas}
+                      onChange={(e) => setFormClinico((f) => ({ ...f, notas_clinicas: e.target.value }))}
+                      rows={2}
+                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={guardarClinico}
+                      disabled={aGuardarClinico}
+                      className="rounded-lg bg-oasis-header px-3 py-1.5 text-[11px] font-bold text-white shadow-sm hover:bg-slate-700 disabled:opacity-50"
+                    >
+                      {aGuardarClinico ? "A guardar…" : "Guardar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAEditarClinico(false);
+                        carregar();
+                      }}
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </Painel>
           </div>
 
           {/* PAINEL DIREITO: DIÁRIO CLÍNICO */}
@@ -322,6 +549,10 @@ export function OasisConsulta() {
         </div>
       )}
 
+      {/* Modal Universal de Feedback do Doente */}
+      {modalDoenteAberto && dados?.doente && (
+        <DoenteModal doenteId={dados.doente.doente_id} onFechar={() => setModalDoenteAberto(false)} />
+      )}
     </div>
   );
 }

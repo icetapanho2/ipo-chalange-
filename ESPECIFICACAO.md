@@ -212,7 +212,7 @@ Selector de perfil no topo (sem autenticação) + botão **"Repor demo"** (recar
 
 | Doente | Estado inicial | O que se faz | Resultado esperado |
 |---|---|---|---|
-| **Maria Fernandes** (100101) | consulta hoje 09:30, Dr. Pedro | médico escreve o plano A e guarda; administrativa valida | 3 pedidos; análises → TC → revisão (21/10, Dr. Pedro); dependências e timeline |
+| **Maria Fernandes** (100101) | consulta hoje 08:30 (a primeira do Dr. Pedro) | médico declara os pedidos no assistente | 3 pedidos; análises → TC → revisão (21/10, Dr. Pedro); dependências e timeline |
 | **José Carvalho** (100104) | TC TAP MP até 05/10, EXTRAÍDO | administrativa valida | TAC cheio até 13/10 → proposta: José ocupa 02/10, **Manuel** (100106) passa para 14/10 (dentro do seu prazo); Radiologia aprova |
 | **Rosa Teixeira** (100105) | consulta hoje 09:50 | médico escreve o plano B | "HPC" desconhecido → alerta; administrativa corrige para Manutenção CVC → entra no dicionário do Dr. Pedro |
 | **Carlos Mendes** (100107) | consulta hoje 10:10 | médico escreve o plano C | "HPC" reconhecido automaticamente, com selo "aprendido" |

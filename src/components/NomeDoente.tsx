@@ -6,7 +6,7 @@ import { FichaDoente } from "./FichaDoente";
 const EVENTO = "oasis:abrir-doente";
 
 /** Abre a ficha do doente no painel lateral (de qualquer sítio da aplicação). */
-export type VistaFicha = "percurso" | "folha" | "exames";
+export type VistaFicha = "percurso" | "folha" | "exames" | "perfil";
 export function abrirDoente(doenteId: string, vista: VistaFicha = "percurso") {
   window.dispatchEvent(new CustomEvent(EVENTO, { detail: { id: doenteId, vista } }));
 }

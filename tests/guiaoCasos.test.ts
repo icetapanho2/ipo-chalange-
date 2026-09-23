@@ -29,7 +29,7 @@ async function correrCasos() {
   const agendaU01 = await get<{ atos: { ato_id: string; data_hora: string }[] }>("/api/oasis/medico/agenda", "U01");
 
   // Caso A — tudo corre bem. A1: Maria (consulta → pedidos → marcados, com dependências)
-  const atoMaria = agendaU01.atos.find((a) => a.data_hora === "2026-09-23T09:30")!;
+  const atoMaria = agendaU01.atos.find((a) => a.data_hora === "2026-09-23T08:30")!;
   await post(`/api/oasis/consulta/${atoMaria.ato_id}/pedidos`, "U01", {
     pedidos: [
       { especialidade_destino: "6100", ato_codigo: "9", analises: ["A001", "A002", "A003", "A004", "A005"] },
@@ -220,7 +220,7 @@ describe("Guião por casos (caso normal + casos em que a prioridade decide)", ()
 
     // Caso A — tudo corre bem (ficha do doente mostra tudo marcado)
     expect(primeira.maria).toEqual([
-      "Onc. Cirúrgica-C. Digestivo 2026-09-23T09:30",
+      "Onc. Cirúrgica-C. Digestivo 2026-09-23T08:30",
       "Patologia Clínica-Geral 2026-09-24T07:30",
       "Radiologia-Geral (TAC) 2026-10-14T08:20",
       "Onc. Cirúrgica-C. Digestivo 2026-10-21T08:30",

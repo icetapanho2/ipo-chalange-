@@ -281,13 +281,14 @@ function Passo({ e, aoRemarcar }: { e: Etapa; aoRemarcar: (e: Etapa) => void }) 
  * clicar num nome. Em cima o essencial (quem é, estádio, alergias, como se contacta, próxima marcação,
  * progresso); depois o percurso completo pela ordem das datas; ao lado o perfil e as mensagens.
  */
-export function FichaDoente({ doenteId, compacta = false, vistaInicial = "percurso" }: { doenteId: string; compacta?: boolean; vistaInicial?: "percurso" | "folha" | "exames" }) {
+export function FichaDoente({ doenteId, compacta = false, vistaInicial = "percurso" }: { doenteId: string; compacta?: boolean; vistaInicial?: "percurso" | "folha" | "exames" | "perfil" }) {
   const [dados, setDados] = useState<Resposta | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [aEditar, setAEditar] = useState(false);
   const [form, setForm] = useState<Partial<DoenteFicha> & { alergiasTexto?: string }>({});
   const [verHistorico, setVerHistorico] = useState(false);
-  const [vista, setVista] = useState<"percurso" | "folha" | "exames">(vistaInicial);
+  const [vista, setVista] = useState<"percurso" | "folha" | "exames">(vistaInicial === "perfil" ? "percurso" : vistaInicial);
+  const [edicaoInicialFeita, setEdicaoInicialFeita] = useState(vistaInicial !== "perfil");
   const [mensagem, setMensagem] = useState<string | null>(null);
 
   function carregar() {
@@ -299,6 +300,15 @@ export function FichaDoente({ doenteId, compacta = false, vistaInicial = "percur
       .catch((e) => setErro(String(e)));
   }
   useEffect(carregar, [doenteId]);
+
+  // Aberta em "perfil": o formulário de edição já vem aberto.
+  useEffect(() => {
+    if (dados && !edicaoInicialFeita) {
+      setEdicaoInicialFeita(true);
+      editar();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dados]);
 
   function editar() {
     if (!dados) return;

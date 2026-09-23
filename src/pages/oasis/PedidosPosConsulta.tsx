@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { apiGet, apiPost } from "../../lib/api";
 import { usePerfil } from "../../lib/PerfilContext";
 import { DoenteModal } from "../../components/DoenteModal";
+import { abrirDoente } from "../../components/NomeDoente";
+import { dataHoraPT } from "../../lib/datas";
 import {
   CheckCircle2,
   ChevronLeft,
@@ -10,7 +12,6 @@ import {
   Plus,
   Trash2,
   User,
-  CalendarClock,
 } from "lucide-react";
 
 /** Cartão no estilo usado no resto do site (Triagem, Serviço): branco, cabeçalho leve. */
@@ -89,6 +90,8 @@ interface PedidoForm {
 
 interface PedidoSubmetido {
   pedido_id: string;
+  estado: string;
+  data_marcada: string;
   tipo_pedido_legivel: string;
   especialidade_destino_legivel: string;
   descricao: string;
@@ -218,6 +221,10 @@ export function OasisPedidosPosConsulta() {
     for (const p of pedidosVisiveis) {
       if (!p.especialidade_destino || !p.ato_codigo) {
         setErro("Há pedidos por preencher: escolha o serviço/especialidade e o acto em cada um.");
+        return;
+      }
+      if (!p.especificacao.trim()) {
+        setErro("Escreva as observações de cada pedido (o motivo ou o que o serviço precisa de saber).");
         return;
       }
     }
@@ -583,7 +590,7 @@ export function OasisPedidosPosConsulta() {
                               )}
 
                               <label className="block text-xs mt-2.5">
-                                <span className="block font-semibold text-slate-700 mb-0.5">Observações (opcional)</span>
+                                <span className="block font-semibold text-slate-700 mb-0.5">Observações *</span>
                                 <textarea
                                   className="w-full rounded border border-slate-300 px-2 py-1.5"
                                   rows={2}
@@ -734,31 +741,45 @@ export function OasisPedidosPosConsulta() {
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
                 <CheckCircle2 className="h-9 w-9 text-emerald-600" />
               </div>
-              <p className="mt-4 text-lg font-bold text-slate-900">Pedidos de marcação submetidos com sucesso!</p>
-              <div className="mt-4 space-y-1 text-sm text-slate-600">
-                <p>
-                  N.º do pedido: <strong className="font-mono text-slate-800">{resultado.protocolo}</strong>
-                </p>
-                <p>Data: {resultado.criadoEm.replace("T", " às ")}</p>
-                <p>Médico requisitante: {resultado.medicoNome}</p>
-                <p>{resultado.pedidos.length} pedido(s) submetido(s)</p>
-              </div>
+              <p className="mt-4 text-lg font-bold text-slate-900">{resultado.pedidos.length} pedido(s) enviados</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {resultado.medicoNome} · {dataHoraPT(resultado.criadoEm)} · protocolo {resultado.protocolo}
+              </p>
 
-              <div className="mt-4 flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-left text-xs text-sky-900">
-                <CalendarClock className="h-4 w-4 text-sky-600 shrink-0 mt-0.5" />
-                <span>
-                  Os pedidos foram encaminhados automaticamente para os serviços responsáveis (agendamento directo ou
-                  triagem, conforme o tipo). Pode acompanhar o estado no prontuário do doente.
-                </span>
+              {/* O que aconteceu a cada pedido, já — é isto que passa a aparecer no perfil do doente */}
+              <ul className="mt-4 divide-y divide-slate-100 rounded-lg border border-slate-200 text-left text-xs">
+                {resultado.pedidos.map((p) => (
+                  <li key={p.pedido_id} className="flex items-start justify-between gap-3 px-3 py-2">
+                    <span className="min-w-0">
+                      <span className="block font-semibold text-slate-800">{p.descricao.split(" — ")[0]}</span>
+                      <span className="text-slate-500">{p.especialidade_destino_legivel}</span>
+                    </span>
+                    <span
+                      className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold ${
+                        p.data_marcada ? "bg-emerald-100 text-emerald-800" : p.estado === "EM_TRIAGEM" ? "bg-violet-100 text-violet-800" : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {p.data_marcada ? `Marcado ${dataHoraPT(p.data_marcada)}` : p.estado === "EM_TRIAGEM" ? "Enviado para triagem" : p.estado_legivel}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-left text-xs text-sky-900">
+                <strong>Perfil de {dados.doente?.nome} actualizado:</strong>{" "}
+                {resultado.pedidos.filter((p) => p.data_marcada).length} marcado(s) ·{" "}
+                {resultado.pedidos.filter((p) => p.estado === "EM_TRIAGEM").length} em triagem ·{" "}
+                {resultado.pedidos.filter((p) => !p.data_marcada && p.estado !== "EM_TRIAGEM").length} por marcar. Cada serviço já recebeu os seus
+                pedidos; o doente recebe o aviso com a preparação de cada exame.
               </div>
 
               <div className="mt-5 flex flex-col gap-2">
                 <button
                   type="button"
-                  onClick={() => setModalDoenteAberto(true)}
+                  onClick={() => dados.doente && abrirDoente(dados.doente.doente_id)}
                   className="rounded-lg bg-oasis-header px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-slate-700"
                 >
-                  Ver pedidos do doente
+                  Ver o perfil do doente
                 </button>
                 <button
                   type="button"
