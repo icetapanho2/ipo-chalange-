@@ -116,7 +116,7 @@ export function VagasLibertadas({ aoMudar }: { aoMudar?: (mensagem: string) => v
   const visiveis = marcacoes.filter((m) => !filtro || m.doente_nome.toLowerCase().includes(filtro.toLowerCase())).slice(0, 8);
 
   return (
-    <div className="mt-5 space-y-5">
+    <div className="mt-5 space-y-5" data-tour="vagas-libertadas">
       {erro && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
 
       {/* Ofertas pendentes */}

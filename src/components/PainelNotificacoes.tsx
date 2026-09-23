@@ -191,6 +191,7 @@ export function PainelNotificacoes() {
     <>
       <button
         type="button"
+        data-tour="sino"
         onMouseEnter={entrar}
         onMouseLeave={sair}
         onClick={alternarFixo}

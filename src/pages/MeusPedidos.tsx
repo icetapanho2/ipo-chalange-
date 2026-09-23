@@ -207,7 +207,9 @@ export function MeusPedidos() {
       {erro && <p className="mt-3 text-sm text-red-600">{erro}</p>}
 
       {/* O que precisa de uma resposta do médico */}
-      <DecisoesRemarcacao aoMudar={recarregar} />
+      <div data-tour="meus-pedidos">
+        <DecisoesRemarcacao aoMudar={recarregar} />
+      </div>
       {porResponder > 0 && dados && (
         <section className="mt-4 space-y-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
           <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-900">

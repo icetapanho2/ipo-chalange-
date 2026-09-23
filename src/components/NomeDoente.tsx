@@ -1,9 +1,15 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ExternalLink, X } from "lucide-react";
 import { FichaDoente } from "./FichaDoente";
 
 const EVENTO = "oasis:abrir-doente";
+const EVENTO_FECHAR = "oasis:fechar-doente";
+
+/** Fecha a ficha lateral, se estiver aberta (usado pelo tutorial). */
+export function fecharDoente() {
+  window.dispatchEvent(new Event(EVENTO_FECHAR));
+}
 
 /** Abre a ficha do doente no painel lateral (de qualquer sítio da aplicação). */
 export type VistaFicha = "percurso" | "folha" | "exames" | "perfil";
@@ -33,6 +39,14 @@ export function NomeDoente({ id, nome, className = "" }: { id?: string; nome: st
 export function GavetaDoente() {
   const [id, setId] = useState<string | null>(null);
   const [vista, setVista] = useState<VistaFicha>("percurso");
+  const { pathname } = useLocation();
+  // Mudar de página fecha a ficha (ela é da página de onde foi aberta).
+  useEffect(() => setId(null), [pathname]);
+  useEffect(() => {
+    const fechar = () => setId(null);
+    window.addEventListener(EVENTO_FECHAR, fechar);
+    return () => window.removeEventListener(EVENTO_FECHAR, fechar);
+  }, []);
   useEffect(() => {
     const abrir = (e: Event) => {
       const { id, vista } = (e as CustomEvent<{ id: string; vista: VistaFicha }>).detail;
@@ -50,7 +64,7 @@ export function GavetaDoente() {
   if (!id) return null;
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/30" onClick={() => setId(null)}>
-      <div className="h-full w-full max-w-3xl overflow-y-auto bg-slate-100 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div data-tour="ficha" className="h-full w-full max-w-3xl overflow-y-auto bg-slate-100 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
           <span className="text-xs font-bold uppercase tracking-wide text-slate-500">Ficha do doente</span>
           <div className="flex items-center gap-2">

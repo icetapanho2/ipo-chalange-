@@ -194,7 +194,7 @@ export function OasisMedico() {
               Sem consultas marcadas neste dia para esta agenda médica.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" data-tour="agenda">
               <table className="w-full border-collapse text-left text-xs">
                 <thead>
                   <tr className="border-b border-oasis-border bg-slate-100 text-[11px] uppercase font-bold text-slate-600">
@@ -211,6 +211,7 @@ export function OasisMedico() {
                   {resposta.atos.map((item) => (
                     <tr
                       key={item.ato_id}
+                      data-tour={`agenda-${item.doente_id}`}
                       className="group bg-white hover:bg-sky-50/50 transition-colors"
                     >
                       <td className="py-3 px-3 font-mono font-bold text-slate-800">
@@ -220,6 +221,7 @@ export function OasisMedico() {
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
+                            data-tour={`nome-${item.doente_id}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               setDoenteModalId(item.doente_id);
@@ -252,6 +254,7 @@ export function OasisMedico() {
                       <td className="py-3 px-3 text-right">
                         <button
                           type="button"
+                          data-tour={`abrir-consulta-${item.doente_id}`}
                           onClick={() => navigate(`/oasis/medico/${item.ato_id}`)}
                           className="rounded-lg bg-oasis-header px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-slate-700 transition-colors inline-flex items-center gap-1"
                         >

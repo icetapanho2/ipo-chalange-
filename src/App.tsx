@@ -2,6 +2,8 @@ import { Suspense, lazy } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Cabecalho } from "./components/Cabecalho";
 import { GavetaDoente } from "./components/NomeDoente";
+import { Tutorial } from "./components/Tutorial";
+import { usePerfil } from "./lib/PerfilContext";
 import { Inicio } from "./pages/Inicio";
 import { OasisMedico } from "./pages/oasis/Medico";
 import { OasisConsulta } from "./pages/oasis/Consulta";
@@ -22,11 +24,14 @@ import { LaboratorioPrioridades } from "./pages/LaboratorioPrioridades";
 const Gestao = lazy(() => import("./pages/Gestao").then((m) => ({ default: m.Gestao })));
 
 export function App() {
+  // Trocar de utilizador remonta a página: cada perfil vê os seus dados, mesmo sem mudar de endereço.
+  const { utilizadorId } = usePerfil();
   return (
     <BrowserRouter>
       <Cabecalho />
       <GavetaDoente />
-      <Routes>
+      <Tutorial />
+      <Routes key={utilizadorId}>
         <Route path="/" element={<Inicio />} />
         <Route path="/oasis/medico" element={<OasisMedico />} />
         <Route path="/oasis/medico/:atoId" element={<OasisConsulta />} />

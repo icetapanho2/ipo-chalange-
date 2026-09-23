@@ -315,7 +315,7 @@ export function OasisConsulta() {
 
                 {/* Atalhos para a ficha do doente (abre ao lado, sem sair da consulta) */}
                 {dados.doente && (
-                  <div className="grid grid-cols-4 gap-1.5 text-center">
+                  <div className="grid grid-cols-4 gap-1.5 text-center" data-tour="atalhos-ficha">
                     {(
                       [
                         ["perfil", UserCog, "Perfil", "Perfil completo — ver e editar os dados do doente"],

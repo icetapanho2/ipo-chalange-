@@ -383,3 +383,19 @@ Pedido do utilizador depois da revisão:
    - Saíram a curva de "aprovação directa da IA" (a extracção saiu da interface), o gráfico de
      decisões da triagem e os cartões de "consultas em risco" (operacionais, já estão no serviço).
      Ficam o impacto, as definições/laboratório de prioridades e a comparação entre serviços.
+
+## 2026-09-23 — Modo tutorial no Guião
+
+1. **"Fazer em modo tutorial"** em cada caso (e "Tutorial" em cada passo, para começar a meio): o ecrã
+   escurece menos o que interessa, com um cartão a dizer o que é e o que fazer; troca de perfil e de
+   página sozinho. O destaque não bloqueia cliques (pode-se experimentar), o cartão minimiza-se e o
+   tutorial sobrevive a mudanças de página (sessionStorage). Só frontend: nada muda no servidor.
+2. **Caso 1 guiado clique a clique** (a Maria): agenda → ficha ao lado (explica o que dá para fazer;
+   avança ao fechar) → consulta → atalhos → diário **pronto a copiar** → assistente (com
+   "preencher por mim" que põe o plano do guião) → resumo → confirmação → triagem da Oncologia Médica
+   → aceitar → notificações → ficha "4 marcados". Os passos avançam sozinhos quando se faz a acção.
+3. **Casos 2 a 8 gerados a partir do guião** (`src/lib/casosDemo.ts`, agora partilhado): um passo por
+   botão do guião, com o destaque na zona onde se decide (`alvo`), a descrição, o resultado esperado e
+   a fala. Alvos marcados com `data-tour` nos componentes.
+4. Trocar de utilizador remonta a página (a triagem de Onc. Médica → Radioterapia no mesmo endereço
+   mostrava a fila antiga); mudar de página fecha a ficha lateral.

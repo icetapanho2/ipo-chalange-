@@ -233,6 +233,7 @@ export function Triagem() {
           .map((item) => (
           <div
             key={item.pedido_id}
+            data-tour={`triagem-${item.doente_id}`}
             className={`rounded-xl border bg-white p-4 shadow-sm transition-all ${
               item.doente_id === doenteDestacado ? "border-amber-400 ring-2 ring-amber-200" : "border-slate-200 hover:border-slate-300"
             }`}
@@ -326,6 +327,7 @@ export function Triagem() {
                 <button
                   type="button"
                   disabled={aProcessar}
+                  data-tour={`aceitar-${item.doente_id}`}
                   onClick={() => aceitar(item)}
                   className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5 transition-transform active:scale-95"
                 >

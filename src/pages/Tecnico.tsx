@@ -122,7 +122,7 @@ export function Tecnico() {
         </div>
       )}
 
-      <div className="mt-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+      <div data-tour="tecnico-avaria" className="mt-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-xs font-bold text-slate-700 block mb-1">Serviço afectado</label>

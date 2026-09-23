@@ -77,7 +77,7 @@ export function ListaChamadas({ aoMudar }: { aoMudar?: (mensagem: string) => voi
   const pct = dados.marcacoesNoHorizonte ? Math.round((dados.itens.length / dados.marcacoesNoHorizonte) * 100) : 0;
 
   return (
-    <div className="mt-5 space-y-4">
+    <div className="mt-5 space-y-4" data-tour="chamadas">
       {erro && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-3">

@@ -14,301 +14,11 @@ import {
   Check,
   ShieldAlert,
   Search,
+  GraduationCap,
 } from "lucide-react";
 
-interface AcaoPasso {
-  etiqueta: string;
-  utilizadorId: string;
-  caminho: string;
-}
-
-interface Passo {
-  titulo: string;
-  descricao: string;
-  resultado: string;
-  acoes: AcaoPasso[];
-  /** O que dizer ao júri neste passo. */
-  fala?: string;
-}
-
-interface Caso {
-  id: string;
-  titulo: string;
-  tipo: "normal" | "problema" | "impacto";
-  problema: string;
-  regras?: string[];
-  passos: Passo[];
-}
-
-/**
- * Guião da demo por CASOS: o caso normal (tudo corre bem) e os casos com problemas em que as
- * regras de prioridade decidem (ESPECIFICACAO.md secção 8A). Os resultados esperados são os de
- * tests/guiaoCasos.test.ts — correr os casos por esta ordem, depois de "Repor demo".
- */
-const CASOS: Caso[] = [
-  {
-    id: "1",
-    titulo: "Caso 1 — Tudo corre bem",
-    tipo: "normal",
-    problema:
-      "Hoje o plano da consulta segue num papel (o \"cromo\"): a administrativa copia-o e cada serviço marca por si, sem saber das dependências. Aqui o médico declara os pedidos uma vez e o sistema faz o resto.",
-    passos: [
-      {
-        titulo: "Maria Fernandes — da consulta às marcações",
-        descricao:
-          "Dr. Pedro, primeira doente do dia (08:30; sem pedidos pendentes). Os ícones ao lado abrem o perfil, os pedidos, a folha clínica e os exames. Escrever no Diário Clínico e \"Guardar & Seguinte\". No assistente escolher Análises, Exames, Próxima consulta (já vem no serviço dele) e Pedido de consulta (Oncologia Médica). Colheita com jejum (hemograma, bioquímica com creatinina, CEA, CA 19.9); TC TAP com contraste; próxima consulta que depende dos exames, com continuidade. Observações obrigatórias em cada pedido. Submeter.",
-        resultado:
-          "A confirmação mostra o que aconteceu a cada pedido: colheita 24/09 07:30 → TC 14/10 08:20 (regra R1: creatinina antes do contraste) → próxima consulta com o Dr. Pedro 21/10 08:30 (7 dias depois do TC); a interconsulta segue para a triagem da Oncologia Médica. O perfil da Maria fica logo com 3 marcados e 1 em triagem.",
-        acoes: [{ etiqueta: "Agenda do Dr. Pedro", utilizadorId: "U01", caminho: "/oasis/medico" }],
-        fala: "O médico declara os pedidos uma vez. O sistema percebe as dependências e marca tudo pela ordem certa, sem papel.",
-      },
-      {
-        titulo: "Maria — cada serviço recebe o que é seu",
-        descricao:
-          "Triador de Oncologia Médica: a Maria está em primeiro na fila (\"Novo\") → Aceitar & Agendar. Ver também as administrativas da Patologia, do TAC e da Oncologia Médica (Serviço → Pedidos e avisos): o pedido da Maria aparece em primeiro, marcado como novo.",
-        resultado:
-          "Consulta de Oncologia Médica marcada; o Dr. Pedro recebe as notificações e a ficha da Maria passa a \"Tudo em ordem · 4 marcados\".",
-        acoes: [
-          { etiqueta: "Triagem (Onc. Médica)", utilizadorId: "U04", caminho: "/triagem" },
-          { etiqueta: "Pedidos (TAC)", utilizadorId: "U07", caminho: "/servico?aba=pedidos" },
-          { etiqueta: "Ficha da Maria", utilizadorId: "U01", caminho: "/doente/100101" },
-        ],
-      },
-      {
-        titulo: "Luísa Martins — pedido para outro serviço",
-        descricao: "O triador de Oncologia Médica vê que o pedido é para Radioterapia e reencaminha-o; a triadora de Radioterapia aceita.",
-        resultado: "1.ª consulta de Radioterapia a 30/09 09:00, marcada no momento em que é aceite.",
-        acoes: [
-          { etiqueta: "Reencaminhar (Onc. Médica)", utilizadorId: "U04", caminho: "/triagem" },
-          { etiqueta: "Aceitar (Radioterapia)", utilizadorId: "U06", caminho: "/triagem" },
-        ],
-      },
-      {
-        titulo: "Fernando Lopes — Hospital de Dia",
-        descricao: "A triadora de Hospital de Dia aceita a sessão de quimioterapia.",
-        resultado: "Sessão a 25/09 08:30; as análises pré-quimioterapia são criadas e marcadas sozinhas para 24/09 07:30 (regra R2: 1 a 3 dias antes).",
-        acoes: [{ etiqueta: "Aceitar (Hospital de Dia)", utilizadorId: "U10", caminho: "/triagem" }],
-      },
-      {
-        titulo: "Ver tudo na ficha do doente",
-        descricao:
-          "Abrir a ficha da Maria: em \"Marcações do doente\" aparece cada marcação, com a indicação de que está dentro do prazo, e as mensagens que ela recebeu (aviso com a preparação do exame e lembrete a D-3).",
-        resultado: "Tudo o que foi pedido está marcado, dentro do prazo, e o doente já sabe o que tem de fazer.",
-        acoes: [
-          { etiqueta: "Ficha da Maria", utilizadorId: "U03", caminho: "/doente/100101" },
-          { etiqueta: "Ficha do Fernando", utilizadorId: "U03", caminho: "/doente/100108" },
-        ],
-        fala: "Fim do circuito normal: pedido, triagem, marcação e aviso ao doente, sem papel e sem telefonemas.",
-      },
-    ],
-  },
-  {
-    id: "2",
-    titulo: "Caso 2 — O TAC está cheio: quem cede a vaga?",
-    tipo: "problema",
-    problema:
-      "José Carvalho tem suspeita de recidiva: TC muito prioritário até 05/10. O TAC não tem vagas até 13/10. Alguém tem de ceder a vaga — mas quem? Hoje, é quem calha (ou quem tem mais folga), e às vezes é o doente de 81 anos que vem de ambulância.",
-    regras: [
-      "Nunca se mexe numa marcação a 7 dias ou menos.",
-      "Nunca se remarca pelo hospital alguém que já foi remarcado.",
-      "Nunca se mexe em quem está em tratamento.",
-      "Entre os restantes, cede quem tem menor custo de remarcar: idade, sem telemóvel, distância, transporte, outra marcação no mesmo dia, em diagnóstico (a folga até ao prazo desconta).",
-      "É sempre uma proposta: um humano aprova.",
-    ],
-    passos: [
-      {
-        titulo: "Radiologia: \"Porquê esta escolha?\"",
-        descricao:
-          "O Dr. Pedro pediu o TC do José ontem; como não havia vaga, o sistema preparou logo uma proposta de troca para a Radiologia. Serviço → Para decidir → Trocas de vaga: abrir \"Porquê esta escolha?\" — todos os doentes avaliados, as exclusões e o custo de cada um. Aprovar.",
-        resultado:
-          "Cede a vaga Manuel Costa (follow-up, SMS, prazo 31/12): 02/10 10:00 → 14/10 08:00 (vaga reservada desde que a proposta foi criada). Excluídos: Beatriz (já remarcada uma vez) e Tiago (em quimioterapia). Pela regra antiga seria o Sr. Joaquim — mais folga, mas 81 anos, sem telemóvel, Castelo Branco, ambulância e consulta no mesmo dia: custo 70 contra −30.",
-        acoes: [{ etiqueta: "Propostas (Radiologia)", utilizadorId: "U07", caminho: "/servico?aba=decidir" }],
-        fala: "O sistema não decide sozinho: propõe, explica porquê em linguagem simples, e um humano aprova.",
-      },
-      {
-        titulo: "Laboratório: e se as regras fossem outras?",
-        descricao:
-          "Na Gestão, abrir o Laboratório de prioridades. Pôr as \"Remarcações\" do Manuel a 1: ele passa a estar protegido e a escolha muda. Experimentar também os pesos das regras.",
-        resultado: "Com o Manuel já remarcado, cede a vaga a Graça Pereira Santos (custo 49); o Sr. Joaquim continua protegido.",
-        acoes: [{ etiqueta: "Laboratório de prioridades", utilizadorId: "U12", caminho: "/gestao/laboratorio" }],
-        fala: "Os critérios são da direcção clínica. Aqui vê-se o efeito de cada um, sem mexer em marcações reais.",
-      },
-    ],
-  },
-  {
-    id: "3",
-    titulo: "Caso 3 — Um doente desmarca: quem aproveita a vaga?",
-    tipo: "problema",
-    problema:
-      "Rui Fonseca liga a desmarcar o TC de 30/09 (vai estar fora; pode a partir de 19/10). Hoje a vaga fica vazia ou vai para quem ligar primeiro — enquanto há doentes em diagnóstico marcados semanas depois do prazo.",
-    regras: [
-      "Aviso de mais de 72 h: a vaga é oferecida por SMS; com menos de 24 h não se chama ninguém de fora.",
-      "Primeiro quem está sem vaga ou marcado depois do prazo — em diagnóstico à frente, depois quem ficaria mais dias fora do prazo.",
-      "Depois, doentes em diagnóstico que ganham pelo menos 7 dias e aceitam ser antecipados.",
-      "Antecipar alguém não conta como remarcação: foi o doente que aceitou.",
-    ],
-    passos: [
-      {
-        titulo: "Radiologia regista a desmarcação",
-        descricao: "Separador \"Vagas libertadas\": procurar \"Rui\" → \"Desmarcar a pedido do doente\", disponível a partir de 19/10.",
-        resultado:
-          "Rui reagendado para 19/10 08:40. A vaga de 30/09 09:00 é oferecida a Helena Duarte — em diagnóstico (suspeita de cancro do pâncreas), marcada a 13/10, 35 dias depois do prazo.",
-        acoes: [{ etiqueta: "Vagas libertadas (Radiologia)", utilizadorId: "U07", caminho: "/servico?aba=vagas" }],
-      },
-      {
-        titulo: "A Helena aceita",
-        descricao: "Clicar em \"Doente aceitou\" (a resposta ao SMS é simulada). Abrir \"Porquê esta pessoa?\" para ver a lista ordenada.",
-        resultado:
-          "Helena passa para 30/09 09:00 e ganha 13 dias, sem contar como remarcação. A vaga dela de 13/10 é oferecida automaticamente a Luís Martins Alves (cascata).",
-        acoes: [
-          { etiqueta: "Vagas libertadas (Radiologia)", utilizadorId: "U07", caminho: "/servico?aba=vagas" },
-          { etiqueta: "Ficha da Helena", utilizadorId: "U07", caminho: "/doente/100112" },
-        ],
-        fala: "Uma desmarcação com uma semana de aviso deixa de ser uma vaga perdida e passa a ser tempo ganho por quem espera um diagnóstico.",
-      },
-    ],
-  },
-  {
-    id: "4",
-    titulo: "Caso 4 — Doente de longe, idoso e sem telemóvel",
-    tipo: "problema",
-    problema:
-      "O Sr. Joaquim (81 anos) mora em Castelo Branco, a 230 km, não tem telemóvel e vem de ambulância. Já tem TC e consulta a 01/10. Hoje o Dr. Pedro pede-lhe uma colheita — a primeira vaga é amanhã, o que obrigaria a mais uma viagem.",
-    regras: [
-      "Dia único: para quem mora a 50 km ou mais, o sistema prefere um dia em que o doente já vem ao hospital (nunca para lá do prazo) e evita horas antes das 10:00.",
-      "Lista de chamadas: todos recebem aviso e lembrete; a administrativa só liga a quem tem risco (sem contacto digital, preparação crítica, faltas, 2.ª remarcação).",
-    ],
-    passos: [
-      {
-        titulo: "Dr. Pedro pede a colheita",
-        descricao: "Consulta das 11:50 (Joaquim Pereira) → \"Guardar & Seguinte\" → Análises: colheita sem jejum (hemograma, CEA). Submeter.",
-        resultado:
-          "Marcada a 01/10 10:00, entre o TC (09:00) e a consulta (11:10) — não a 24/09, que era a primeira vaga. Evita uma viagem de 460 km.",
-        acoes: [
-          { etiqueta: "Agenda do Dr. Pedro", utilizadorId: "U01", caminho: "/oasis/medico" },
-          { etiqueta: "Ficha do Joaquim", utilizadorId: "U08", caminho: "/doente/100109" },
-        ],
-      },
-      {
-        titulo: "Lista de chamadas da Radiologia",
-        descricao: "Separador \"Chamadas\": o Sr. Joaquim aparece (sem contacto digital, 81 anos) e a Maria aparece por causa da preparação (TC com contraste e metformina).",
-        resultado: "Cerca de 1 em cada 5 marcações precisa de chamada; as restantes ficam só com o SMS/email e o lembrete a D-3.",
-        acoes: [{ etiqueta: "Lista de chamadas (Radiologia)", utilizadorId: "U07", caminho: "/servico?aba=chamadas" }],
-        fala: "Não ligamos a toda a gente: ligamos a quem, sem chamada, provavelmente falharia o exame.",
-      },
-    ],
-  },
-  {
-    id: "5",
-    titulo: "Caso 5 — Avaria: 5 doentes para remarcar de uma vez",
-    tipo: "problema",
-    problema:
-      "O ecógrafo avariou e só fica reparado depois de amanhã: as 5 ecografias de 24/09 têm de ser remarcadas e só há uma vaga livre antes de sexta. Hoje a administrativa pega no telefone e remarca pela ordem da lista — quem calha fica com a vaga, e ninguém repara que um dos exames já não chega a tempo da consulta.",
-    regras: [
-      "Cada pedido já tem o índice de prioridade calculado e guardado (nível, prazo, estádio, score clínico, remarcações já sofridas, espera): a ordem já está feita antes da avaria.",
-      "Dois MP com o mesmo prazo não empatam: quem está em diagnóstico fica à frente.",
-      "Se uma consulta depende do exame, a nova data tem de deixar tempo para o resultado. Se não houver, é um alerta — nunca uma remarcação às cegas.",
-      "Sem vaga a tempo: a administrativa resolve com vaga extra ou outsourcing; se não puder, decide o médico (avançar com a consulta ou adiá-la, e para que dia).",
-    ],
-    passos: [
-      {
-        titulo: "O técnico reporta a avaria",
-        descricao:
-          "Perfil Técnico → Reportar avaria: Radiologia-Geral (Ecografia), todo o serviço, \"Ecógrafo avariado (sonda); técnico da marca só amanhã ao fim do dia\", a partir de 24/09, 1 dia.",
-        resultado: "A administrativa da Ecografia (Tiago Neves) recebe logo: \"Avaria em Radiologia-Geral (Ecografia): 5 marcação(ões) a remarcar — plano pronto\".",
-        acoes: [{ etiqueta: "Reportar avaria (Técnico)", utilizadorId: "U13", caminho: "/tecnico" }],
-      },
-      {
-        titulo: "A administrativa revê o plano e aceita",
-        descricao:
-          "Serviço → Para decidir → Remarcações propostas: as 5 propostas por ordem do índice, com a vaga sugerida, o porquê e os avisos (carregar no índice mostra cada ponto). \"Aceitar todas\" aplica as 4 que têm solução.",
-        resultado:
-          "1.º Sónia (MP, em diagnóstico, 717) → 25/09 10:40, a única vaga no prazo. 2.º Artur (MP, 621) → 28/09 11:00, 3 dias fora do prazo, com aviso. 3.º Fátima (em QT) → 28/09 12:00, aviso \"2.ª remarcação — ligar\". 4.º Olga (84 anos, Santarém) → 01/10 11:40, no dia da consulta dela. 5.º Diogo (índice 134) → sem vaga a tempo (ver passo seguinte).",
-        acoes: [{ etiqueta: "Remarcações (Ecografia)", utilizadorId: "U11", caminho: "/servico?aba=decidir" }],
-        fala: "Cinco remarcações em segundos, cada uma com o porquê. Quem decide continua a ser a administrativa.",
-      },
-      {
-        titulo: "Diogo: sem vaga a tempo — alerta",
-        descricao:
-          "O Diogo tem revisão com a Dra. Sofia a 29/09 que precisa do resultado da ecografia (3 dias): o exame teria de ser até 26/09 e a única vaga (25/09) ficou para a Sónia, com índice 717 contra 134. O cartão fica a vermelho, com um alerta, e três saídas: \"Resolvi com vaga extra\" (já sugere 25/09 13:30), \"Resolvi com outsourcing\", ou \"Não há solução — enviar ao médico\". Para a demo: enviar ao médico.",
-        resultado: "A Dra. Sofia recebe a notificação \"Decisão necessária: Diogo Almeida Reis — revisão de 29/09\". (Com vaga extra, o exame ficaria a 25/09 13:30 e a consulta mantinha-se.)",
-        acoes: [{ etiqueta: "Remarcações (Ecografia)", utilizadorId: "U11", caminho: "/servico?aba=decidir" }],
-        fala: "Quem tem menos prioridade não fica esquecido: fica um alerta com as opções, e se a administração não resolve, decide o médico.",
-      },
-      {
-        titulo: "A médica decide: adiar a consulta",
-        descricao:
-          "Perfil Dra. Sofia Lemos → Os Meus Pedidos: \"Exame sem vaga a tempo da consulta — decida\". Opções: avançar com a consulta a 29/09 e ver a ecografia depois (28/09), ou adiar a consulta (data mínima sugerida 01/10). Escolher \"Adiar\" com 01/10.",
-        resultado: "Consulta adiada para 06/10 09:30 (primeiro dia livre da Dra. Sofia a partir de 01/10); ecografia a 28/09 12:40, a tempo do resultado. O doente e a administrativa são avisados; o técnico recebe \"avaria resolvida\".",
-        acoes: [
-          { etiqueta: "Os Meus Pedidos (Dra. Sofia)", utilizadorId: "U02", caminho: "/meus-pedidos" },
-          { etiqueta: "Ficha do Diogo", utilizadorId: "U02", caminho: "/doente/100117" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "6",
-    titulo: "Caso 6 — A médica vai de férias",
-    tipo: "problema",
-    problema: "A Dra. Sofia Lemos falta a 08/10. As 7 consultas desse dia têm de mudar — e os doentes que ela segue devem continuar com ela.",
-    regras: ["Mesmo motor da avaria, só na agenda desse médico.", "Continuidade: primeiro a agenda do mesmo médico; ordem pelo índice."],
-    passos: [
-      {
-        titulo: "A administrativa regista a ausência",
-        descricao: "Perfil Joana Moreira → Serviço → Para decidir → \"Registar ausência de médico\": Dra. Sofia Lemos, 08/10, 1 dia, Férias. Rever o plano e \"Aceitar todas\".",
-        resultado: "7 consultas remarcadas pela ordem do índice, com a própria Dra. Sofia: o 1.º (MP, em diagnóstico) para 13/10 09:10 e os restantes a 13/10 e 15/10.",
-        acoes: [{ etiqueta: "Remarcações (Onc. Cirúrgica)", utilizadorId: "U03", caminho: "/servico?aba=decidir" }],
-        fala: "Férias, doença, formação: a agenda de um médico inteiro muda em segundos, sem perder a continuidade.",
-      },
-    ],
-  },
-  {
-    id: "7",
-    titulo: "Caso 7 — Faltou a uma análise antes da consulta",
-    tipo: "problema",
-    problema: "António Ribeiro faltou ontem à colheita de que depende a revisão de 28/09. Sem o sistema, só se descobre no dia da consulta.",
-    passos: [
-      {
-        titulo: "A administrativa recebe a sugestão e aceita",
-        descricao:
-          "Perfil Rita Vieira (Patologia Clínica): a notificação da falta já traz a sugestão. Serviço → Para decidir → Remarcações propostas (falta): ler o porquê e \"Aceitar\". Na ficha do António o semáforo passa de vermelho a amarelo.",
-        resultado: "Colheita a 24/09 07:40 — a primeira vaga que ainda dá tempo ao resultado (2 dias) antes da consulta de 28/09. Não conta como remarcação pelo hospital.",
-        acoes: [
-          { etiqueta: "Remarcações (Patologia Clínica)", utilizadorId: "U08", caminho: "/servico?aba=decidir" },
-          { etiqueta: "Ficha do António", utilizadorId: "U08", caminho: "/doente/100102" },
-        ],
-        fala: "Uma falta deixa de rebentar a consulta seguinte: a solução chega à administrativa antes de ela ter de a procurar.",
-      },
-    ],
-  },
-  {
-    id: "8",
-    titulo: "Gestão — antecipar em vez de apagar fogos",
-    tipo: "impacto",
-    problema:
-      "O que isto vale para quem gere: saber onde pôr capacidade antes de os prazos falharem (e onde uma sessão extra não resolve nada), quem ganha com ela antes de a pagar, e os números do antes e do depois.",
-    passos: [
-      {
-        titulo: "Onde pôr capacidade e sessão extra",
-        descricao:
-          "Gestão: \"Onde falta capacidade — próximas 2 semanas\", por serviço: o que a administrativa resolve com as vagas que tem, o que só uma sessão extra resolve, e o que está parado à espera de exames de outro serviço. As consultas de Cirurgia em risco esperam pelo TAC e pelas análises: sessão extra de Cirurgia não adiantava — o estrangulamento é o TAC. \"Preparar sessão extra\" no TAC (sábado 26/09 às 08:00) mostra quem ganha com cada vaga.",
-        resultado:
-          "Das 6 vagas, só 2 têm quem ganhe com elas (Paula Ribeiro Nunes e Helena Duarte Matos, em diagnóstico e fora do prazo): o sistema diz para abrir só 2. \"Abrir a sessão\" cria as vagas e envia as ofertas por SMS.",
-        acoes: [{ etiqueta: "Abrir Gestão", utilizadorId: "U12", caminho: "/gestao" }],
-        fala: "Antes de pagar horas extra, sabe-se onde servem, quem ganha com elas e quantas vagas chegam — e onde não servem de nada.",
-      },
-      {
-        titulo: "Impacto em números",
-        descricao:
-          "No topo da Gestão: antes das regras (60 dias), o que as regras fizeram nesta demonstração, espera por estádio, e a projecção mensal com os pressupostos à vista. Na lista de chamadas de cada serviço há também os encaixes sugeridos por dia (só sugestão).",
-        resultado:
-          "0 doentes remarcados uma 2.ª vez por troca (2 inevitáveis, sinalizadas), 3 doentes vulneráveis protegidos, 12/12 remarcações por avaria/ausência justificadas e validadas, 1 vaga libertada reaproveitada (13 dias ganhos), 2 deslocações evitadas (630 km), ~23% das marcações a ligar.",
-        acoes: [{ etiqueta: "Abrir Gestão", utilizadorId: "U12", caminho: "/gestao" }],
-      },
-    ],
-  },
-];
+import { CASOS, type AcaoPasso } from "../lib/casosDemo";
+import { iniciarTutorial, obterTutorial } from "../lib/tutoriais";
 
 interface DoenteCompleto {
   doente_id: string;
@@ -491,7 +201,8 @@ export function Guiao() {
           <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600 shadow-2xs">
             <strong className="text-slate-800">Como apresentar:</strong> carregar em \"Repor demo\" e seguir os casos por esta ordem. O Caso 1
             mostra o circuito normal; os Casos 2 a 7 mostram problemas reais em que as regras de prioridade decidem; o último mostra o impacto
-            em números. Cada botão já troca para o perfil certo.
+            em números. Cada botão já troca para o perfil certo. Em <strong>"Fazer em modo tutorial"</strong> o ecrã escurece e fica destacado só
+            o que interessa em cada passo, com o texto do que é e do que fazer (para sair: × no cartão).
           </div>
 
           <div className="space-y-6">
@@ -519,6 +230,14 @@ export function Guiao() {
                   >
                     {caso.tipo === "normal" ? "caso normal" : caso.tipo === "impacto" ? "gestão" : "a prioridade decide"}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => iniciarTutorial(caso.id)}
+                    className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-amber-600"
+                    title="Percorrer o caso no ecrã, passo a passo, com o que está a ver destacado"
+                  >
+                    <GraduationCap className="h-3.5 w-3.5" /> Fazer em modo tutorial
+                  </button>
                 </div>
                 <p className="mt-1.5 text-xs leading-relaxed text-slate-700">
                   <strong>{caso.tipo === "impacto" ? "Para quê:" : "Problema:"}</strong> {caso.problema}
@@ -555,6 +274,13 @@ export function Guiao() {
                         </div>
                       )}
                       <div className="mt-2.5 flex flex-wrap gap-2 border-t border-slate-100 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => iniciarTutorial(caso.id, obterTutorial(caso.id)?.inicioPorPassoGuiao[i] ?? 0)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-2xs hover:bg-amber-100"
+                        >
+                          <GraduationCap className="h-3.5 w-3.5" /> Tutorial
+                        </button>
                         {passo.acoes.map((acao) => (
                           <button
                             key={acao.etiqueta}

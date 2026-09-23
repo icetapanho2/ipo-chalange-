@@ -111,14 +111,14 @@ export function Gestao() {
         regras de prioridade do hospital e o impacto.
       </p>
 
-      <section className="mt-4 space-y-3">
+      <section className="mt-4 space-y-3" data-tour="capacidade">
         <h2 className="text-sm font-semibold text-slate-600">1 · Decidir capacidade</h2>
         <OndePorCapacidade opcoes={sessao} versao={versao} aoPreparar={preparar} />
         <SessaoExtra opcoes={sessao} setOpcoes={setSessao} aoAbrir={() => setVersao((v) => v + 1)} />
         <PrazosEmRisco />
       </section>
 
-      <section className="mt-6">
+      <section className="mt-6" data-tour="impacto">
         <h2 className="mb-2 text-sm font-semibold text-slate-600">2 · Impacto das regras de prioridade e agendamento</h2>
         <PainelImpacto />
       </section>

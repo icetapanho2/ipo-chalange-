@@ -5,6 +5,7 @@ import { usePerfil } from "../../lib/PerfilContext";
 import { DoenteModal } from "../../components/DoenteModal";
 import { abrirDoente } from "../../components/NomeDoente";
 import { dataHoraPT } from "../../lib/datas";
+import { EVENTO_ACAO_TUTORIAL } from "../../lib/tutoriais";
 import {
   CheckCircle2,
   ChevronLeft,
@@ -15,9 +16,9 @@ import {
 } from "lucide-react";
 
 /** Cartão no estilo usado no resto do site (Triagem, Serviço): branco, cabeçalho leve. */
-function Painel({ titulo, children }: { titulo?: string; children: ReactNode }) {
+function Painel({ titulo, tour, children }: { titulo?: string; tour?: string; children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div data-tour={tour} className="rounded-xl border border-slate-200 bg-white shadow-sm">
       {titulo && (
         <div className="border-b border-slate-100 px-3.5 py-2 text-xs font-bold uppercase tracking-wide text-slate-600">{titulo}</div>
       )}
@@ -179,6 +180,26 @@ export function OasisPedidosPosConsulta() {
       continuidade_medico: tipo === "consulta",
     };
   }
+
+  // Tutorial do Guião: "preencher por mim" o plano da Maria (o mesmo do guião e dos testes).
+  useEffect(() => {
+    const aoPedir = (e: Event) => {
+      if ((e as CustomEvent<string>).detail !== "preencher-maria" || !catalogo || !dados) return;
+      const tipos: TipoPedido[] = ["analises", "exame", "consulta", "pedido_consulta"];
+      const base = (tipo: TipoPedido, patch: Partial<PedidoForm>): PedidoForm => ({ ...novoPedido(tipo), ...patch });
+      setTiposSelecionados(tipos);
+      setPedidos([
+        base("analises", { especialidade_destino: "6100", ato_codigo: "9", analises: ["A001", "A002", "A003", "A004", "A005"], especificacao: "Controlo de vigilância, em jejum; creatinina antes do TC com contraste." }),
+        base("exame", { especialidade_destino: "7000_2", ato_codigo: "1", exames: ["7000002", "7000004", "7000009"], especificacao: "TC TAP com contraste — reavaliação de vigilância." }),
+        base("consulta", { especialidade_destino: dados.ato.especialidade_codigo, depende_exames_consulta: true, continuidade_medico: true, especificacao: "Revisão com os resultados das análises e do TC." }),
+        base("pedido_consulta", { especialidade_destino: "1300", ato_codigo: "1", especificacao: "Avaliação por Oncologia Médica." }),
+      ]);
+      setErro(null);
+      setEtapa("preenchimento");
+    };
+    window.addEventListener(EVENTO_ACAO_TUTORIAL, aoPedir);
+    return () => window.removeEventListener(EVENTO_ACAO_TUTORIAL, aoPedir);
+  });
 
   function alternarTipo(tipo: TipoPedido) {
     setTiposSelecionados((atual) => (atual.includes(tipo) ? atual.filter((t) => t !== tipo) : [...atual, tipo]));
@@ -374,7 +395,7 @@ export function OasisPedidosPosConsulta() {
         <>
           {/* ETAPA 2: TIPO DE PEDIDOS */}
           {etapa === "tipos" && (
-            <Painel titulo="Tipo de Pedidos">
+            <Painel titulo="Tipo de Pedidos" tour="tipos-pedido">
               <p className="text-xs text-slate-500 mb-3">
                 Escolha uma ou várias opções (equivalente ao Modelo 234). Pode juntar vários tipos na mesma submissão.
               </p>
@@ -425,7 +446,7 @@ export function OasisPedidosPosConsulta() {
 
           {/* ETAPA 3: PREENCHIMENTO DOS PEDIDOS */}
           {etapa === "preenchimento" && (
-            <Painel titulo="Preenchimento dos Pedidos">
+            <Painel titulo="Preenchimento dos Pedidos" tour="preenchimento">
               <div className="space-y-6">
                 {tiposSelecionados.map((tipo) => {
                   const blocos = pedidos.filter((p) => p.tipo_pedido === tipo);
@@ -639,7 +660,7 @@ export function OasisPedidosPosConsulta() {
 
           {/* ETAPA 4: RESUMO E SUBMISSÃO */}
           {etapa === "resumo" && (
-            <Painel titulo="Resumo do Pedido de Marcações">
+            <Painel titulo="Resumo do Pedido de Marcações" tour="resumo">
               <div className="mb-3 text-xs text-slate-500">
                 <strong className="text-slate-800">{dados.doente?.nome}</strong> · Médico requisitante: reveja os pedidos antes de submeter.
               </div>
@@ -737,7 +758,7 @@ export function OasisPedidosPosConsulta() {
 
           {/* ETAPA 5: PEDIDO SUBMETIDO */}
           {etapa === "confirmacao" && resultado && (
-            <div className="rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-sm max-w-xl mx-auto">
+            <div data-tour="confirmacao" className="rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-sm max-w-xl mx-auto">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
                 <CheckCircle2 className="h-9 w-9 text-emerald-600" />
               </div>
