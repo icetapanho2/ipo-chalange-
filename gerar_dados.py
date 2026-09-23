@@ -936,6 +936,33 @@ ecols = ["evento_id", "pedido_id", "data_hora", "tipo", "estado_anterior", "esta
 eventos.sort(key=lambda e: e["data_hora"])
 wcsv("eventos.csv", [[x[c] for c in ecols] for x in eventos], ecols)
 
+# Folha clínica: diário simulado de cada consulta já realizada (determinístico, sem aleatoriedade —
+# não mexe nos restantes dados). Construído a partir do perfil do doente e dos pedidos saídos da consulta.
+SUBJECTIVO = {
+    "NOVO": "Primeira consulta. Referenciado por suspeita diagnóstica; traz exames do exterior.",
+    "PRE_TRATAMENTO": "Em estudo para decisão terapêutica. Sem queixas novas desde a última consulta.",
+    "EM_TRATAMENTO": "Em tratamento. Tolera bem, astenia ligeira, sem outras queixas.",
+    "FOLLOW_UP": "Em vigilância. Assintomático, bom estado geral.",
+}
+notas = []
+for a in atos:
+    c = CATALOGO[(a["esp"], a["ato"])]
+    if a["estado"] != "REALIZADA" or c[4] != "consulta":
+        continue
+    d = doentes[a["doente_id"]]
+    feitos = [q for q in pedidos if q["consulta_origem_ato_id"] == a["ato_id"]]
+    plano = "; ".join(CATALOGO[(q["especialidade_destino"], q["ato_codigo"])][0] for q in feitos)
+    notas.append((
+        a["ato_id"],
+        SUBJECTIVO.get(d["estadio_cuidado"], "Sem queixas novas."),
+        "ECOG 0-1. Exame objectivo sem alterações de relevo.",
+        d["diagnostico_principal"] or "Sem diagnóstico registado.",
+        f"Pedidos: {plano}." if plano else "Manter vigilância; sem novos pedidos.",
+        iso(a["data_hora"] + timedelta(minutes=a["duracao"] or 20)),
+        a["medico"],
+    ))
+wcsv("notas_consulta.csv", notas, ["ato_id", "s", "o", "a", "p", "guardado_em", "guardado_por"])
+
 wcsv("regras_prazos.csv", [(tp, n, dias) for tp, m in PRAZOS.items() for n, dias in m.items()],
      ["tipo_pedido", "prioridade", "prazo_dias"])
 wcsv("intervalos_resultado.csv", INTERVALO_RESULTADO.items(), ["especialidade_codigo", "dias_ate_resultado"])

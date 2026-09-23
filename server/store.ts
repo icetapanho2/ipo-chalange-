@@ -1,4 +1,5 @@
 import path from "node:path";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { readCsv } from "./csv.ts";
 import { definirDataDemo } from "./clock.ts";
@@ -332,7 +333,18 @@ class Store {
     // Alertas, propostas de troca, notas SOAP e notificações são geradas pela aplicação (não vêm de CSV).
     this.alertas = [];
     this.propostasTroca = [];
-    this.notasConsulta = [];
+    // Diário das consultas já realizadas (folha clínica simulada, gerada por gerar_dados.py).
+    this.notasConsulta = existsSync(p("notas_consulta.csv"))
+      ? readCsv<Record<string, string>>(p("notas_consulta.csv")).map((r) => ({
+          ato_id: r.ato_id,
+          s: r.s ?? "",
+          o: r.o ?? "",
+          a: r.a ?? "",
+          p: r.p ?? "",
+          guardado_em: r.guardado_em ?? "",
+          guardado_por: r.guardado_por ?? "",
+        }))
+      : [];
     this.notificacoes = [];
     this.silenciamentos = [];
     this.avarias = [];

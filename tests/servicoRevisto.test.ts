@@ -117,6 +117,18 @@ describe("Serviço revisto", () => {
     expect(f.percurso.some((e) => e.dependencias.length > 0)).toBe(true);
   });
 
+  it("ficha: folha clínica com o diário de cada consulta e arquivo de exames", async () => {
+    type F = {
+      folhaClinica: { data_hora: string; diario: { a: string; p: string } | null; pedidos: unknown[] }[];
+      arquivoExames: { estado: string }[];
+    };
+    const f = (await api<F>("/api/doente/100102", "U01")).json;
+    const consulta = f.folhaClinica.find((c) => c.data_hora === "2026-09-04T09:10")!;
+    expect(consulta.diario?.a).toContain("esófago-gástrica");
+    expect(consulta.pedidos.length).toBe(3);
+    expect(f.arquivoExames.map((x) => x.estado)).toEqual(["FALTOU", "REALIZADA", "REALIZADA"]);
+  });
+
   it("validação, dicionário e tradutor já não existem", async () => {
     expect((await api("/api/validacao/consultas", "U03")).status).toBe(404);
     expect((await api("/api/dicionario", "U03")).status).toBe(404);

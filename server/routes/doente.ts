@@ -373,7 +373,46 @@ export function criarRotasDoente(store: typeof StoreType) {
     };
     const proxima = percurso.find((x) => x.estado === "MARCADO" && x.data_marcada >= isoData(hoje)) ?? null;
 
+    // Folha clínica: cada consulta do doente (a mais recente primeiro), com o diário e os pedidos feitos nela.
+    const tipoDoAto = (a: (typeof store.atosMedicos)[number]) =>
+      store.catalogoAtos.find((c) => c.especialidade_codigo === a.especialidade_codigo && c.ato_codigo === a.ato_codigo)?.tipo_pedido ?? "";
+    const atosDoente = store.atosMedicos.filter((a) => a.doente_id === doente.doente_id);
+    const folhaClinica = atosDoente
+      .filter((a) => tipoDoAto(a) === "consulta" && a.estado !== "DESMARCADA" && apenasData(parseIso(a.data_hora)).getTime() <= hoje.getTime())
+      .sort((x, y) => y.data_hora.localeCompare(x.data_hora))
+      .map((a) => {
+        const nota = store.notasConsulta.find((n) => n.ato_id === a.mvp_ato_id);
+        return {
+          ato_id: a.mvp_ato_id,
+          data_hora: a.data_hora,
+          estado: a.estado,
+          descricao: a.ato_descricao,
+          especialidade_legivel: descreverEspecialidade(a.especialidade_codigo),
+          medico: descreverUtilizador(a.mvp_medico_id),
+          diario: nota ? { s: nota.s, o: nota.o, a: nota.a, p: nota.p, guardado_em: nota.guardado_em } : null,
+          pedidos: pedidos.filter((p) => p.consulta_origem_ato_id === a.mvp_ato_id).map((p) => ({ pedido_id: p.pedido_id, descricao: descreverPedido(p), estado_legivel: descreverEstado(p.estado) })),
+        };
+      });
+    // Arquivo de exames: tudo o que já foi feito (ou falhado) fora das consultas, do mais recente para o mais antigo.
+    const arquivoExames = atosDoente
+      .filter((a) => tipoDoAto(a) !== "consulta" && (a.estado === "REALIZADA" || a.estado === "FALTOU"))
+      .sort((x, y) => y.data_hora.localeCompare(x.data_hora))
+      .map((a) => {
+        const pedido = store.pedidos.find((p) => p.pedido_id === a.mvp_pedido_id);
+        return {
+          ato_id: a.mvp_ato_id,
+          data_hora: a.data_hora,
+          estado: a.estado,
+          descricao: pedido ? descreverPedido(pedido) : a.ato_descricao,
+          especialidade_legivel: descreverEspecialidade(a.especialidade_codigo),
+          local: a.gabinete_descricao,
+          pedido_por: pedido ? descreverUtilizador(pedido.medico_requisitante_id) : "",
+        };
+      });
+
     res.json({
+      folhaClinica,
+      arquivoExames,
       hoje: isoData(hoje),
       doente: { ...doente, estadio_cuidado_legivel: descreverEstadioCuidado(doente.estadio_cuidado) },
       percurso,

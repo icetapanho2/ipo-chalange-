@@ -338,3 +338,15 @@ Pedido do utilizador depois da revisão:
    serviço da consulta e com o mesmo acto; opção de **transporte não urgente** no resumo; o "+" do
    resumo volta à escolha dos pedidos. Nova utilizadora **U14 Sara Lopes**, administrativa da Oncologia
    Médica (a única especialidade com consultas sem ninguém para lhes dar seguimento).
+
+## 2026-09-23 — Consulta do médico e folha clínica
+
+1. **Consulta:** saiu a coluna com a identificação, os contadores pendentes/agendados/realizados e o
+   perfil clínico editável. Fica uma barra com o essencial (nome, estádio, alergias, diagnóstico, acto e
+   hora) e dois botões — **Folha clínica** e **Perfil completo** — que abrem a ficha ao lado, onde se edita.
+2. **Ficha do doente:** a coluna principal tem três vistas — **Percurso dos pedidos**, **Folha clínica**
+   (cada consulta, a mais recente aberta, com o diário S/O/A/P e os pedidos feitos nela) e **Arquivo de
+   exames** (realizados e faltas). O histórico de eventos continua em baixo.
+3. **Diários das consultas passadas** gerados por `gerar_dados.py` em `dados/notas_consulta.csv`
+   (determinísticos, a partir do estádio, diagnóstico e pedidos da consulta; dados simulados). Os
+   restantes dados não mudaram.

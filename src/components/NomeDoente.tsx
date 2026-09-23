@@ -6,8 +6,9 @@ import { FichaDoente } from "./FichaDoente";
 const EVENTO = "oasis:abrir-doente";
 
 /** Abre a ficha do doente no painel lateral (de qualquer sítio da aplicação). */
-export function abrirDoente(doenteId: string) {
-  window.dispatchEvent(new CustomEvent(EVENTO, { detail: doenteId }));
+export type VistaFicha = "percurso" | "folha" | "exames";
+export function abrirDoente(doenteId: string, vista: VistaFicha = "percurso") {
+  window.dispatchEvent(new CustomEvent(EVENTO, { detail: { id: doenteId, vista } }));
 }
 
 /** Nome de doente clicável: abre a ficha sem sair da página onde se está. */
@@ -31,8 +32,13 @@ export function NomeDoente({ id, nome, className = "" }: { id?: string; nome: st
 /** Painel lateral com a ficha (montado uma vez, na App). */
 export function GavetaDoente() {
   const [id, setId] = useState<string | null>(null);
+  const [vista, setVista] = useState<VistaFicha>("percurso");
   useEffect(() => {
-    const abrir = (e: Event) => setId((e as CustomEvent<string>).detail);
+    const abrir = (e: Event) => {
+      const { id, vista } = (e as CustomEvent<{ id: string; vista: VistaFicha }>).detail;
+      setVista(vista);
+      setId(id);
+    };
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setId(null);
     window.addEventListener(EVENTO, abrir);
     window.addEventListener("keydown", esc);
@@ -57,7 +63,7 @@ export function GavetaDoente() {
           </div>
         </div>
         <div className="p-4">
-          <FichaDoente doenteId={id} compacta />
+          <FichaDoente key={`${id}-${vista}`} doenteId={id} compacta vistaInicial={vista} />
         </div>
       </div>
     </div>

@@ -62,7 +62,30 @@ interface DoenteFicha {
   transporte_nao_urgente?: boolean;
 }
 
+interface ConsultaFolha {
+  ato_id: string;
+  data_hora: string;
+  estado: string;
+  descricao: string;
+  especialidade_legivel: string;
+  medico: string;
+  diario: { s: string; o: string; a: string; p: string; guardado_em: string } | null;
+  pedidos: { pedido_id: string; descricao: string; estado_legivel: string }[];
+}
+
+interface ExameArquivo {
+  ato_id: string;
+  data_hora: string;
+  estado: string;
+  descricao: string;
+  especialidade_legivel: string;
+  local: string;
+  pedido_por: string;
+}
+
 interface Resposta {
+  folhaClinica: ConsultaFolha[];
+  arquivoExames: ExameArquivo[];
   hoje: string;
   doente: DoenteFicha;
   percurso: Etapa[];
@@ -143,6 +166,64 @@ function Indice({ e }: { e: Etapa }) {
   );
 }
 
+/** Uma consulta da folha clínica: abre para mostrar o diário (S/O/A/P) e os pedidos feitos nela. */
+function ConsultaDiario({ c, abertaInicial }: { c: ConsultaFolha; abertaInicial: boolean }) {
+  const [aberta, setAberta] = useState(abertaInicial);
+  return (
+    <li className="rounded-lg border border-slate-200 bg-white">
+      <button type="button" onClick={() => setAberta((a) => !a)} className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-50">
+        {aberta ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+        <span className="w-32 shrink-0 text-xs font-bold text-slate-800">{dataHoraPT(c.data_hora)}</span>
+        <span className="min-w-0 flex-1 truncate text-xs text-slate-700">
+          {c.descricao} · {c.especialidade_legivel} · {c.medico}
+        </span>
+        {c.estado === "FALTOU" ? (
+          <span className="rounded bg-rose-100 px-1.5 text-[10px] font-bold text-rose-800">faltou</span>
+        ) : c.diario ? (
+          <span className="rounded bg-emerald-50 px-1.5 text-[10px] font-semibold text-emerald-700">diário</span>
+        ) : (
+          <span className="rounded bg-slate-100 px-1.5 text-[10px] text-slate-500">sem diário</span>
+        )}
+      </button>
+      {aberta && (
+        <div className="space-y-1.5 border-t border-slate-100 px-3 py-2.5 text-xs">
+          {c.diario ? (
+            (
+              [
+                ["Subjectivo", c.diario.s],
+                ["Objectivo", c.diario.o],
+                ["Avaliação", c.diario.a],
+                ["Plano", c.diario.p],
+              ] as const
+            )
+              .filter(([, t]) => t)
+              .map(([rotulo, texto]) => (
+                <p key={rotulo}>
+                  <span className="font-semibold text-slate-500">{rotulo}: </span>
+                  <span className="whitespace-pre-line text-slate-800">{texto}</span>
+                </p>
+              ))
+          ) : (
+            <p className="text-slate-400">{c.estado === "FALTOU" ? "O doente faltou a esta consulta." : "Sem diário registado."}</p>
+          )}
+          {c.pedidos.length > 0 && (
+            <div className="border-t border-slate-100 pt-1.5">
+              <span className="font-semibold text-slate-500">Pedidos feitos nesta consulta:</span>
+              <ul className="mt-0.5 list-disc pl-4 text-slate-700">
+                {c.pedidos.map((p) => (
+                  <li key={p.pedido_id}>
+                    {p.descricao} <span className="text-slate-400">· {p.estado_legivel}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
 function Passo({ e, aoRemarcar }: { e: Etapa; aoRemarcar: (e: Etapa) => void }) {
   return (
     <li className="relative">
@@ -200,12 +281,13 @@ function Passo({ e, aoRemarcar }: { e: Etapa; aoRemarcar: (e: Etapa) => void }) 
  * clicar num nome. Em cima o essencial (quem é, estádio, alergias, como se contacta, próxima marcação,
  * progresso); depois o percurso completo pela ordem das datas; ao lado o perfil e as mensagens.
  */
-export function FichaDoente({ doenteId, compacta = false }: { doenteId: string; compacta?: boolean }) {
+export function FichaDoente({ doenteId, compacta = false, vistaInicial = "percurso" }: { doenteId: string; compacta?: boolean; vistaInicial?: "percurso" | "folha" | "exames" }) {
   const [dados, setDados] = useState<Resposta | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [aEditar, setAEditar] = useState(false);
   const [form, setForm] = useState<Partial<DoenteFicha> & { alergiasTexto?: string }>({});
   const [verHistorico, setVerHistorico] = useState(false);
+  const [vista, setVista] = useState<"percurso" | "folha" | "exames">(vistaInicial);
   const [mensagem, setMensagem] = useState<string | null>(null);
 
   function carregar() {
@@ -395,8 +477,68 @@ export function FichaDoente({ doenteId, compacta = false }: { doenteId: string; 
       <div className={`grid gap-4 ${compacta ? "" : "lg:grid-cols-[1fr_320px]"}`}>
         {/* Percurso: tudo o que foi pedido, pela ordem das datas */}
         <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-sm font-bold text-slate-800">Percurso</h2>
-          {percurso.length === 0 && <p className="text-xs text-slate-400">Ainda sem pedidos.</p>}
+          <div className="mb-3 flex flex-wrap gap-1 rounded-lg bg-slate-100 p-0.5 text-xs font-semibold">
+            {(
+              [
+                ["percurso", `Percurso dos pedidos (${percurso.length})`],
+                ["folha", `Folha clínica (${dados.folhaClinica.length})`],
+                ["exames", `Arquivo de exames (${dados.arquivoExames.length})`],
+              ] as const
+            ).map(([valor, rotulo]) => (
+              <button
+                key={valor}
+                type="button"
+                onClick={() => setVista(valor)}
+                className={`flex-1 rounded-md px-2 py-1.5 ${vista === valor ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
+
+          {vista === "folha" && (
+            <ul className="space-y-1.5">
+              {dados.folhaClinica.length === 0 && <li className="text-xs text-slate-400">Sem consultas registadas.</li>}
+              {dados.folhaClinica.map((c, i) => (
+                <ConsultaDiario key={c.ato_id} c={c} abertaInicial={i === 0} />
+              ))}
+            </ul>
+          )}
+
+          {vista === "exames" && (
+            <table className="w-full text-xs">
+              <tbody>
+                {dados.arquivoExames.length === 0 && (
+                  <tr>
+                    <td className="text-slate-400">Sem exames realizados.</td>
+                  </tr>
+                )}
+                {dados.arquivoExames.map((x) => (
+                  <tr key={x.ato_id} className="border-t border-slate-100 align-top first:border-t-0">
+                    <td className="w-32 py-1.5 pr-2 font-semibold text-slate-800">{dataHoraPT(x.data_hora)}</td>
+                    <td className="py-1.5 pr-2">
+                      <span className="text-slate-800">{x.descricao}</span>
+                      <span className="block text-[11px] text-slate-500">
+                        {x.especialidade_legivel}
+                        {x.local && ` · ${x.local}`}
+                        {x.pedido_por && ` · pedido por ${x.pedido_por}`}
+                      </span>
+                    </td>
+                    <td className="py-1.5 text-right">
+                      {x.estado === "FALTOU" ? (
+                        <span className="rounded bg-rose-100 px-1.5 text-[10px] font-bold text-rose-800">faltou</span>
+                      ) : (
+                        <span className="rounded bg-emerald-50 px-1.5 text-[10px] font-semibold text-emerald-700">realizado</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {vista === "percurso" && percurso.length === 0 && <p className="text-xs text-slate-400">Ainda sem pedidos.</p>}
+          {vista === "percurso" && (
           <ol className="relative space-y-2.5 border-l-2 border-slate-100 pl-6">
             {passados.map((e) => (
               <Passo key={e.pedido_id} e={e} aoRemarcar={remarcar} />
@@ -411,6 +553,7 @@ export function FichaDoente({ doenteId, compacta = false }: { doenteId: string; 
               <Passo key={e.pedido_id} e={e} aoRemarcar={remarcar} />
             ))}
           </ol>
+          )}
         </section>
 
         <div className="space-y-4">
