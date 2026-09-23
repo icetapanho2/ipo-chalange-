@@ -3,6 +3,7 @@ import { useState } from "react";
 import { apiPost } from "../lib/api";
 import { usePerfil } from "../lib/PerfilContext";
 import { TrocadorUtilizador } from "./TrocadorUtilizador";
+import { ITENS_INICIO, NAV_POR_PERFIL, type ItemNav } from "../lib/navegacao";
 import {
   Stethoscope,
   RotateCcw,
@@ -17,11 +18,6 @@ import {
   Wrench,
 } from "lucide-react";
 
-export interface ItemNav {
-  caminho: string;
-  etiqueta: string;
-}
-
 const ICONES_NAV: Record<string, React.ElementType> = {
   "/": Activity,
   "/oasis/medico": Stethoscope,
@@ -34,29 +30,13 @@ const ICONES_NAV: Record<string, React.ElementType> = {
   "/guiao": HelpCircle,
 };
 
-const INICIO: ItemNav = { caminho: "/", etiqueta: "Início" };
-
-/**
- * O que cada perfil vê no cabeçalho — não é suposto dar para "passar por todas as páginas":
- * cada user só tem acesso ao que lhe compete, tal como aconteceria já integrado num sistema
- * hospitalar real. O Guião fica de fora deste mapa: é sempre visível, para quem apresenta a
- * demo poder orquestrar a troca de perfis e mostrar o sistema todo.
- */
-const NAV_POR_PERFIL: Record<string, ItemNav[]> = {
-  MEDICO: [INICIO, { caminho: "/oasis/medico", etiqueta: "Oasis · Médico" }, { caminho: "/meus-pedidos", etiqueta: "Meus Pedidos" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }],
-  ADMINISTRATIVO: [INICIO, { caminho: "/servico", etiqueta: "Serviço" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }],
-  TRIADOR: [INICIO, { caminho: "/triagem", etiqueta: "Triagem" }, { caminho: "/oasis/agendas", etiqueta: "Agendas" }],
-  GESTAO: [INICIO, { caminho: "/gestao", etiqueta: "Gestão" }],
-  TECNICO: [INICIO, { caminho: "/tecnico", etiqueta: "Técnico" }],
-};
-
 const ITEM_GUIAO: ItemNav = { caminho: "/guiao", etiqueta: "Guião" };
 
 export function Cabecalho() {
   const { utilizador } = usePerfil();
   const [aRepor, setARepor] = useState(false);
   const [mensagem, setMensagem] = useState<string | null>(null);
-  const itens = utilizador ? NAV_POR_PERFIL[utilizador.perfil] ?? [INICIO] : [INICIO];
+  const itens = utilizador ? NAV_POR_PERFIL[utilizador.perfil] ?? ITENS_INICIO : ITENS_INICIO;
 
   async function reporDemo() {
     setARepor(true);

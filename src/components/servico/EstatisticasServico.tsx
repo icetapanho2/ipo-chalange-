@@ -82,8 +82,8 @@ export function EstatisticasServico() {
             <div className="flex flex-wrap gap-1.5">
               {[
                 { valor: "NOVO", legivel: "Novo" },
-                { valor: "PRE_TRATAMENTO", legivel: "Pré-tratamento" },
-                { valor: "EM_TRATAMENTO", legivel: "Em tratamento" },
+                { valor: "PRE_TRATAMENTO", legivel: "Diagnóstico" },
+                { valor: "EM_TRATAMENTO", legivel: "Tratamento" },
                 { valor: "FOLLOW_UP", legivel: "Follow-up" },
               ].map((op) => (
                 <button

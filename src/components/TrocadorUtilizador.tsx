@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { dataHoraPT } from "../lib/datas";
 import { useNavigate } from "react-router-dom";
 import { apiGet, apiPost } from "../lib/api";
+import { paginaPrincipal } from "../lib/navegacao";
 import { usePerfil } from "../lib/PerfilContext";
 import { Bell, BellOff, Check, CheckCheck, ChevronDown, RefreshCcw, UserCircle2 } from "lucide-react";
 
@@ -174,6 +175,8 @@ export function TrocadorUtilizador() {
 
   function trocarPara(id: string) {
     definirUtilizadorId(id);
+    // Abre logo a página de trabalho do novo utilizador (não fica numa página de outro perfil).
+    navigate(paginaPrincipal(utilizadores.find((u) => u.utilizador_id === id)?.perfil));
     setAberto(false);
     setSeparador("notificacoes");
   }

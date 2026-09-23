@@ -54,8 +54,8 @@ const TERMOS: { titulo: string; explicacao: string; campos: { chave: string; rot
     titulo: "Estádio do doente",
     explicacao: "Quem está à espera de diagnóstico ou a meio de um tratamento passa à frente.",
     campos: [
-      { chave: "diagnostico", rotulo: "Em diagnóstico" },
-      { chave: "tratamento", rotulo: "Em tratamento" },
+      { chave: "diagnostico", rotulo: "Novo ou diagnóstico" },
+      { chave: "tratamento", rotulo: "Tratamento" },
     ],
   },
   {

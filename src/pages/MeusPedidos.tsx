@@ -55,6 +55,13 @@ const SITUACOES: { valor: Situacao | "todos"; legivel: string; cor: string }[] =
   { valor: "marcado", legivel: "Tudo marcado", cor: "bg-emerald-500" },
   { valor: "concluido", legivel: "Concluído", cor: "bg-slate-300" },
 ];
+const ESTADIOS = [
+  { valor: "", legivel: "Todos" },
+  { valor: "NOVO", legivel: "Novo" },
+  { valor: "PRE_TRATAMENTO", legivel: "Diagnóstico" },
+  { valor: "EM_TRATAMENTO", legivel: "Tratamento" },
+  { valor: "FOLLOW_UP", legivel: "Follow-up" },
+];
 const COR_SITUACAO = Object.fromEntries(SITUACOES.map((s) => [s.valor, s.cor])) as Record<Situacao, string>;
 
 function IconeEtapa({ e }: { e: Etapa }) {
@@ -151,17 +158,26 @@ export function MeusPedidos() {
     }
   }
 
+  // Cada grupo de filtros conta dentro do que o outro já filtrou (situação × estádio).
   const contagens = useMemo(() => {
-    const c: Record<string, number> = { todos: doentes?.length ?? 0 };
-    for (const d of doentes ?? []) c[d.situacao] = (c[d.situacao] ?? 0) + 1;
+    const doEstadio = (doentes ?? []).filter((d) => !estadio || d.estadio_cuidado === estadio);
+    const c: Record<string, number> = { todos: doEstadio.length };
+    for (const d of doEstadio) c[d.situacao] = (c[d.situacao] ?? 0) + 1;
     return c;
-  }, [doentes]);
+  }, [doentes, estadio]);
+  const porEstadio = useMemo(() => {
+    const daSituacao = (doentes ?? []).filter((d) => situacao === "todos" || d.situacao === situacao);
+    const c: Record<string, number> = { "": daSituacao.length };
+    for (const d of daSituacao) c[d.estadio_cuidado] = (c[d.estadio_cuidado] ?? 0) + 1;
+    return c;
+  }, [doentes, situacao]);
 
   const termo = pesquisa.trim().toLowerCase();
   const lista = (doentes ?? []).filter(
     (d) => (situacao === "todos" || d.situacao === situacao) && (!estadio || d.estadio_cuidado === estadio) && (!termo || d.doente_nome.toLowerCase().includes(termo)),
   );
-  const atual = doentes?.find((d) => d.doente_id === selecionado) ?? null;
+  // Se os filtros esconderem o doente seleccionado, mostra o primeiro da lista filtrada.
+  const atual = lista.find((d) => d.doente_id === selecionado) ?? lista[0] ?? null;
   const porResponder = (dados?.devolvidos.length ?? 0) + (dados?.semVagaDecisao.length ?? 0);
 
   return (
@@ -259,13 +275,21 @@ export function MeusPedidos() {
               <Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-slate-400" />
               <input value={pesquisa} onChange={(e) => setPesquisa(e.target.value)} placeholder="Procurar doente" className="w-full rounded-lg border border-slate-300 py-1.5 pl-7 pr-2 text-xs" />
             </label>
-            <select value={estadio} onChange={(e) => setEstadio(e.target.value)} className="rounded-lg border border-slate-300 px-2 text-xs">
-              <option value="">Todos os estádios</option>
-              <option value="NOVO">Novo</option>
-              <option value="PRE_TRATAMENTO">Pré-tratamento</option>
-              <option value="EM_TRATAMENTO">Em tratamento</option>
-              <option value="FOLLOW_UP">Follow-up</option>
-            </select>
+          </div>
+          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-semibold text-slate-500">Estádio:</span>
+            {ESTADIOS.map((e) => (
+              <button
+                key={e.valor}
+                type="button"
+                onClick={() => setEstadio(e.valor)}
+                className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                  estadio === e.valor ? "border-oasis-header bg-oasis-header text-white" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {e.legivel} <span className="opacity-70">{porEstadio[e.valor] ?? 0}</span>
+              </button>
+            ))}
           </div>
           <ul className="max-h-[70vh] divide-y divide-slate-100 overflow-y-auto rounded-xl border border-slate-200 bg-white">
             {!doentes && <li className="p-3 text-xs text-slate-400">A carregar…</li>}
@@ -275,7 +299,7 @@ export function MeusPedidos() {
                 <button
                   type="button"
                   onClick={() => setSelecionado(d.doente_id)}
-                  className={`flex w-full items-start gap-2.5 px-3 py-2 text-left ${selecionado === d.doente_id ? "bg-sky-50" : "hover:bg-slate-50"}`}
+                  className={`flex w-full items-start gap-2.5 px-3 py-2 text-left ${atual?.doente_id === d.doente_id ? "bg-sky-50" : "hover:bg-slate-50"}`}
                 >
                   <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${COR_SITUACAO[d.situacao]}`} />
                   <span className="min-w-0 flex-1">

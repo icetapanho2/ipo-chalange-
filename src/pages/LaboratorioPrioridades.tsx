@@ -198,8 +198,8 @@ export function LaboratorioPrioridades() {
                       className="rounded border border-slate-300 px-1 py-0.5"
                     >
                       <option value="NOVO">Novo</option>
-                      <option value="PRE_TRATAMENTO">Pré-tratamento</option>
-                      <option value="EM_TRATAMENTO">Em tratamento</option>
+                      <option value="PRE_TRATAMENTO">Diagnóstico</option>
+                      <option value="EM_TRATAMENTO">Tratamento</option>
                       <option value="FOLLOW_UP">Follow-up</option>
                     </select>
                   </label>

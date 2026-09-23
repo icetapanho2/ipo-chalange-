@@ -307,6 +307,7 @@ interface DoenteCompleto {
   demo_cenario: string;
   diagnostico_principal?: string;
   estadiamento?: string;
+  estadio_cuidado?: string;
   alergias?: string[];
   contacto?: string;
   notas_clinicas?: string;
@@ -336,7 +337,7 @@ export function Guiao() {
   const [novoSexo, setNovoSexo] = useState("F");
   const [novaDataNascimento, setNovaDataNascimento] = useState("1978-05-14");
   const [novoDiagnostico, setNovoDiagnostico] = useState("Neoplasia da mama esquerda cT2N0M0");
-  const [novoEstadiamento, setNovoEstadiamento] = useState("Estádio IIa");
+  const [novoEstadio, setNovoEstadio] = useState("NOVO");
   const [novasAlergias, setNovasAlergias] = useState("Alergia a contraste iodado");
   const [novoContacto, setNovoContacto] = useState("912 345 678");
   const [novasNotas, setNovasNotas] = useState("Primeira consulta com suspeita diagnóstica, aguarda biópsia.");
@@ -406,7 +407,7 @@ export function Guiao() {
         sexo: novoSexo,
         data_nascimento: novaDataNascimento,
         diagnostico_principal: novoDiagnostico,
-        estadiamento: novoEstadiamento,
+        estadio_cuidado: novoEstadio,
         alergias: novasAlergias.split(",").map((s) => s.trim()).filter(Boolean),
         contacto: novoContacto,
         notas_clinicas: novasNotas,
@@ -696,15 +697,19 @@ export function Guiao() {
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Estadiamento Clínico:
+                    Estádio:
                   </label>
-                  <input
-                    type="text"
-                    value={doenteEmEdicao.estadiamento ?? ""}
-                    onChange={(e) => setDoenteEmEdicao({ ...doenteEmEdicao, estadiamento: e.target.value })}
-                    placeholder="Ex: cT3N1M0 · Estádio III"
+                  <select
+                    value={doenteEmEdicao.estadio_cuidado ?? ""}
+                    onChange={(e) => setDoenteEmEdicao({ ...doenteEmEdicao, estadio_cuidado: e.target.value })}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-800"
-                  />
+                  >
+                    <option value="">— Não classificado</option>
+                    <option value="NOVO">Novo</option>
+                    <option value="PRE_TRATAMENTO">Diagnóstico</option>
+                    <option value="EM_TRATAMENTO">Tratamento</option>
+                    <option value="FOLLOW_UP">Follow-up</option>
+                  </select>
                 </div>
               </div>
 
@@ -873,15 +878,18 @@ export function Guiao() {
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Estadiamento:
+                    Estádio:
                   </label>
-                  <input
-                    type="text"
-                    value={novoEstadiamento}
-                    onChange={(e) => setNovoEstadiamento(e.target.value)}
-                    placeholder="Ex: Estádio I, Estádio IIb"
+                  <select
+                    value={novoEstadio}
+                    onChange={(e) => setNovoEstadio(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-800"
-                  />
+                  >
+                    <option value="NOVO">Novo</option>
+                    <option value="PRE_TRATAMENTO">Diagnóstico</option>
+                    <option value="EM_TRATAMENTO">Tratamento</option>
+                    <option value="FOLLOW_UP">Follow-up</option>
+                  </select>
                 </div>
               </div>
 

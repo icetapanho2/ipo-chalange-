@@ -308,3 +308,16 @@ Pedido do utilizador depois da revisão:
 7. **Os meus doentes (médico):** lista + percurso em vez de 120 cartões; situação única por doente
    (precisa de atenção / por marcar / tudo marcado / concluído) com o porquê.
 8. Páginas com a mesma largura do cabeçalho; o diário da consulta ocupa metade do ecrã.
+
+## 2026-09-23 — Estádios, troca de utilizador e "Outra solução"
+
+1. **Estádio = Novo · Diagnóstico · Tratamento · Follow-up** em toda a interface (os códigos internos
+   mantêm-se). Saiu dos ecrãs o "Estadiamento" (Estádio I–IV), que se confundia com o estádio do
+   percurso; o valor continua nos dados e no score clínico.
+2. **Os meus doentes:** filtro por estádio em botões com contagem, combinável com a situação.
+3. **Trocar de utilizador abre a página de trabalho dele** (a primeira do menu depois do Início).
+4. **Remarcação proposta: "Outra solução" em vez de "Rejeitar".** Rejeitar deixava o doente na marcação
+   original — numa avaria, uma vaga que já não existe. Agora abre as próximas vagas livres (a dizer se
+   cumprem o prazo e se chegam a tempo da consulta), vaga extra, outsourcing ou, se houver consulta
+   dependente, enviar ao médico. A escolha fica registada com quem e porquê. Rejeitar uma troca passa o
+   pedido para "Sem vaga no prazo", com as opções para o resolver.

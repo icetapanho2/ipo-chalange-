@@ -14,6 +14,8 @@ import {
   resolverComVagaExtra,
   resolverComOutsourcing,
   pedirDecisaoAoMedico,
+  alternativasProposta,
+  escolherAlternativa,
 } from "../motor/propostasRemarcacao.ts";
 import { marcarOutsourcing, pedirDecisaoMedico } from "../motor/fluxo.ts";
 import { desmarcarAPedidoDoDoente, expirarOfertas, responderOferta } from "../motor/antecipacao.ts";
@@ -216,6 +218,20 @@ export function criarRotasServico(store: typeof StoreType) {
     const p = rejeitarPropostaRemarcacao(req.params.id, req.utilizadorId, agora());
     if (!p) {
       res.status(404).json({ erro: "Proposta não encontrada ou já decidida." });
+      return;
+    }
+    res.json({ ok: true, proposta: propostaRemarcacaoJson(p) });
+  });
+
+  // "Outra solução": alternativas à vaga sugerida, e aplicar a escolhida.
+  router.get("/remarcacoes/:id/alternativas", (req, res) => {
+    res.json(alternativasProposta(req.params.id, agora()).map((a) => ({ ...a, medico_nome: descreverUtilizador(a.medico_id) })));
+  });
+
+  router.post("/remarcacoes/:id/escolher", (req, res) => {
+    const p = escolherAlternativa(req.params.id, String(req.body?.vagaId ?? ""), req.utilizadorId, agora());
+    if (!p) {
+      res.status(404).json({ erro: "A vaga já não está disponível ou a proposta já foi decidida." });
       return;
     }
     res.json({ ok: true, proposta: propostaRemarcacaoJson(p) });

@@ -77,7 +77,7 @@ export function procurarAntecipaveis(vaga: Vaga, quando: Date, excluirPedidoIds:
     if (avisoHoras < 72 && !(doente?.aceita_antecipacao && (doente.distancia_km ?? 0) < 50)) continue;
 
     const atrasoPrevisto = dataAtual ? diferencaDias(dataAtual, prazo) : diferencaDias(hoje, prazo);
-    const nomeEstadio = { NOVO: "em diagnóstico", PRE_TRATAMENTO: "pré-tratamento", EM_TRATAMENTO: "em tratamento", FOLLOW_UP: "follow-up" }[estadio as string] ?? "estádio não registado";
+    const nomeEstadio = { NOVO: "novo, em diagnóstico", PRE_TRATAMENTO: "em diagnóstico", EM_TRATAMENTO: "em tratamento", FOLLOW_UP: "em follow-up" }[estadio as string] ?? "estádio não registado";
     const motivo =
       grupo === 1
         ? dataAtual

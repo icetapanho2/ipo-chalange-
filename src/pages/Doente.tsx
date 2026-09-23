@@ -33,12 +33,11 @@ interface DoenteInfo {
   estadio_cuidado?: string;
 }
 
-const OPCOES_ESTADIAMENTO = ["", "Estádio I", "Estádio II", "Estádio III", "Estádio IV", "Metastático"];
 
 const OPCOES_ESTADIO_CUIDADO = [
   { valor: "NOVO", legivel: "Novo" },
-  { valor: "PRE_TRATAMENTO", legivel: "Pré-tratamento" },
-  { valor: "EM_TRATAMENTO", legivel: "Em tratamento" },
+  { valor: "PRE_TRATAMENTO", legivel: "Diagnóstico" },
+  { valor: "EM_TRATAMENTO", legivel: "Tratamento" },
   { valor: "FOLLOW_UP", legivel: "Follow-up" },
 ];
 
@@ -584,11 +583,7 @@ export function Doente() {
                   <p className="text-slate-800 mt-0.5">{dados.doente.diagnostico_principal || "— Não registado"}</p>
                 </div>
                 <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Estadiamento</span>
-                  <p className="text-slate-800 mt-0.5">{dados.doente.estadiamento || "— Não registado"}</p>
-                </div>
-                <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Estádio do percurso</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Estádio</span>
                   <p className="text-slate-800 mt-0.5">
                     {OPCOES_ESTADIO_CUIDADO.find((o) => o.valor === dados.doente.estadio_cuidado)?.legivel || "— Não classificado"}
                   </p>
@@ -622,21 +617,7 @@ export function Doente() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Estadiamento</label>
-                    <select
-                      value={formClinico.estadiamento}
-                      onChange={(e) => setFormClinico((f) => ({ ...f, estadiamento: e.target.value }))}
-                      className="w-full rounded border border-slate-300 px-2.5 py-2 text-sm text-slate-800"
-                    >
-                      {OPCOES_ESTADIAMENTO.map((op) => (
-                        <option key={op} value={op}>
-                          {op || "— Não registado"}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">Estádio do percurso</label>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">Estádio</label>
                     <select
                       value={formClinico.estadio_cuidado}
                       onChange={(e) => setFormClinico((f) => ({ ...f, estadio_cuidado: e.target.value }))}

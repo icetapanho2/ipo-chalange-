@@ -199,7 +199,7 @@ export function avaliarFactos(
 
 const NOME_ESTADIO: Record<string, string> = {
   NOVO: "novo doente",
-  PRE_TRATAMENTO: "pré-tratamento",
+  PRE_TRATAMENTO: "em diagnóstico",
   EM_TRATAMENTO: "em tratamento",
   FOLLOW_UP: "follow-up",
 };

@@ -76,6 +76,26 @@ describe("Serviço revisto", () => {
     expect((await api(`/api/servico/pedidos/${semVaga.pedido_id}/aceitar-primeira-vaga`, "U03", {})).status).toBe(404);
   });
 
+  it("outra solução: em vez de rejeitar, a administrativa escolhe outra vaga e o doente sai da vaga avariada", async () => {
+    await api("/api/repor-demo", "U12", {});
+    await api("/api/tecnico/avarias", "U13", { especialidade_codigo: "7000_3", descricao: "Ecógrafo avariado", duracao_dias: 1, data_inicio: "2026-09-24" });
+    type PR = { proposta_id: string; doente_nome: string; data_hora_sugerida: string; estado: string; resolucao?: string };
+    const plano = (await api<{ avarias: { propostas: PR[] }[] }>("/api/servico/remarcacoes", "U11")).json.avarias[0];
+    const artur = plano.propostas.find((p) => p.doente_nome.startsWith("Artur"))!;
+    const alternativas = (await api<{ vaga_id: string; data_hora: string }[]>(`/api/servico/remarcacoes/${artur.proposta_id}/alternativas`, "U11")).json;
+    expect(alternativas.length).toBeGreaterThan(0);
+    // A vaga sugerida está reservada para ele; as alternativas são outras e nunca no dia avariado.
+    expect(alternativas.some((a) => a.data_hora === artur.data_hora_sugerida)).toBe(false);
+    expect(alternativas.every((a) => !a.data_hora.startsWith("2026-09-24"))).toBe(true);
+    const escolhida = alternativas[0];
+    expect((await api(`/api/servico/remarcacoes/${artur.proposta_id}/escolher`, "U11", { vagaId: escolhida.vaga_id })).status).toBe(200);
+    const depois = (await api<{ avarias: { propostas: PR[] }[] }>("/api/servico/remarcacoes", "U11")).json.avarias[0].propostas.find((p) => p.proposta_id === artur.proposta_id)!;
+    expect(depois.estado).toBe("ACEITE");
+    const agenda = (await api<{ agenda: { data_hora: string; especialidade_legivel: string }[] }>("/api/doente/100115", "U11")).json.agenda;
+    expect(agenda.some((m) => m.data_hora === escolhida.data_hora)).toBe(true);
+    expect(agenda.some((m) => m.data_hora.startsWith("2026-09-24") && m.especialidade_legivel.includes("Eco"))).toBe(false);
+  });
+
   it("validação, dicionário e tradutor já não existem", async () => {
     expect((await api("/api/validacao/consultas", "U03")).status).toBe(404);
     expect((await api("/api/dicionario", "U03")).status).toBe(404);

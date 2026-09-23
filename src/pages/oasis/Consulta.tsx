@@ -46,8 +46,8 @@ interface Doente {
 
 const OPCOES_ESTADIO_CUIDADO = [
   { valor: "NOVO", legivel: "Novo" },
-  { valor: "PRE_TRATAMENTO", legivel: "Pré-tratamento" },
-  { valor: "EM_TRATAMENTO", legivel: "Em tratamento" },
+  { valor: "PRE_TRATAMENTO", legivel: "Diagnóstico" },
+  { valor: "EM_TRATAMENTO", legivel: "Tratamento" },
   { valor: "FOLLOW_UP", legivel: "Follow-up" },
 ];
 
@@ -58,7 +58,6 @@ interface ResumoPedidos {
   realizados: number;
 }
 
-const OPCOES_ESTADIAMENTO = ["", "Estádio I", "Estádio II", "Estádio III", "Estádio IV", "Metastático"];
 
 interface Nota {
   s: string;
@@ -369,11 +368,6 @@ export function OasisConsulta() {
                     <div>
                       <span className="text-slate-500">Diagnóstico: </span>
                       <span className="text-slate-800 font-medium">{dados.doente?.diagnostico_principal || "— Não registado"}</span>
-                      {dados.doente?.estadiamento && (
-                        <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold text-slate-600">
-                          {dados.doente.estadiamento}
-                        </span>
-                      )}
                     </div>
                   </div>
                   <div className="flex items-start gap-1.5">
@@ -403,7 +397,7 @@ export function OasisConsulta() {
               ) : (
                 <div className="space-y-2">
                   <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Estádio do percurso</label>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Estádio</label>
                     <select
                       value={formClinico.estadio_cuidado}
                       onChange={(e) => setFormClinico((f) => ({ ...f, estadio_cuidado: e.target.value }))}
@@ -425,20 +419,6 @@ export function OasisConsulta() {
                       onChange={(e) => setFormClinico((f) => ({ ...f, diagnostico_principal: e.target.value }))}
                       className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
                     />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Estadiamento</label>
-                    <select
-                      value={formClinico.estadiamento}
-                      onChange={(e) => setFormClinico((f) => ({ ...f, estadiamento: e.target.value }))}
-                      className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs text-slate-800"
-                    >
-                      {OPCOES_ESTADIAMENTO.map((op) => (
-                        <option key={op} value={op}>
-                          {op || "— Não registado"}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                   <div>
                     <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Alergias (vírgula)</label>

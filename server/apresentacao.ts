@@ -35,8 +35,8 @@ export function descreverDoente(id: string): string {
 
 const NOME_ESTADIO_CUIDADO: Record<string, string> = {
   NOVO: "Novo",
-  PRE_TRATAMENTO: "Pré-tratamento",
-  EM_TRATAMENTO: "Em tratamento",
+  PRE_TRATAMENTO: "Diagnóstico",
+  EM_TRATAMENTO: "Tratamento",
   FOLLOW_UP: "Follow-up",
 };
 

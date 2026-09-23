@@ -4,6 +4,7 @@ import { amanha, apenasData, diferencaDias, formatarDataHoraPt, formatarDataPt, 
 import { registarEvento } from "./estados.ts";
 import {
   encontrarVagaLivre,
+  vagasLivresCompativeis,
   janelaAgendamento,
   janelaAvaria,
   marcarPedidoNaVaga,
@@ -621,6 +622,66 @@ export function pedirDecisaoAoMedico(propostaId: string, utilizadorId: string, q
   });
   fecharAlertaDaProposta(proposta, utilizadorId, "Decisão pedida ao médico", quando);
   if (proposta.origem === "AVARIA") concluirAvariaSeTerminada(proposta.avaria_id, utilizadorId, quando);
+  return proposta;
+}
+
+// ------------------------------------------------------------------------------ outra solução
+export interface Alternativa {
+  vaga_id: string;
+  data_hora: string;
+  medico_id: string;
+  dentro_do_prazo: boolean | null;
+  a_tempo_da_consulta: boolean | null;
+}
+
+/**
+ * Quando a administrativa não quer a vaga sugerida: as próximas vagas livres compatíveis (a sugerida
+ * fica reservada, por isso não aparece), cada uma a dizer se cumpre o prazo e se chega a tempo da
+ * consulta que depende do exame. Nunca se "rejeita" sem alternativa: o doente não pode ficar na
+ * marcação original (numa avaria, essa vaga já não existe).
+ */
+export function alternativasProposta(propostaId: string, quando: Date = agora(), n = 6): Alternativa[] {
+  const proposta = store.propostasRemarcacao.find((p) => p.proposta_id === propostaId);
+  const ato = store.atosMedicos.find((a) => a.mvp_ato_id === proposta?.ato_id);
+  if (!proposta || !ato) return [];
+  const pedido = store.pedidos.find((p) => p.pedido_id === proposta.pedido_id) ?? null;
+  const hoje = apenasData(quando);
+  const inicio = pedido ? janelaAgendamento(pedido, hoje).inicio : (maxData(amanha(hoje), apenasData(parseIso(ato.data_hora))) ?? amanha(hoje));
+  const prazo = pedido ? parseIso(pedido.prazo_limite) : null;
+  const fim = somarDias(maxData(prazo, inicio) ?? inicio, 60);
+  const dep = pedido ? consultaDependente(pedido) : null;
+  const limite = dep ? somarDias(apenasData(parseIso(dep.ato.data_hora)), -dep.intervalo) : null;
+  return vagasLivresCompativeis(ato.especialidade_codigo, ato.ato_codigo, inicio, fim, undefined, pedido ? { pedido, quando } : {})
+    .slice(0, n)
+    .map((v) => {
+      const dia = apenasData(parseIso(v.data_hora));
+      return {
+        vaga_id: v.vaga_id,
+        data_hora: v.data_hora,
+        medico_id: v.medico_id,
+        dentro_do_prazo: prazo ? dia.getTime() <= prazo.getTime() : null,
+        a_tempo_da_consulta: limite ? dia.getTime() <= limite.getTime() : null,
+      };
+    });
+}
+
+/** A administrativa escolhe outra vaga da lista de alternativas: aplica-a, comunica e regista porquê. */
+export function escolherAlternativa(propostaId: string, vagaId: string, utilizadorId: string, quando: Date = agora()): PropostaRemarcacao | null {
+  const proposta = store.propostasRemarcacao.find((p) => p.proposta_id === propostaId);
+  const ato = store.atosMedicos.find((a) => a.mvp_ato_id === proposta?.ato_id);
+  if (!proposta || !ato || proposta.estado !== "PENDENTE") return null;
+  if (!alternativasProposta(propostaId, quando, 50).some((a) => a.vaga_id === vagaId)) return null;
+  const vaga = store.vagas.find((v) => v.vaga_id === vagaId)!;
+  const pedido = store.pedidos.find((p) => p.pedido_id === proposta.pedido_id);
+  libertarReserva(proposta);
+  const motivo = `Alternativa escolhida pela administrativa em vez da sugestão (${formatarDataHoraPt(parseIso(vaga.data_hora))})`;
+  if (pedido) {
+    colocarExameNaVaga(proposta, pedido, ato, vaga, utilizadorId, motivo, quando);
+    pedido.decisao_pendente = false;
+  } else {
+    moverAto(ato, vaga, quando);
+  }
+  concluir(proposta, utilizadorId, `Marcado a ${formatarDataHoraPt(parseIso(vaga.data_hora))} (alternativa escolhida)`, quando);
   return proposta;
 }
 

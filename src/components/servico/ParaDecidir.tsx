@@ -149,7 +149,7 @@ export function ParaDecidir({ aoMudar }: { aoMudar: (mensagem: string) => void }
   async function decidirTroca(id: string, decisao: "aprovar" | "rejeitar") {
     try {
       await apiPost(`/servico/propostas/${id}/${decisao}`);
-      mudou(decisao === "aprovar" ? "Troca aprovada: os dois doentes foram avisados da nova data." : "Troca rejeitada: o pedido fica sem vaga para decidir.");
+      mudou(decisao === "aprovar" ? "Troca aprovada: os dois doentes foram avisados da nova data." : "Troca rejeitada: o pedido passou para \"Sem vaga no prazo\", com as opções para o resolver.");
     } catch (e) {
       setErro(e instanceof Error ? e.message : String(e));
     }
@@ -213,7 +213,7 @@ export function ParaDecidir({ aoMudar }: { aoMudar: (mensagem: string) => void }
                     <Check className="h-3.5 w-3.5" /> Aprovar troca
                   </button>
                   <button type="button" onClick={() => decidirTroca(p.proposta_id, "rejeitar")} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                    <X className="h-3.5 w-3.5" /> Rejeitar
+                    <X className="h-3.5 w-3.5" /> Rejeitar e procurar outra solução
                   </button>
                 </div>
               </div>
