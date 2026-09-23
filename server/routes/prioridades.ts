@@ -251,12 +251,16 @@ export function criarRotasPrioridades(store: typeof StoreType) {
         chamadas_no_horizonte: chamadasNoHorizonte,
         marcacoes_no_horizonte: chamadas.marcacoesNoHorizonte,
         chamadas_registadas: store.chamadas.length,
+        vagas_extra_pedidas: store.pedidosVagaExtra.length,
+        vagas_extra_aprovadas: store.pedidosVagaExtra.filter((v) => v.estado === "APROVADO").length,
       },
       projecaoMensal: {
         faltas_mes: faltasMes,
         faltas_tac_mes: faltasTacMes,
         faltas_tac_evitadas_mes: faltasTacEvitadasMes,
         valor_recuperado_mes_eur: faltasTacEvitadasMes * p.custo_medio_vaga_tac,
+        custo_medio_vaga_tac: p.custo_medio_vaga_tac,
+        reducao_faltas_percent: Math.round(p.reducao_faltas_lembrete * 100),
         faltas_evitadas_mes: faltasEvitadasMes,
         percentagem_marcacoes_a_ligar: chamadas.marcacoesNoHorizonte
           ? Math.round((chamadasNoHorizonte / chamadas.marcacoesNoHorizonte) * 100)

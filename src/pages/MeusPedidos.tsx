@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { NomeDoente } from "../components/NomeDoente";
 import { Link, useSearchParams } from "react-router-dom";
 import { dataHoraPT, dataPT } from "../lib/datas";
-import { apiGet, apiPost } from "../lib/api";
+import { apiGet, apiPost, useVersaoDados } from "../lib/api";
 import { DecisoesRemarcacao } from "../components/DecisoesRemarcacao";
 import { AlertTriangle, CalendarCheck2, CheckCircle2, Clock, ExternalLink, HelpCircle, Hourglass, Search, XCircle } from "lucide-react";
 
@@ -158,7 +158,9 @@ export function MeusPedidos() {
       })
       .catch((e) => setErro(String(e)));
   }
-  useEffect(recarregar, []);
+  const versaoDados = useVersaoDados();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(recarregar, [versaoDados]);
 
   async function executar(caminho: string, corpo: unknown) {
     setErro(null);

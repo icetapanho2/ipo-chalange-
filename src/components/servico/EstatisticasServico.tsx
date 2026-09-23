@@ -138,19 +138,41 @@ function TabelaCorte({ linhas }: { linhas: Corte[] }) {
   );
 }
 
-/** Estatísticas do serviço: filtros por período, estádio e nível; tudo o resto responde a eles. */
-export function EstatisticasServico() {
+interface LinhaComparacao extends Resumo {
+  codigo: string;
+  legivel: string;
+  anteriorPercentDentroPrazo: number | null;
+  pendentesAgora: number;
+}
+
+/**
+ * Estatísticas: filtros por período, estádio e nível; tudo o resto responde a eles. A administrativa
+ * vê o seu serviço; a gestão (gestao) vê primeiro todos os serviços lado a lado e escolhe um para o detalhe.
+ */
+export function EstatisticasServico({ gestao = false }: { gestao?: boolean }) {
   const [periodo, setPeriodo] = useState("mes");
   const [estadios, setEstadios] = useState<Set<string>>(new Set());
   const [niveis, setNiveis] = useState<Set<string>>(new Set());
   const [dados, setDados] = useState<Resposta | null>(null);
+  const [comparacao, setComparacao] = useState<LinhaComparacao[] | null>(null);
+  const [servico, setServico] = useState("");
 
   useEffect(() => {
     const q = new URLSearchParams({ periodo });
     if (estadios.size) q.set("estadio", [...estadios].join(","));
     if (niveis.size) q.set("nivel", [...niveis].join(","));
-    apiGet<Resposta>(`/servico/estatisticas?${q}`).then(setDados).catch(() => undefined);
-  }, [periodo, estadios, niveis]);
+    if (!gestao) {
+      apiGet<Resposta>(`/servico/estatisticas?${q}`).then(setDados).catch(() => undefined);
+      return;
+    }
+    apiGet<LinhaComparacao[]>(`/gestao/comparar?${q}`)
+      .then((l) => {
+        setComparacao(l);
+        setServico((s) => s || l[0]?.codigo || "");
+      })
+      .catch(() => undefined);
+    if (servico) apiGet<Resposta>(`/gestao/estatisticas?especialidade=${servico}&${q}`).then(setDados).catch(() => undefined);
+  }, [periodo, estadios, niveis, gestao, servico]);
 
   const alternar = (s: Set<string>, v: string) => {
     const n = new Set(s);
@@ -195,6 +217,51 @@ export function EstatisticasServico() {
           </button>
         )}
       </div>
+
+      {gestao && comparacao && (
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white px-4 py-3">
+          <div className="mb-1 text-xs font-bold text-slate-700">Serviços lado a lado — clique num para ver o detalhe</div>
+          <table className="w-full min-w-[640px] text-left text-xs">
+            <thead>
+              <tr className="text-[10px] uppercase text-slate-400">
+                <th className="py-1">Serviço</th>
+                <th className="text-right">Pedidos</th>
+                <th className="text-right">Dentro do prazo</th>
+                <th className="text-right">vs período anterior</th>
+                <th className="text-right">Mediana até marcar</th>
+                <th className="text-right">Faltas</th>
+                <th className="text-right">Por marcar agora</th>
+              </tr>
+            </thead>
+            <tbody>
+              {comparacao.map((l) => {
+                const dif = l.percentDentroPrazo !== null && l.anteriorPercentDentroPrazo !== null ? l.percentDentroPrazo - l.anteriorPercentDentroPrazo : null;
+                return (
+                  <tr
+                    key={l.codigo}
+                    onClick={() => setServico(l.codigo)}
+                    className={`cursor-pointer border-t border-slate-100 hover:bg-sky-50 ${servico === l.codigo ? "bg-sky-50 font-semibold" : ""}`}
+                  >
+                    <td className="py-1.5 text-slate-800">{l.legivel}</td>
+                    <td className="text-right text-slate-600">{l.pedidos}</td>
+                    <td className={`text-right font-bold ${l.percentDentroPrazo !== null && l.percentDentroPrazo < 80 ? "text-rose-700" : "text-emerald-700"}`}>
+                      {l.percentDentroPrazo ?? "—"}
+                      {l.percentDentroPrazo !== null && "%"}
+                    </td>
+                    <td className={`text-right ${dif === null ? "text-slate-400" : dif < 0 ? "text-rose-700" : "text-emerald-700"}`}>
+                      {dif === null ? "—" : `${dif > 0 ? "+" : ""}${dif} pp`}
+                    </td>
+                    <td className="text-right text-slate-600">{l.medianaDias ?? "—"}{l.medianaDias !== null && " d"}</td>
+                    <td className="text-right text-slate-600">{l.taxaFaltas ?? "—"}{l.taxaFaltas !== null && "%"}</td>
+                    <td className="text-right text-slate-600">{l.pendentesAgora}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {gestao && dados && <h3 className="text-sm font-bold text-slate-700">Detalhe · {dados.especialidade_legivel}</h3>}
 
       {!dados || !g ? (
         <p className="text-sm text-slate-400">A carregar…</p>

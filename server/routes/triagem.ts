@@ -66,8 +66,14 @@ export function criarRotasTriagem(store: typeof StoreType) {
     res.json({ especialidade, especialidade_legivel: descreverEspecialidade(especialidade), fila });
   });
 
-  router.get("/especialidades", (_req, res) => {
-    res.json(store.especialidades);
+  // Para onde se pode reencaminhar: só serviços com triador (quem recebe o pedido), menos o próprio.
+  function servicosComTriador(excepto: string) {
+    const comTriador = new Set(store.utilizadores.filter((u) => u.perfil === "TRIADOR").map((u) => u.especialidade_codigo));
+    return store.especialidades.filter((e) => comTriador.has(e.codigo) && e.codigo !== excepto);
+  }
+  router.get("/especialidades", (req, res) => {
+    const eu = store.utilizadores.find((u) => u.utilizador_id === req.utilizadorId);
+    res.json(servicosComTriador(eu?.especialidade_codigo ?? ""));
   });
 
   router.post("/:id/aceitar", (req, res) => {
@@ -94,8 +100,8 @@ export function criarRotasTriagem(store: typeof StoreType) {
     const pedido = obterPedidoEmTriagem(store, req.params.id, res);
     if (!pedido) return;
     const novaEspecialidade: string = req.body?.especialidade ?? "";
-    if (!novaEspecialidade) {
-      res.status(400).json({ erro: "Escolha o serviço de destino." });
+    if (!novaEspecialidade || !servicosComTriador(pedido.especialidade_destino).some((e) => e.codigo === novaEspecialidade)) {
+      res.status(400).json({ erro: "Escolha um serviço com triagem (Oncologia Médica, Radioterapia ou Hospital de Dia)." });
       return;
     }
     reencaminharTriagem(pedido, novaEspecialidade, req.utilizadorId, req.body?.motivo ?? "", agora());

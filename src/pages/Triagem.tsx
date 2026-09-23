@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { NomeDoente } from "../components/NomeDoente";
 import { dataPT } from "../lib/datas";
-import { apiGet, apiPost } from "../lib/api";
+import { apiGet, apiPost, useVersaoDados } from "../lib/api";
 import { usePerfil } from "../lib/PerfilContext";
 import { DoenteModal } from "../components/DoenteModal";
 import {
@@ -70,10 +70,12 @@ export function Triagem() {
       .catch((e) => setErro(String(e)));
   }
 
+  const versaoDados = useVersaoDados();
   useEffect(() => {
     recarregar();
     apiGet<Especialidade[]>("/triagem/especialidades").then(setEspecialidades);
-  }, [utilizador?.utilizador_id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [utilizador?.utilizador_id, versaoDados]);
 
   async function aceitar(item: ItemFila) {
     setErro(null);
@@ -405,7 +407,7 @@ export function Triagem() {
                   value={destinoReencaminho}
                   onChange={(e) => setDestinoReencaminho(e.target.value)}
                 >
-                  <option value="">Escolher serviço hospitalar…</option>
+                  <option value="">Escolher serviço com triagem…</option>
                   {especialidades
                     .filter((e) => e.codigo !== resposta?.especialidade)
                     .map((e) => (

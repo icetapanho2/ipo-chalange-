@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiGet } from "../lib/api";
+import { apiGet, useVersaoDados } from "../lib/api";
 import { usePerfil } from "../lib/PerfilContext";
 import { dataPT } from "../lib/datas";
 import { DoenteModal } from "../components/DoenteModal";
@@ -93,6 +93,7 @@ export function Inicio() {
   const [tarefas, setTarefas] = useState<Tarefa[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [modalDoenteId, setModalDoenteId] = useState<string | null>(null);
+  const versaoDados = useVersaoDados();
 
   useEffect(() => {
     apiGet<Estado>("/estado")
@@ -101,12 +102,11 @@ export function Inicio() {
     apiGet<DoenteSumario[]>("/doente")
       .then((l) => setDoentes(l.filter((d) => d.demo_cenario)))
       .catch(() => undefined);
-  }, []);
+  }, [versaoDados]);
 
   useEffect(() => {
-    setTarefas(null);
     if (utilizador) tarefasDoPerfil(utilizador.perfil).then(setTarefas);
-  }, [utilizador?.utilizador_id, utilizador?.perfil]);
+  }, [utilizador?.utilizador_id, utilizador?.perfil, versaoDados]);
 
   const porFazer = (tarefas ?? []).filter((t) => t.n === null || t.n > 0);
 

@@ -30,6 +30,7 @@ const ROTULO: Record<string, string> = {
   AVARIA_RESOLVIDA: "Avaria resolvida",
   PEDIDO_DECISAO_NECESSARIA: "Decisão necessária",
   REMARCACAO_SUGERIDA: "Remarcação sugerida",
+  VAGA_EXTRA_PEDIDA: "Vaga extra pedida",
 };
 
 const COR: Record<string, string> = {
@@ -43,6 +44,7 @@ const COR: Record<string, string> = {
   AVARIA_RESOLVIDA: "bg-emerald-100 text-emerald-800",
   PEDIDO_DECISAO_NECESSARIA: "bg-rose-100 text-rose-800",
   REMARCACAO_SUGERIDA: "bg-sky-100 text-sky-800",
+  VAGA_EXTRA_PEDIDA: "bg-sky-100 text-sky-800",
 };
 
 /**
@@ -70,6 +72,8 @@ function rotaDaNotificacao(n: Notificacao): string {
       return doMedico;
     case "AVARIA_RESOLVIDA":
       return "/tecnico";
+    case "VAGA_EXTRA_PEDIDA":
+      return "/gestao?vagas-extra=1";
     default:
       return "/";
   }

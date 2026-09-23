@@ -32,9 +32,10 @@ async function correrCasos() {
   const atoMaria = agendaU01.atos.find((a) => a.data_hora === "2026-09-23T08:30")!;
   await post(`/api/oasis/consulta/${atoMaria.ato_id}/pedidos`, "U01", {
     pedidos: [
-      { especialidade_destino: "6100", ato_codigo: "9", analises: ["A001", "A002", "A003", "A004", "A005"] },
-      { especialidade_destino: "7000_2", ato_codigo: "1", exames: ["7000002", "7000004", "7000009"], especificacao: "com contraste" },
-      { especialidade_destino: "2102", ato_codigo: "22", especificacao: "revisão com exames", depende_exames_consulta: true, continuidade_medico: true },
+      // O plano do guião (P/ TC TAP; cons. Onco; rev c/ exames comigo): 3 pedidos.
+      { especialidade_destino: "7000_2", ato_codigo: "1", exames: ["7000002", "7000004", "7000009"], especificacao: "TC TAP" },
+      { especialidade_destino: "1300", ato_codigo: "1", especificacao: "cons. Onco" },
+      { especialidade_destino: "2102", ato_codigo: "22", especificacao: "rev c/ exames comigo", depende_exames_consulta: true, continuidade_medico: true },
     ],
   });
   const maria = await get<Agenda>("/api/doente/100101", "U03");
@@ -145,19 +146,6 @@ async function correrCasos() {
   const tecnico = await get<{ notificacoes: { tipo: string }[] }>("/api/notificacoes", "U13");
   r.tecnico_avisado = tecnico.notificacoes.some((n) => n.tipo === "AVARIA_RESOLVIDA");
 
-  // Caso E2 — ausência da Dra. Sofia a 08/10: a Joana regista, o plano sai com continuidade
-  const aus = await post<{ afetadas: number }>("/api/servico/ausencias", "U03", {
-    medico_id: "U02",
-    data_inicio: "2026-10-08",
-    duracao_dias: 1,
-    motivo: "Férias",
-  });
-  r.ausencia_afetadas = aus.afetadas;
-  const planoAus = await get<{ avarias: { avaria_id: string; tipo: string; propostas: PR[] }[] }>("/api/servico/remarcacoes", "U03");
-  const pAus = planoAus.avarias.find((a) => a.tipo === "AUSENCIA_MEDICO")!;
-  r.ausencia_plano = pAus.propostas.map((p) => `${p.ordem} ${p.doente_nome} → ${p.data_hora_sugerida}`);
-  await post(`/api/servico/avarias/${pAus.avaria_id}/aceitar-plano`, "U03");
-
   // Caso F — falta a uma análise: a administrativa recebe a sugestão com justificação e aceita
   interface MF { semaforo: { cor: string }; dependencias: { pedido_id: string; pode_remarcar: boolean }[] }
   const antes = await get<{ marcacoesFuturas: MF[] }>("/api/doente/100102", "U08");
@@ -169,6 +157,12 @@ async function correrCasos() {
   const dep = antes.marcacoesFuturas[0].dependencias.find((d) => d.pode_remarcar)!;
   r.antonio_depois = (await get<{ marcacoesFuturas: MF[] }>("/api/doente/100102", "U08")).marcacoesFuturas[0].semaforo.cor;
   r.antonio_colheita = (await get<Agenda>("/api/doente/100102", "U08")).agenda.find((m) => m.pedido_id === dep.pedido_id)?.data_hora;
+
+  // Caso G0 — sem vaga a tempo: a Joana pede vaga extra para a Fernanda e a gestão aprova
+  const fern = (await get<{ porEstado: Record<string, { pedido_id: string; doente_nome: string; vaga_extra_sugerida: string }[]> }>("/api/servico/pedidos", "U03")).porEstado.SEM_VAGA.find((p) => p.doente_nome.startsWith("Fernanda"))!;
+  await post(`/api/servico/pedidos/${fern.pedido_id}/pedir-vaga-extra`, "U03", { dataHora: fern.vaga_extra_sugerida });
+  const ve = (await get<{ id: string; estado: string }[]>("/api/gestao/vagas-extra", "U12")).find((v) => v.estado === "PENDENTE")!;
+  r.vaga_extra = (await post<{ data_hora: string }>(`/api/gestao/vagas-extra/${ve.id}/aprovar`, "U12", {})).data_hora;
 
   // Caso G — gestão: prazos em risco e sessão extra de TAC no sábado 26/09
   const prazos = await get<{ total: number; itens: { doente_nome: string; solucao: string }[] }>("/api/prioridades/prazos-em-risco", "U12");
@@ -221,7 +215,6 @@ describe("Guião por casos (caso normal + casos em que a prioridade decide)", ()
     // Caso A — tudo corre bem (ficha do doente mostra tudo marcado)
     expect(primeira.maria).toEqual([
       "Onc. Cirúrgica-C. Digestivo 2026-09-23T08:30",
-      "Patologia Clínica-Geral 2026-09-24T07:30",
       "Radiologia-Geral (TAC) 2026-10-14T08:20",
       "Onc. Cirúrgica-C. Digestivo 2026-10-21T08:30",
     ]);
@@ -248,7 +241,8 @@ describe("Guião por casos (caso normal + casos em que a prioridade decide)", ()
     expect(primeira.joaquim).toContain("Patologia Clínica-Geral 2026-10-01T10:00");
     expect(primeira.joaquim_motivo).toContain("Castelo Branco");
     expect(primeira.chamada_joaquim).toBe("SEM_CONTACTO,IDADE");
-    expect(primeira.chamada_maria).toBe("PREPARACAO");
+    // A Maria (TC sem contraste) fica só com SMS + lembrete: não precisa de chamada.
+    expect(primeira.chamada_maria).toBeNull();
 
     // Caso E — avaria na Ecografia
     expect(primeira.notificacao_eco).toBe("Avaria em Radiologia-Geral (Ecografia): 5 marcação(ões) a remarcar");
@@ -267,18 +261,17 @@ describe("Guião por casos (caso normal + casos em que a prioridade decide)", ()
     expect(primeira.alerta_diogo).toBe(true);
     expect(primeira.decisao_medico_data_minima).toBe("2026-10-01");
     expect(primeira.diogo_decisao).toBe("consulta 2026-10-06T09:30 · eco 2026-09-28T12:40");
-    expect(primeira.ausencia_afetadas).toBe(7);
-    expect((primeira.ausencia_plano as string[])[0]).toBe("1 Rui Marques Monteiro → 2026-10-13T09:10");
     expect(primeira.sessao_previsao).toEqual(["Paula Ribeiro Nunes 2026-09-26T08:00", "Helena Duarte Matos 2026-09-26T08:20"]);
     expect(primeira.sessao_aberta).toBe("2 vagas, 2 ofertas");
+    expect(primeira.vaga_extra).toBe("2026-11-09T18:00");
     expect(primeira.olga).toEqual(["Onc. Cirúrgica-C. Digestivo 2026-10-01T10:50", "Radiologia-Geral (Ecografia) 2026-10-01T11:40"]);
     expect(primeira.tecnico_avisado).toBe(true);
-    expect(primeira.antonio_sugestao).toContain("Sugerido 24/09/2026 07:40: primeira vaga que ainda dá tempo ao resultado antes da consulta");
+    expect(primeira.antonio_sugestao).toContain("Sugerido 24/09/2026 07:30: primeira vaga que ainda dá tempo ao resultado antes da consulta");
 
     // Caso F — falta a uma análise
     expect(primeira.antonio_antes).toBe("vermelho");
     expect(primeira.antonio_depois).toBe("amarelo");
-    expect(primeira.antonio_colheita).toBe("2026-09-24T07:40");
+    expect(primeira.antonio_colheita).toBe("2026-09-24T07:30");
 
     // Impacto
     const impacto = primeira.impacto as { sessao: Record<string, number> };
@@ -288,11 +281,23 @@ describe("Guião por casos (caso normal + casos em que a prioridade decide)", ()
     expect(impacto.sessao.dias_ganhos).toBe(13);
     expect(impacto.sessao.deslocacoes_evitadas).toBe(2);
     expect(impacto.sessao.segundas_remarcacoes_inevitaveis).toBe(2);
-    expect(impacto.sessao.remarcacoes_avaria_validadas).toBe(12);
+    expect(impacto.sessao.remarcacoes_avaria_validadas).toBe(5);
     expect(impacto.sessao.sugestoes_falta_aceites).toBe(1);
 
     await post("/api/repor-demo", "U12");
     const segunda = await correrCasos();
     expect(segunda).toEqual(primeira);
+  });
+
+  // A ausência de um médico (férias) saiu do guião apresentado, mas continua a funcionar.
+  it("ausência de um médico: o plano de remarcação sai com continuidade", async () => {
+    await post("/api/repor-demo", "U12");
+    interface PR { ordem: number; doente_nome: string; data_hora_sugerida: string }
+    const aus = await post<{ afetadas: number }>("/api/servico/ausencias", "U03", { medico_id: "U02", data_inicio: "2026-10-08", duracao_dias: 1, motivo: "Férias" });
+    expect(aus.afetadas).toBe(7);
+    const plano = await get<{ avarias: { tipo: string; propostas: PR[] }[] }>("/api/servico/remarcacoes", "U03");
+    const p = plano.avarias.find((a) => a.tipo === "AUSENCIA_MEDICO")!;
+    expect(p.propostas).toHaveLength(7);
+    expect(p.propostas.every((x) => x.data_hora_sugerida)).toBe(true);
   });
 });

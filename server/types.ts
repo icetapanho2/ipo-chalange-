@@ -267,7 +267,8 @@ export type TipoNotificacao =
   | "AVARIA_SERVICO"
   | "AVARIA_RESOLVIDA"
   | "PEDIDO_DECISAO_NECESSARIA"
-  | "REMARCACAO_SUGERIDA";
+  | "REMARCACAO_SUGERIDA"
+  | "VAGA_EXTRA_PEDIDA";
 
 /** Notificação dirigida a um utilizador, gerada pelo motor em cada transição relevante do fluxo (secção 5/N2). */
 export interface Notificacao {

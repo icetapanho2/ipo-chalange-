@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { apiGet } from "../lib/api";
+import { apiGet, useVersaoDados } from "../lib/api";
 import { VagasLibertadas } from "../components/VagasLibertadas";
 import { ListaChamadas } from "../components/ListaChamadas";
 import { ParaDecidir } from "../components/servico/ParaDecidir";
@@ -53,10 +53,11 @@ export function Servico() {
   const [contagens, setContagens] = useState<Contagens>({ decidir: 0, vagas: 0, chamadas: 0 });
   const [mensagem, setMensagem] = useState<string | null>(null);
   const [versao, setVersao] = useState(0);
+  const versaoDados = useVersaoDados();
 
   useEffect(() => {
     Promise.all([
-      apiGet<{ especialidade_legivel: string; porEstado: Record<string, { decisao_pendente?: boolean }[]> }>("/servico/pedidos"),
+      apiGet<{ especialidade_legivel: string; porEstado: Record<string, { decisao_pendente?: boolean; vaga_extra?: { estado: string } | null }[]> }>("/servico/pedidos"),
       apiGet<{ pendentes: number }>("/servico/remarcacoes"),
       apiGet<unknown[]>("/servico/propostas"),
       apiGet<{ pendentes: unknown[] }>("/servico/vagas-libertadas"),
@@ -64,7 +65,7 @@ export function Servico() {
     ])
       .then(([pedidos, remarcacoes, trocas, vagas, chamadas]) => {
         setServico(pedidos.especialidade_legivel);
-        const semVaga = (pedidos.porEstado.SEM_VAGA ?? []).filter((p) => !p.decisao_pendente).length;
+        const semVaga = (pedidos.porEstado.SEM_VAGA ?? []).filter((p) => !p.decisao_pendente && p.vaga_extra?.estado !== "PENDENTE").length;
         setContagens({
           decidir: remarcacoes.pendentes + trocas.length + semVaga,
           vagas: vagas.pendentes.length,
@@ -72,7 +73,7 @@ export function Servico() {
         });
       })
       .catch(() => undefined);
-  }, [versao]);
+  }, [versao, versaoDados]);
 
   function aoMudar(m: string) {
     setMensagem(m);

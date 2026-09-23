@@ -17,6 +17,15 @@ import { agora } from "./clock.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Versão dos dados: sobe a cada acção (POST/PUT/DELETE) na API. O frontend pergunta por ela a cada
+ * segundo e meio e recarrega o que está no ecrã quando muda — a triagem, a ficha e as listas
+ * actualizam-se sozinhas, sem recarregar a página (mesmo com várias janelas abertas).
+ */
+let versaoDados = 0;
+/** Identifica esta instância do servidor: se o frontend vir outra, o estado em memória não é o mesmo. */
+const INSTANCIA = Math.random().toString(36).slice(2, 10);
+
 /** Constrói a app Express (sem escutar em nenhuma porta) — usado pelo servidor e pelos testes. */
 export function criarApp() {
   const app = express();
@@ -28,6 +37,14 @@ export function criarApp() {
     req.utilizadorId = (req.header("x-utilizador-id") as string) || "";
     next();
   });
+
+  app.use("/api", (req, res, next) => {
+    if (req.method !== "GET") versaoDados += 1;
+    res.setHeader("X-Versao-Dados", `${INSTANCIA}:${versaoDados}`);
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+  app.get("/api/versao", (_req, res) => res.json({ versao: versaoDados, instancia: INSTANCIA }));
 
   app.use("/api", criarRotasSistema(store));
   app.use("/api/oasis", criarRotasOasis(store));

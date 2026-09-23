@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
-import { useState } from "react";
-import { apiPost } from "../lib/api";
+import { useEffect, useState } from "react";
+import { EVENTO_INSTANCIA, apiPost } from "../lib/api";
 import { usePerfil } from "../lib/PerfilContext";
 import { TrocadorUtilizador } from "./TrocadorUtilizador";
 import { PainelNotificacoes } from "./PainelNotificacoes";
@@ -40,6 +40,13 @@ export function Cabecalho() {
   const [aRepor, setARepor] = useState(false);
   const [mensagem, setMensagem] = useState<string | null>(null);
   const itens = utilizador ? NAV_POR_PERFIL[utilizador.perfil] ?? ITENS_INICIO : ITENS_INICIO;
+  // O estado vive na memória do servidor: se ele reiniciar (ou houver mais de uma instância), avisa.
+  const [outraInstancia, setOutraInstancia] = useState(false);
+  useEffect(() => {
+    const f = () => setOutraInstancia(true);
+    window.addEventListener(EVENTO_INSTANCIA, f);
+    return () => window.removeEventListener(EVENTO_INSTANCIA, f);
+  }, []);
 
   async function reporDemo() {
     setARepor(true);
@@ -58,6 +65,12 @@ export function Cabecalho() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-md shadow-2xs">
+      {outraInstancia && (
+        <div className="bg-amber-100 px-4 py-1.5 text-center text-xs font-semibold text-amber-900">
+          O servidor reiniciou ou está a correr em mais de uma instância: os dados podem não coincidir entre ecrãs. Carregue em "Repor
+          demo" — e, no Cloud Run, use 1 instância (mínimo e máximo).
+        </div>
+      )}
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2.5">
         {/* Marca & Identidade */}
         <div className="flex items-center gap-2.5">

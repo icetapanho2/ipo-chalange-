@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NomeDoente } from "./NomeDoente";
-import { apiGet, apiPost } from "../lib/api";
+import { apiGet, apiPost, useVersaoDados } from "../lib/api";
 import { dataHoraCurta } from "./PorqueEstaEscolha";
 import { Phone, PhoneOff, Check, CalendarX2 } from "lucide-react";
 
@@ -54,7 +54,9 @@ export function ListaChamadas({ aoMudar }: { aoMudar?: (mensagem: string) => voi
   function recarregar() {
     apiGet<RespostaChamadas>("/servico/chamadas").then(setDados).catch((e) => setErro(String(e)));
   }
-  useEffect(recarregar, []);
+  const versaoDados = useVersaoDados();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(recarregar, [versaoDados]);
 
   async function registar(atoId: string, resultado: string) {
     setErro(null);

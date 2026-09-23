@@ -320,3 +320,126 @@ export function OndePorCapacidade({ opcoes, versao, aoPreparar }: { opcoes: Opco
     </div>
   );
 }
+
+interface PedidoVagaExtra {
+  id: string;
+  estado: "PENDENTE" | "APROVADO" | "RECUSADO";
+  data_hora: string;
+  motivo: string;
+  motivo_recusa: string;
+  doente_id: string;
+  doente_nome: string;
+  descricao: string;
+  especialidade_legivel: string;
+  prazo_limite: string;
+  prazo_ja_passou: boolean;
+  pedido_por_nome: string;
+  decidido_por_nome: string;
+  criado_em: string;
+}
+
+function LinhaVagaExtra({ v, aoDecidir }: { v: PedidoVagaExtra; aoDecidir: (m: string) => void }) {
+  const [dataHora, setDataHora] = useState(v.data_hora);
+  const [recusar, setRecusar] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  async function decidir(accao: "aprovar" | "recusar") {
+    try {
+      await apiPost(`/gestao/vagas-extra/${v.id}/${accao}`, accao === "aprovar" ? { dataHora } : { motivo });
+      aoDecidir(
+        accao === "aprovar"
+          ? `Aprovada: ${v.doente_nome} marcado(a) a ${dataHoraCurta(dataHora)}. Serviço, médico e doente avisados.`
+          : `Recusada: o serviço de ${v.especialidade_legivel} foi avisado e resolve com outsourcing ou com o médico.`,
+      );
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
+  }
+  return (
+    <li className="rounded-lg border border-sky-200 bg-white p-3 text-xs">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="font-semibold text-slate-800">
+          <NomeDoente id={v.doente_id} nome={v.doente_nome} /> <span className="font-normal text-slate-500">· {v.descricao}</span>
+        </p>
+        <span className="text-[11px] text-slate-500">
+          {v.especialidade_legivel} · pedido por {v.pedido_por_nome}
+        </span>
+      </div>
+      <p className="mt-1 text-slate-600">
+        {v.motivo}
+        {v.prazo_ja_passou ? " · o prazo já passou" : ""}
+      </p>
+      {v.estado === "PENDENTE" ? (
+        recusar ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input autoFocus value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Porquê (ex.: sem equipa disponível nessa semana)" className="min-w-[16rem] flex-1 rounded border border-slate-300 px-2 py-1" />
+            <button type="button" disabled={!motivo.trim()} onClick={() => decidir("recusar")} className="rounded-lg bg-rose-700 px-3 py-1 font-bold text-white hover:bg-rose-800 disabled:opacity-40">
+              Recusar
+            </button>
+            <button type="button" onClick={() => setRecusar(false)} className="text-slate-500 hover:underline">
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-slate-600">Vaga extra a</span>
+            <input type="datetime-local" value={dataHora} onChange={(e) => setDataHora(e.target.value)} className="rounded border border-slate-300 px-2 py-1" />
+            <button type="button" onClick={() => decidir("aprovar")} className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 font-bold text-white hover:bg-emerald-700">
+              Aprovar e marcar
+            </button>
+            <button type="button" onClick={() => setRecusar(true)} className="rounded-lg border border-slate-300 px-3 py-1 font-semibold text-slate-700 hover:bg-slate-50">
+              Recusar
+            </button>
+          </div>
+        )
+      ) : (
+        <p className={`mt-1.5 font-semibold ${v.estado === "APROVADO" ? "text-emerald-700" : "text-rose-700"}`}>
+          {v.estado === "APROVADO" ? `Aprovada por ${v.decidido_por_nome}: marcada a ${dataHoraCurta(v.data_hora)}` : `Recusada por ${v.decidido_por_nome}: ${v.motivo_recusa}`}
+        </p>
+      )}
+      {erro && <p className="mt-1 text-rose-700">{erro}</p>}
+    </li>
+  );
+}
+
+/**
+ * Pedidos de vaga extra das administrativas: quando não há vaga a tempo, o serviço pede horas extra
+ * e a gestão decide aqui. Aprovar marca logo; recusar devolve ao serviço (outsourcing ou médico).
+ */
+export function PedidosVagaExtra({ versao, aoDecidir }: { versao: number; aoDecidir: () => void }) {
+  const [lista, setLista] = useState<PedidoVagaExtra[] | null>(null);
+  const [mensagem, setMensagem] = useState<string | null>(null);
+  useEffect(() => {
+    apiGet<PedidoVagaExtra[]>("/gestao/vagas-extra").then(setLista).catch(() => undefined);
+  }, [versao]);
+  if (!lista) return null;
+  const pendentes = lista.filter((v) => v.estado === "PENDENTE");
+  return (
+    <div id="vagas-extra" className="rounded-xl border border-sky-200 bg-sky-50/40 p-4">
+      <h3 className="mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-sky-900">
+        <CalendarPlus className="h-4 w-4" /> Pedidos de vaga extra dos serviços ({pendentes.length} por decidir)
+      </h3>
+      <p className="mb-2 text-[11px] text-sky-900">
+        Quando não há vaga a tempo, a administrativa pede horas extra. Aprovar marca o doente logo e avisa toda a gente; recusar devolve ao
+        serviço, que resolve com outsourcing ou passa ao médico.
+      </p>
+      {mensagem && <p className="mb-2 rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800">{mensagem}</p>}
+      {lista.length === 0 ? (
+        <p className="text-xs text-slate-500">Sem pedidos de vaga extra.</p>
+      ) : (
+        <ul className="space-y-2">
+          {lista.slice(0, 8).map((v) => (
+            <LinhaVagaExtra
+              key={v.id}
+              v={v}
+              aoDecidir={(m) => {
+                setMensagem(m);
+                aoDecidir();
+              }}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

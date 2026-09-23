@@ -200,14 +200,13 @@ export function OasisPedidosPosConsulta() {
   useEffect(() => {
     const aoPedir = (e: Event) => {
       if ((e as CustomEvent<string>).detail !== "preencher-maria" || !catalogo || !dados) return;
-      const tipos: TipoPedido[] = ["analises", "exame", "consulta", "pedido_consulta"];
+      const tipos: TipoPedido[] = ["exame", "consulta", "pedido_consulta"];
       const base = (tipo: TipoPedido, patch: Partial<PedidoForm>): PedidoForm => ({ ...novoPedido(tipo), ...patch });
       setTiposSelecionados(tipos);
       setPedidos([
-        base("analises", { especialidade_destino: "6100", ato_codigo: "9", analises: ["A001", "A002", "A003", "A004", "A005"], especificacao: "Controlo de vigilância, em jejum; creatinina antes do TC com contraste." }),
-        base("exame", { especialidade_destino: "7000_2", ato_codigo: "1", exames: ["7000002", "7000004", "7000009"], especificacao: "TC TAP com contraste — reavaliação de vigilância." }),
-        base("consulta", { especialidade_destino: dados.ato.especialidade_codigo, depende_exames_consulta: true, continuidade_medico: true, especificacao: "Revisão com os resultados das análises e do TC." }),
-        base("pedido_consulta", { especialidade_destino: "1300", ato_codigo: "1", especificacao: "Avaliação por Oncologia Médica." }),
+        base("exame", { especialidade_destino: "7000_2", ato_codigo: "1", exames: ["7000002", "7000004", "7000009"], especificacao: "TC TAP", pre_selecionado: "TC TAP" }),
+        base("pedido_consulta", { especialidade_destino: "1300", ato_codigo: "1", especificacao: "cons. Onco", pre_selecionado: "cons. Onco" }),
+        base("consulta", { especialidade_destino: dados.ato.especialidade_codigo, depende_exames_consulta: true, continuidade_medico: true, especificacao: "rev c/ exames comigo", pre_selecionado: "rev c/ exames comigo" }),
       ]);
       setErro(null);
       setEtapa("preenchimento");

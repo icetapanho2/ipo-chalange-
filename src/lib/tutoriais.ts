@@ -101,7 +101,7 @@ const CASO_1: PassoTutorial[] = [
   {
     titulo: "O plano já traduzido",
     texto:
-      "O assistente traduziu o P/: Análises, Exames, Próxima consulta e Pedido de consulta já vêm seleccionados (marcados \"do plano\"). O médico pode tirar ou juntar tipos. Carregue em Seguinte.",
+      "O assistente traduziu o P/: Exames, Próxima consulta e Pedido de consulta já vêm seleccionados (marcados \"do plano\"). O médico pode tirar ou juntar tipos. Carregue em Seguinte.",
     alvo: '[data-tour="tipos-pedido"]',
     avancarQuando: '[data-tour="preenchimento"]',
     acao: { rotulo: "Não veio pré-seleccionado? Preencher o plano da Maria", nome: "preencher-maria" },
@@ -109,9 +109,8 @@ const CASO_1: PassoTutorial[] = [
   {
     titulo: "Cada pedido já preenchido",
     texto:
-      "\"hemog, bioq, creat, CEA, CA 19.9\" → colheita com jejum com as 5 análises.\n" +
-      "\"TC TAP c/ contraste\" → TC corpo: tórax, abdominal e pélvica, com contraste.\n" +
-      "\"cons. Onco\" → pedido de consulta de Oncologia Médica.\n" +
+      "\"TC TAP\" → TC corpo: tórax, abdominal e pélvica (marcado logo).\n" +
+      "\"cons. Onco\" → pedido de consulta de Oncologia Médica (vai para a triagem desse serviço).\n" +
       "\"rev c/ exames comigo\" → próxima consulta no serviço do Dr. Pedro, depois dos exames, com ele.\n" +
       "Cada bloco diz de que pedaço do plano veio. Tudo se pode alterar; a prioridade fica automática. Depois, Seguinte.",
     alvo: '[data-tour="preenchimento"]',
@@ -119,14 +118,14 @@ const CASO_1: PassoTutorial[] = [
   },
   {
     titulo: "Resumo e submissão",
-    texto: "O resumo mostra os 4 pedidos. Indique se a doente precisa de transporte e carregue em \"Submeter pedidos\".",
+    texto: "O resumo mostra os 3 pedidos. Indique se a doente precisa de transporte e carregue em \"Submeter pedidos\".",
     alvo: '[data-tour="resumo"]',
     avancarQuando: '[data-tour="confirmacao"]',
   },
   {
     titulo: "O que aconteceu a cada pedido",
     texto:
-      "Marcado no momento, pela ordem certa: colheita a 24/09 07:30 → TC a 14/10 (regra R1: a creatinina antes do contraste) → próxima consulta com o Dr. Pedro depois do TC. A interconsulta de Oncologia Médica segue para a triagem desse serviço.",
+      "Marcado no momento, pela ordem certa: TC a 14/10 08:20 → próxima consulta com o Dr. Pedro a 21/10 08:30, só depois do resultado do TC. A interconsulta de Oncologia Médica segue para a triagem desse serviço.",
     alvo: '[data-tour="confirmacao"]',
     fala: "O médico declara os pedidos uma vez. O sistema percebe as dependências e marca tudo pela ordem certa, sem papel.",
   },

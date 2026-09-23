@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { NomeDoente } from "../NomeDoente";
-import { apiGet, apiPost } from "../../lib/api";
+import { apiGet, apiPost, useVersaoDados } from "../../lib/api";
 import { dataHoraPT, dataPT } from "../../lib/datas";
 import { PlanoRemarcacoes } from "../PlanoRemarcacoes";
 import { PorqueEstaEscolha, type CandidatoTroca } from "../PorqueEstaEscolha";
-import { ArrowLeftRight, Building2, CalendarClock, Check, CheckCircle2, HelpCircle, X } from "lucide-react";
+import { ArrowLeftRight, Building2, CalendarClock, CalendarPlus, Check, CheckCircle2, HelpCircle, X } from "lucide-react";
 
 interface PropostaTroca {
   proposta_id: string;
@@ -25,7 +25,12 @@ interface PedidoSemVaga {
   decisao_pendente?: boolean;
   primeira_vaga: { data_hora: string; dias_fora: number } | null;
   sem_sugestao: string;
+  vaga_extra_sugerida: string;
+  vaga_extra: { estado: "PENDENTE" | "APROVADO" | "RECUSADO"; data_hora: string; motivo_recusa: string } | null;
 }
+
+/** À espera de alguém (médico ou gestão): não conta como "para decidir" da administrativa. */
+const aEspera = (p: PedidoSemVaga) => !!p.decisao_pendente || p.vaga_extra?.estado === "PENDENTE";
 
 function Seccao({ id, icone: Icone, titulo, explicacao, n, children }: { id: string; icone: React.ElementType; titulo: string; explicacao: string; n: number; children: React.ReactNode }) {
   return (
@@ -41,8 +46,9 @@ function Seccao({ id, icone: Icone, titulo, explicacao, n, children }: { id: str
 }
 
 function SemVaga({ p, aoMudar, aoErro }: { p: PedidoSemVaga; aoMudar: (m: string) => void; aoErro: (m: string) => void }) {
-  const [form, setForm] = useState<"" | "outsourcing" | "medico">("");
+  const [form, setForm] = useState<"" | "outsourcing" | "medico" | "extra">("");
   const [texto, setTexto] = useState("");
+  const [dataExtra, setDataExtra] = useState(p.vaga_extra_sugerida);
 
   async function executar(caminho: string, corpo: unknown, mensagem: string) {
     try {
@@ -68,13 +74,22 @@ function SemVaga({ p, aoMudar, aoErro }: { p: PedidoSemVaga; aoMudar: (m: string
         <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
           <HelpCircle className="h-3.5 w-3.5" /> Enviado ao médico — aguarda a decisão dele
         </p>
+      ) : p.vaga_extra?.estado === "PENDENTE" ? (
+        <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-bold text-sky-800">
+          <CalendarPlus className="h-3.5 w-3.5" /> Vaga extra pedida à gestão para {dataHoraPT(p.vaga_extra.data_hora)} — aguarda aprovação
+        </p>
       ) : (
         <>
+          {p.vaga_extra?.estado === "RECUSADO" && (
+            <p className="mt-1.5 rounded bg-rose-50 px-2 py-1 text-xs text-rose-800">
+              <strong>A gestão recusou a vaga extra:</strong> {p.vaga_extra.motivo_recusa}. Resolver com outsourcing ou enviar ao médico.
+            </p>
+          )}
           <p className="mt-1.5 rounded bg-amber-50 px-2 py-1 text-xs text-amber-900">
             <strong>Sugestão:</strong>{" "}
             {p.primeira_vaga
-              ? `não há vaga até ${dataPT(p.prazo_limite)}. A primeira vaga é ${dataHoraPT(p.primeira_vaga.data_hora)}, ${p.primeira_vaga.dias_fora} dia(s) depois do prazo. Se o atraso não for aceitável, resolver com outsourcing ou pedir ao médico que decida.`
-              : `${p.sem_sugestao} Resolver com outsourcing ou pedir ao médico que decida.`}
+              ? `não há vaga até ${dataPT(p.prazo_limite)}. A primeira vaga é ${dataHoraPT(p.primeira_vaga.data_hora)}, ${p.primeira_vaga.dias_fora} dia(s) depois do prazo. Se o atraso não for aceitável, pedir uma vaga extra (a gestão aprova), resolver com outsourcing ou pedir ao médico que decida.`
+              : `${p.sem_sugestao} Pedir uma vaga extra (a gestão aprova), resolver com outsourcing ou pedir ao médico que decida.`}
           </p>
           {form === "" ? (
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -87,11 +102,32 @@ function SemVaga({ p, aoMudar, aoErro }: { p: PedidoSemVaga; aoMudar: (m: string
                   <Check className="h-3.5 w-3.5" /> Aceitar {dataHoraPT(p.primeira_vaga.data_hora)}
                 </button>
               )}
+              {p.vaga_extra?.estado !== "RECUSADO" && (
+                <button type="button" onClick={() => setForm("extra")} className="inline-flex items-center gap-1 rounded-lg bg-sky-700 px-2.5 py-1 text-xs font-bold text-white hover:bg-sky-800">
+                  <CalendarPlus className="h-3.5 w-3.5" /> Pedir vaga extra
+                </button>
+              )}
               <button type="button" onClick={() => setForm("outsourcing")} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                 <Building2 className="h-3.5 w-3.5" /> Resolvi com outsourcing
               </button>
               <button type="button" onClick={() => setForm("medico")} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                 <HelpCircle className="h-3.5 w-3.5" /> Enviar ao médico
+              </button>
+            </div>
+          ) : form === "extra" ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-slate-600">Vaga extra (fora do horário) a</span>
+              <input type="datetime-local" value={dataExtra} onChange={(e) => setDataExtra(e.target.value)} className="rounded border border-slate-300 px-2 py-1 text-xs" />
+              <button
+                type="button"
+                disabled={!dataExtra}
+                onClick={() => executar(`/servico/pedidos/${p.pedido_id}/pedir-vaga-extra`, { dataHora: dataExtra }, "Vaga extra pedida à gestão. Quando for aprovada, fica marcada e o doente é avisado.")}
+                className="rounded-lg bg-sky-700 px-3 py-1 text-xs font-bold text-white hover:bg-sky-800 disabled:opacity-40"
+              >
+                Pedir à gestão
+              </button>
+              <button type="button" onClick={() => setForm("")} className="text-xs text-slate-500 hover:underline">
+                Cancelar
               </button>
             </div>
           ) : (
@@ -135,12 +171,13 @@ export function ParaDecidir({ aoMudar }: { aoMudar: (mensagem: string) => void }
   const [remarcacoes, setRemarcacoes] = useState(0);
   const [versao, setVersao] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
+  const versaoDados = useVersaoDados();
 
   useEffect(() => {
     apiGet<PropostaTroca[]>("/servico/propostas").then(setTrocas).catch((e) => setErro(String(e)));
     apiGet<{ porEstado: Record<string, PedidoSemVaga[]> }>("/servico/pedidos").then((r) => setSemVaga(r.porEstado.SEM_VAGA ?? []));
     apiGet<{ pendentes: number }>("/servico/remarcacoes").then((r) => setRemarcacoes(r.pendentes));
-  }, [versao]);
+  }, [versao, versaoDados]);
 
   function mudou(m: string) {
     setErro(null);
@@ -158,7 +195,7 @@ export function ParaDecidir({ aoMudar }: { aoMudar: (mensagem: string) => void }
   }
 
   if (!trocas || !semVaga) return <p className="mt-5 text-sm text-slate-500">A carregar…</p>;
-  const total = remarcacoes + trocas.length + semVaga.filter((p) => !p.decisao_pendente).length;
+  const total = remarcacoes + trocas.length + semVaga.filter((p) => !aEspera(p)).length;
 
   return (
     <div className="mt-5 space-y-6">
@@ -169,7 +206,7 @@ export function ParaDecidir({ aoMudar }: { aoMudar: (mensagem: string) => void }
         {[
           { id: "remarcacoes", n: remarcacoes, rotulo: "remarcações a validar", sub: "avaria, ausência de médico, falta" },
           { id: "trocas", n: trocas.length, rotulo: "trocas de vaga a aprovar", sub: "doente urgente sem vaga no prazo" },
-          { id: "sem-vaga", n: semVaga.filter((p) => !p.decisao_pendente).length, rotulo: "pedidos sem vaga no prazo", sub: "aceitar atraso, outsourcing ou médico" },
+          { id: "sem-vaga", n: semVaga.filter((p) => !aEspera(p)).length, rotulo: "pedidos sem vaga no prazo", sub: "vaga extra, outsourcing ou médico" },
         ].map((c) => (
           <a key={c.id} href={`#${c.id}`} className={`rounded-xl border p-3 hover:shadow-sm ${c.n > 0 ? "border-rose-200 bg-rose-50" : "border-slate-200 bg-white"}`}>
             <div className={`text-2xl font-bold ${c.n > 0 ? "text-rose-800" : "text-slate-400"}`}>{c.n}</div>
@@ -229,7 +266,7 @@ export function ParaDecidir({ aoMudar }: { aoMudar: (mensagem: string) => void }
         icone={HelpCircle}
         titulo="Sem vaga no prazo"
         explicacao="Não há vaga nem troca possível até ao prazo. O sistema mostra a primeira vaga que existe; a administrativa aceita o atraso, resolve fora, ou passa a decisão ao médico."
-        n={semVaga.filter((p) => !p.decisao_pendente).length}
+        n={semVaga.filter((p) => !aEspera(p)).length}
       >
         {semVaga.length === 0 ? (
           <p className="text-xs text-slate-400">Todos os pedidos têm vaga.</p>

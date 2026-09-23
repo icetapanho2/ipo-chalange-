@@ -4,6 +4,7 @@ import { Cabecalho } from "./components/Cabecalho";
 import { GavetaDoente } from "./components/NomeDoente";
 import { Tutorial } from "./components/Tutorial";
 import { usePerfil } from "./lib/PerfilContext";
+import { vigiarDados } from "./lib/api";
 import { Inicio } from "./pages/Inicio";
 import { OasisMedico } from "./pages/oasis/Medico";
 import { OasisConsulta } from "./pages/oasis/Consulta";
@@ -23,6 +24,8 @@ import { LaboratorioPrioridades } from "./pages/LaboratorioPrioridades";
 // de longe a maior dependência do bundle — não vale a pena pagar esse custo em todas
 // as outras páginas, que a maioria dos perfis usa muito mais vezes na demo.
 const Gestao = lazy(() => import("./pages/Gestao").then((m) => ({ default: m.Gestao })));
+
+vigiarDados();
 
 export function App() {
   // Trocar de utilizador remonta a página: cada perfil vê os seus dados, mesmo sem mudar de endereço.

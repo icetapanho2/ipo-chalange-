@@ -173,4 +173,26 @@ describe("Serviço revisto", () => {
     expect((await api("/api/dicionario", "U03")).status).toBe(404);
     expect((await api("/api/oasis/tradutor/testar", "U01", { texto: "x" })).status).toBe(404);
   });
+
+  it("sem vaga: pedir vaga extra → a gestão recusa (volta ao serviço) ou aprova (marca logo e avisa)", async () => {
+    await api("/api/repor-demo", "U12", {});
+    type SV = { pedido_id: string; vaga_extra_sugerida: string; vaga_extra: { estado: string; motivo_recusa: string } | null };
+    const semVaga = async () => (await api<{ porEstado: Record<string, SV[]> }>("/api/servico/pedidos", "U03")).json.porEstado.SEM_VAGA?.[0];
+    const p = (await semVaga())!;
+    expect(p.vaga_extra_sugerida).toBe("2026-11-09T18:00");
+    expect((await api(`/api/servico/pedidos/${p.pedido_id}/pedir-vaga-extra`, "U03", { dataHora: p.vaga_extra_sugerida })).status).toBe(200);
+    type VE = { id: string; estado: string }[];
+    const lista = (await api<VE>("/api/gestao/vagas-extra", "U12")).json;
+    expect(lista[0].estado).toBe("PENDENTE");
+    expect((await api<{ notificacoes: { tipo: string }[] }>("/api/notificacoes", "U12")).json.notificacoes.some((n) => n.tipo === "VAGA_EXTRA_PEDIDA")).toBe(true);
+    await api(`/api/gestao/vagas-extra/${lista[0].id}/recusar`, "U12", { motivo: "Sem equipa nessa semana" });
+    expect((await semVaga())!.vaga_extra).toMatchObject({ estado: "RECUSADO", motivo_recusa: "Sem equipa nessa semana" });
+    // Pede outra vez e a gestão aprova: fica marcado na hora aprovada.
+    await api(`/api/servico/pedidos/${p.pedido_id}/pedir-vaga-extra`, "U03", { dataHora: "2026-11-09T18:00" });
+    const id = (await api<VE>("/api/gestao/vagas-extra", "U12")).json.find((v) => v.estado === "PENDENTE")!.id;
+    expect((await api(`/api/gestao/vagas-extra/${id}/aprovar`, "U12", { dataHora: "2026-11-10T18:30" })).status).toBe(200);
+    expect(await semVaga()).toBeUndefined();
+    const marcados = (await api<{ porEstado: Record<string, { pedido_id: string; data_marcada: string }[]> }>("/api/servico/pedidos", "U03")).json.porEstado.MARCADO;
+    expect(marcados.find((x) => x.pedido_id === p.pedido_id)?.data_marcada).toBe("2026-11-10T18:30");
+  });
 });

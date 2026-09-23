@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPost } from "../../lib/api";
+import { apiGet, apiPost, useVersaoDados } from "../../lib/api";
 import { dataHoraPT, dataPT } from "../../lib/datas";
 import { DoenteModal } from "../DoenteModal";
 import { AlertTriangle, Bell, Check, Search, Users } from "lucide-react";
@@ -82,13 +82,14 @@ export function PedidosServico({ aoMudar }: { aoMudar: (mensagem: string) => voi
   const [versao, setVersao] = useState(0);
   const [ordem, setOrdem] = useState<"recentes" | "data">("recentes");
   const [hoje, setHoje] = useState("");
+  const versaoDados = useVersaoDados();
 
   useEffect(() => {
     apiGet<{ porEstado: Record<string, ResumoPedido[]> }>("/servico/pedidos").then((r) => setPorEstado(r.porEstado));
     apiGet<Aviso[]>("/servico/alertas").then((l) => setAvisos(l.filter((a) => AVISOS[a.tipo])));
     apiGet<SinalCapacidade[]>("/servico/overbooking").then(setCapacidade);
     apiGet<{ demoDate: string }>("/estado").then((e) => setHoje(e.demoDate)).catch(() => undefined);
-  }, [versao]);
+  }, [versao, versaoDados]);
 
   async function visto(id: string) {
     await apiPost(`/servico/alertas/${id}/fechar`, { accao: "Visto pela administrativa" });

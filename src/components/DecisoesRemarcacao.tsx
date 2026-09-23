@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NomeDoente } from "./NomeDoente";
-import { apiGet, apiPost } from "../lib/api";
+import { apiGet, apiPost, useVersaoDados } from "../lib/api";
 import { dataHoraCurta } from "./PorqueEstaEscolha";
 import { CalendarClock, FastForward, Stethoscope } from "lucide-react";
 
@@ -77,7 +77,9 @@ export function DecisoesRemarcacao({ aoMudar }: { aoMudar?: () => void }) {
   function recarregar() {
     apiGet<Decisao[]>("/meus-pedidos/decisoes-remarcacao").then(setItens).catch((e) => setErro(String(e)));
   }
-  useEffect(recarregar, []);
+  const versaoDados = useVersaoDados();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(recarregar, [versaoDados]);
 
   async function decidir(id: string, decisao: "AVANCAR" | "ADIAR", data: string) {
     setErro(null);

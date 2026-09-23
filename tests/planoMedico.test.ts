@@ -59,21 +59,27 @@ describe("Assistente de pedidos (P/)", () => {
     await new Promise((r) => servidor.close(r));
   });
 
-  it("traduz o plano do guião nos 4 pedidos, sem avisos", async () => {
+  it("traduz o plano do guião nos 3 pedidos, sem avisos", async () => {
     const r = await api<Interpretacao>(`/api/oasis/consulta/${atoMaria}/interpretar-plano`, "U01", { diario: DIARIO_MARIA });
     expect(r.ativo).toBe(true);
-    expect(r.plano).toBe("colheita c/ jejum: hemog, bioq, creat, CEA, CA 19.9; TC TAP c/ contraste; cons. Onco; rev c/ exames comigo");
+    expect(r.plano).toBe("TC TAP; cons. Onco; rev c/ exames comigo");
     expect(r.avisos).toEqual([]);
     expect(r.pedidos.map((p) => [p.tipo_pedido, p.especialidade_destino, p.ato_codigo])).toEqual([
-      ["analises", "6100", "9"],
       ["exame", "7000_2", "1"],
       ["pedido_consulta", "1300", "1"],
       ["consulta", "2102", ""],
     ]);
-    expect(r.pedidos[0].analises).toEqual(["A001", "A002", "A003", "A004", "A005"]);
-    expect(r.pedidos[1].exames).toEqual(["7000002", "7000004", "7000009"]);
+    expect(r.pedidos[0].exames).toEqual(["7000002", "7000004", "7000009"]);
+    expect(r.pedidos[2]).toMatchObject({ depende_exames_consulta: true, continuidade_medico: true, texto_origem: "rev c/ exames comigo" });
+  });
+
+  it("lê também análises e contraste (abreviaturas)", async () => {
+    const r = await api<Interpretacao>(`/api/oasis/consulta/${atoMaria}/interpretar-plano`, "U01", {
+      diario: "P/ colheita c/ jejum: hemog, bioq, creat, CEA, CA 19.9; TC TAP c/ contraste",
+    });
+    expect(r.avisos).toEqual([]);
+    expect(r.pedidos[0]).toMatchObject({ tipo_pedido: "analises", ato_codigo: "9", analises: ["A001", "A002", "A003", "A004", "A005"] });
     expect(r.pedidos[1].especificacao).toContain("contraste");
-    expect(r.pedidos[3]).toMatchObject({ depende_exames_consulta: true, continuidade_medico: true, texto_origem: "rev c/ exames comigo" });
   });
 
   it("o que não percebe fica assinalado, nunca adivinhado", async () => {
@@ -97,7 +103,7 @@ describe("Assistente de pedidos (P/)", () => {
     expect((await api<Interpretacao>(`/api/oasis/consulta/${atoMaria}/interpretar-plano`, "U01", { diario: DIARIO_MARIA })).ativo).toBe(false);
     expect((await api<{ assistente_plano: boolean }>("/api/oasis/medico/definicoes", "U02")).assistente_plano).toBe(true);
     await api("/api/oasis/medico/definicoes", "U01", { assistente_plano: true });
-    expect((await api<Interpretacao>(`/api/oasis/consulta/${atoMaria}/interpretar-plano`, "U01", { diario: DIARIO_MARIA })).pedidos).toHaveLength(4);
+    expect((await api<Interpretacao>(`/api/oasis/consulta/${atoMaria}/interpretar-plano`, "U01", { diario: DIARIO_MARIA })).pedidos).toHaveLength(3);
   });
 
   it("submeter a pré-selecção dá as marcações do guião e fica registado no evento", async () => {
@@ -112,8 +118,33 @@ describe("Assistente de pedidos (P/)", () => {
     const sub = await api<{ pedidos: { estado: string; data_marcada: string; pedido_id: string }[] }>(`/api/oasis/consulta/${atoMaria}/pedidos`, "U01", {
       pedidos,
     });
-    expect(sub.pedidos.map((p) => p.data_marcada || p.estado)).toEqual(["2026-09-24T07:30", "2026-10-14T08:20", "EM_TRIAGEM", "2026-10-21T08:30"]);
+    expect(sub.pedidos.map((p) => p.data_marcada || p.estado)).toEqual(["2026-10-14T08:20", "EM_TRIAGEM", "2026-10-21T08:30"]);
+    // A triagem de Oncologia Médica recebe-o em primeiro; aceite, a ficha fica com 3 marcados.
+    const fila = await api<{ fila: { pedido_id: string; doente_id: string }[] }>("/api/triagem/fila", "U04");
+    expect(fila.fila[0].doente_id).toBe("100101");
+    await api(`/api/triagem/${fila.fila[0].pedido_id}/aceitar`, "U04", {});
+    const depois = await api<{ progresso: { total: number; marcados: number; por_marcar: number } }>("/api/doente/100101", "U01");
+    expect(depois.progresso).toMatchObject({ total: 3, marcados: 3, por_marcar: 0 });
     const ficha = await api<{ historico: { detalhe: string }[] }>("/api/doente/100101", "U01");
     expect(JSON.stringify(ficha)).toContain("pré-seleccionado pelo assistente");
+  });
+
+  it("reencaminhar: só para serviços com triagem; o novo triador é avisado e, aceite, a ficha fica marcada", async () => {
+    await api("/api/repor-demo", "U12", {});
+    const destinos = await api<{ codigo: string }[]>("/api/triagem/especialidades", "U04");
+    expect(destinos.map((d) => d.codigo).sort()).toEqual(["2300", "9610"]);
+    const consulta = await api<{ ato: { ato_codigo: string } }>(`/api/oasis/consulta/${atoMaria}`, "U01");
+    const r = await api<Interpretacao>(`/api/oasis/consulta/${atoMaria}/interpretar-plano`, "U01", { diario: DIARIO_MARIA });
+    await api(`/api/oasis/consulta/${atoMaria}/pedidos`, "U01", { pedidos: r.pedidos.map((p) => ({ ...p, ato_codigo: p.ato_codigo || consulta.ato.ato_codigo })) });
+    const pedido = (await api<{ fila: { pedido_id: string; doente_id: string }[] }>("/api/triagem/fila", "U04")).fila[0];
+    await expect(api(`/api/triagem/${pedido.pedido_id}/reencaminhar`, "U04", { especialidade: "7000_2" })).rejects.toThrow("400");
+    await api(`/api/triagem/${pedido.pedido_id}/reencaminhar`, "U04", { especialidade: "2300", motivo: "Pertence a Radioterapia" });
+    const notifs = (await api<{ notificacoes: { tipo: string; doente_id: string }[] }>("/api/notificacoes", "U06")).notificacoes;
+    expect(notifs.some((n) => n.tipo === "PEDIDO_EM_TRIAGEM" && n.doente_id === "100101")).toBe(true);
+    const filaRt = (await api<{ fila: { pedido_id: string; doente_id: string }[] }>("/api/triagem/fila", "U06")).fila;
+    expect(filaRt.some((f) => f.pedido_id === pedido.pedido_id)).toBe(true);
+    await api(`/api/triagem/${pedido.pedido_id}/aceitar`, "U06", {});
+    const ficha = await api<{ progresso: { total: number; marcados: number } }>("/api/doente/100101", "U01");
+    expect(ficha.progresso).toMatchObject({ total: 3, marcados: 3 });
   });
 });

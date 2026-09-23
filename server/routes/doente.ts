@@ -1,7 +1,8 @@
 import { Router } from "express";
 import type { store as StoreType } from "../store.ts";
 import { agora } from "../clock.ts";
-import { apenasData, formatarDataHoraPt, isoData, parseIso } from "../util.ts";
+import { apenasData, formatarDataHoraPt, formatarDataPt, isoData, parseIso, somarDias } from "../util.ts";
+import { encontrarVagaLivre, janelaAgendamento } from "../motor/agendamento.ts";
 import { adiarConsulta, remarcarPedido } from "../motor/fluxo.ts";
 import { avaliarDependenciasDetalhado, calcularSemaforo } from "../motor/semaforo.ts";
 import { idadeDoente, remarcacoesHospital } from "../motor/remarcacao.ts";
@@ -311,6 +312,13 @@ export function criarRotasDoente(store: typeof StoreType) {
         const troca = store.propostasTroca.find((t) => t.pedido_urgente === p.pedido_id && t.estado === "PENDENTE");
         const oferta = store.ofertasAntecipacao.find((o) => o.pedido_id === p.pedido_id && o.estado === "PENDENTE");
         const foraDoPrazo = !!dataMarcada && p.estado === "MARCADO" && dataMarcada.slice(0, 10) > p.prazo_limite;
+        // Fora do prazo só é um problema se ainda houver uma vaga livre antes; senão já está na primeira
+        // vaga possível (ex.: antecipado a partir de uma vaga libertada) e fica só como informação.
+        const vagaAntes =
+          foraDoPrazo && ato
+            ? encontrarVagaLivre(p.especialidade_destino, p.ato_codigo, janelaAgendamento(p, hoje).inicio, somarDias(apenasData(parseIso(ato.data_hora)), -1), undefined, { pedido: p, quando: agora() })
+            : null;
+        const foraDoPrazoSemSolucao = foraDoPrazo && !vagaAntes;
         const problema =
           p.estado === "FALTOU"
             ? "O doente faltou"
@@ -320,8 +328,8 @@ export function criarRotasDoente(store: typeof StoreType) {
                 ? `Devolvido pela triagem: "${p.pergunta_triagem || "falta informação"}"`
                 : sem?.cor === "vermelho"
                   ? sem.porque
-                  : foraDoPrazo
-                    ? "Marcado depois do prazo"
+                  : foraDoPrazo && !foraDoPrazoSemSolucao
+                    ? `Marcado depois do prazo — há vaga mais cedo (${formatarDataHoraPt(parseIso(vagaAntes!.data_hora))})`
                     : "";
         const emCurso = proposta
           ? proposta.estado === "AGUARDA_MEDICO"
@@ -354,7 +362,7 @@ export function criarRotasDoente(store: typeof StoreType) {
           dependencias: deps.map(({ requisito, estado }) => ({ pedido_id: requisito.pedido_id, descricao: descreverPedido(requisito), cor: estado.cor, porque: estado.porque })),
           semaforo: sem ? { cor: sem.cor, porque: sem.porque } : null,
           problema,
-          em_curso: emCurso,
+          em_curso: emCurso || (foraDoPrazoSemSolucao ? `Fora do prazo (${formatarDataPt(parseIso(p.prazo_limite))}), mas na primeira vaga possível — não há vaga livre antes` : ""),
           pode_aceitar_remarcacao: !!proposta && proposta.origem === "FALTA" && proposta.estado === "PENDENTE" && !proposta.sem_vaga_a_tempo,
           indice: ["REALIZADO", "CANCELADO", "RECUSADO"].includes(p.estado) ? null : p.indice_prioridade ?? null,
           indice_parcelas: p.indice_parcelas ?? [],

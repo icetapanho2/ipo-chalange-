@@ -20,11 +20,11 @@ export interface Passo {
   copiar?: { rotulo: string; texto: string };
 }
 
-/** Diário da Maria no Caso 1: o assistente lê o "P/" e pré-selecciona os 4 pedidos. */
+/** Diário da Maria no Caso 1: o assistente lê o "P/" e pré-selecciona os 3 pedidos. */
 export const DIARIO_MARIA =
   "Doente de 66 anos com adenocarcinoma do cólon, em vigilância após quimioterapia adjuvante. Sem queixas de novo desde a última avaliação; " +
   "peso estável, bom estado geral. Exame objectivo sem alterações. Diabetes tipo 2 medicada com metformina.\n" +
-  "P/ colheita c/ jejum: hemog, bioq, creat, CEA, CA 19.9; TC TAP c/ contraste; cons. Onco; rev c/ exames comigo";
+  "P/ TC TAP; cons. Onco; rev c/ exames comigo";
 
 export interface Caso {
   id: string;
@@ -51,9 +51,9 @@ export const CASOS: Caso[] = [
       {
         titulo: "Maria Fernandes — da consulta às marcações",
         descricao:
-          "Dr. Pedro, primeira doente do dia (08:30; sem pedidos pendentes). Os ícones ao lado abrem o perfil, os pedidos, a folha clínica e os exames. Colar o diário abaixo: termina com o plano em abreviaturas depois de \"P/\". Em \"Guardar & Seguinte\" o assistente lê o P/ e o ecrã seguinte já traz os 4 pedidos seleccionados e preenchidos (colheita com jejum com hemograma, bioquímica, creatinina, CEA e CA 19.9; TC TAP com contraste; Oncologia Médica; próxima consulta que depende dos exames, com continuidade). O médico confere, pode mudar o que quiser, e submete.",
+          "Dr. Pedro, primeira doente do dia (08:30; sem pedidos pendentes). Os ícones ao lado abrem o perfil, os pedidos, a folha clínica e os exames. Colar o diário abaixo: termina com o plano em abreviaturas depois de \"P/\". Em \"Guardar & Seguinte\" o assistente lê o P/ e o ecrã seguinte já traz os 3 pedidos seleccionados e preenchidos: TC TAP (exame — marcado logo), pedido de consulta de Oncologia Médica (vai para a triagem desse serviço) e próxima consulta com o Dr. Pedro, depois do TC (marcada logo). O médico confere, pode mudar o que quiser, e submete.",
         resultado:
-          "A confirmação mostra o que aconteceu a cada pedido: colheita 24/09 07:30 → TC 14/10 08:20 (regra R1: creatinina antes do contraste) → próxima consulta com o Dr. Pedro 21/10 08:30 (7 dias depois do TC); a interconsulta segue para a triagem da Oncologia Médica. O perfil da Maria fica logo com 3 marcados e 1 em triagem. (O assistente desliga-se em Definições.)",
+          "A confirmação mostra o que aconteceu a cada pedido: TC 14/10 08:20 → próxima consulta com o Dr. Pedro 21/10 08:30 (só depois do resultado do TC — dependência); a interconsulta segue para a triagem da Oncologia Médica. A ficha da Maria fica logo com 2 marcados e 1 em triagem. (O assistente desliga-se em Definições.)",
         copiar: { rotulo: "Diário da consulta (com o plano P/)", texto: DIARIO_MARIA },
         acoes: [{ etiqueta: "Agenda do Dr. Pedro", utilizadorId: "U01", caminho: "/oasis/medico" }],
         fala: "O médico declara os pedidos uma vez. O sistema percebe as dependências e marca tudo pela ordem certa, sem papel.",
@@ -61,12 +61,13 @@ export const CASOS: Caso[] = [
       {
         titulo: "Maria — cada serviço recebe o que é seu",
         descricao:
-          "Triador de Oncologia Médica: a Maria está em primeiro na fila (\"Novo\") → Aceitar & Agendar. Ver também as administrativas da Patologia, do TAC e da Oncologia Médica (Serviço → Pedidos e avisos): o pedido da Maria aparece em primeiro, marcado como novo.",
+          "Triador de Oncologia Médica: a Maria está em primeiro na fila (\"Novo\") → Aceitar & Agendar (ou Reencaminhar — só para serviços com triagem: Radioterapia e Hospital de Dia; o triador de lá é avisado). Ver também a administrativa do TAC (Serviço → Pedidos e avisos): o pedido da Maria aparece em primeiro, marcado como novo. Em \"Os meus pedidos\" do Dr. Pedro, a Maria aparece com tudo marcado.",
         resultado:
-          "Consulta de Oncologia Médica marcada; o Dr. Pedro recebe as notificações e a ficha da Maria passa a \"Tudo em ordem · 4 marcados\".",
+          "Consulta de Oncologia Médica marcada no momento em que é aceite; o Dr. Pedro recebe a notificação e a ficha da Maria passa a \"Tudo em ordem · 3 marcados\" — sem recarregar a página.",
         acoes: [
-          { etiqueta: "Triagem (Onc. Médica)", utilizadorId: "U04", caminho: "/triagem" },
+          { etiqueta: "Triagem (Onc. Médica)", utilizadorId: "U04", caminho: "/triagem?doente=100101", alvo: '[data-tour="triagem-100101"]' },
           { etiqueta: "Pedidos (TAC)", utilizadorId: "U07", caminho: "/servico?aba=pedidos" },
+          { etiqueta: "Os meus pedidos (Dr. Pedro)", utilizadorId: "U01", caminho: "/meus-pedidos?doente=100101" },
           { etiqueta: "Ficha da Maria", utilizadorId: "U01", caminho: "/doente/100101", alvo: '[data-tour="ficha-resumo"]' },
         ],
       },
@@ -187,7 +188,7 @@ export const CASOS: Caso[] = [
       },
       {
         titulo: "Lista de chamadas da Radiologia",
-        descricao: "Separador \"Chamadas\": o Sr. Joaquim aparece (sem contacto digital, 81 anos) e a Maria aparece por causa da preparação (TC com contraste e metformina).",
+        descricao: "Separador \"Chamadas\": o Sr. Joaquim aparece (sem contacto digital, 81 anos); a Maria não aparece — tem SMS e o TC não precisa de preparação especial, chega o SMS com o lembrete.",
         resultado: "Cerca de 1 em cada 5 marcações precisa de chamada; as restantes ficam só com o SMS/email e o lembrete a D-3.",
         acoes: [{ etiqueta: "Lista de chamadas (Radiologia)", utilizadorId: "U07", caminho: "/servico?aba=chamadas", alvo: '[data-tour="chamadas"]' }],
         fala: "Não ligamos a toda a gente: ligamos a quem, sem chamada, provavelmente falharia o exame.",
@@ -245,23 +246,7 @@ export const CASOS: Caso[] = [
   },
   {
     id: "6",
-    titulo: "Caso 6 — A médica vai de férias",
-    tipo: "problema",
-    problema: "A Dra. Sofia Lemos falta a 08/10. As 7 consultas desse dia têm de mudar — e os doentes que ela segue devem continuar com ela.",
-    regras: ["Mesmo motor da avaria, só na agenda desse médico.", "Continuidade: primeiro a agenda do mesmo médico; ordem pelo índice."],
-    passos: [
-      {
-        titulo: "A administrativa regista a ausência",
-        descricao: "Perfil Joana Moreira → Serviço → Para decidir → \"Registar ausência de médico\": Dra. Sofia Lemos, 08/10, 1 dia, Férias. Rever o plano e \"Aceitar todas\".",
-        resultado: "7 consultas remarcadas pela ordem do índice, com a própria Dra. Sofia: o 1.º (MP, em diagnóstico) para 13/10 09:10 e os restantes a 13/10 e 15/10.",
-        acoes: [{ etiqueta: "Remarcações (Onc. Cirúrgica)", utilizadorId: "U03", caminho: "/servico?aba=decidir", alvo: "#remarcacoes" }],
-        fala: "Férias, doença, formação: a agenda de um médico inteiro muda em segundos, sem perder a continuidade.",
-      },
-    ],
-  },
-  {
-    id: "7",
-    titulo: "Caso 7 — Faltou a uma análise antes da consulta",
+    titulo: "Caso 6 — Faltou a uma análise antes da consulta",
     tipo: "problema",
     problema: "António Ribeiro faltou ontem à colheita de que depende a revisão de 28/09. Sem o sistema, só se descobre no dia da consulta.",
     passos: [
@@ -269,7 +254,7 @@ export const CASOS: Caso[] = [
         titulo: "A administrativa recebe a sugestão e aceita",
         descricao:
           "Perfil Rita Vieira (Patologia Clínica): a notificação da falta já traz a sugestão. Serviço → Para decidir → Remarcações propostas (falta): ler o porquê e \"Aceitar\". Na ficha do António o semáforo passa de vermelho a amarelo.",
-        resultado: "Colheita a 24/09 07:40 — a primeira vaga que ainda dá tempo ao resultado (2 dias) antes da consulta de 28/09. Não conta como remarcação pelo hospital.",
+        resultado: "Colheita a 24/09 07:30 — a primeira vaga que ainda dá tempo ao resultado (2 dias) antes da consulta de 28/09. Não conta como remarcação pelo hospital.",
         acoes: [
           { etiqueta: "Remarcações (Patologia Clínica)", utilizadorId: "U08", caminho: "/servico?aba=decidir", alvo: "#remarcacoes" },
           { etiqueta: "Ficha do António", utilizadorId: "U08", caminho: "/doente/100102", alvo: '[data-tour="ficha-resumo"]' },
@@ -279,12 +264,28 @@ export const CASOS: Caso[] = [
     ],
   },
   {
-    id: "8",
+    id: "7",
     titulo: "Gestão — antecipar em vez de apagar fogos",
     tipo: "impacto",
     problema:
       "O que isto vale para quem gere: saber onde pôr capacidade antes de os prazos falharem (e onde uma sessão extra não resolve nada), quem ganha com ela antes de a pagar, e os números do antes e do depois.",
     passos: [
+      {
+        titulo: "Sem vaga a tempo: a administrativa pede vaga extra",
+        descricao:
+          "Joana (Onc. Cirúrgica) → Serviço → Para decidir → \"Sem vaga no prazo\": a consulta da Fernanda Ribeiro só pode ser depois dos exames (09/11) e a agenda acaba a 04/11. Três saídas: pedir vaga extra (horas extra — decide a gestão), outsourcing, ou enviar ao médico. Carregar em \"Pedir vaga extra\" (já vem 09/11 às 18:00) → \"Pedir à gestão\".",
+        resultado: "O pedido fica \"à espera de aprovação\" e o gestor recebe a notificação \"Vaga extra pedida\".",
+        acoes: [{ etiqueta: "Para decidir (Onc. Cirúrgica)", utilizadorId: "U03", caminho: "/servico?aba=decidir", alvo: "#sem-vaga" }],
+      },
+      {
+        titulo: "A gestão decide a vaga extra",
+        descricao:
+          "Dr. Nuno Reis (gestão): \"Pedidos de vaga extra dos serviços\" no topo da Gestão. Aprovar e marcar — ou recusar com o motivo (volta à Joana, que resolve com outsourcing ou passa ao médico, que aceita ou adia).",
+        resultado:
+          "Aprovada: a Fernanda fica marcada na hora escolhida; a Joana, o médico e a doente são avisados, e o pedido sai de \"Para decidir\" sem recarregar a página.",
+        acoes: [{ etiqueta: "Pedidos de vaga extra (Gestão)", utilizadorId: "U12", caminho: "/gestao?vagas-extra=1", alvo: "#vagas-extra" }],
+        fala: "As horas extra deixam de ser pedidas por telefone: chegam à gestão com o doente, o prazo e o porquê, e decide-se num clique.",
+      },
       {
         titulo: "Onde pôr capacidade e sessão extra",
         descricao:
@@ -297,9 +298,9 @@ export const CASOS: Caso[] = [
       {
         titulo: "Impacto em números",
         descricao:
-          "No topo da Gestão: antes das regras (60 dias), o que as regras fizeram nesta demonstração, espera por estádio, e a projecção mensal com os pressupostos à vista. Na lista de chamadas de cada serviço há também os encaixes sugeridos por dia (só sugestão).",
+          "Gestão → \"Impacto\". Primeiro, por mês, antes → com as regras, com o cálculo à vista: faltas no TAC 26 → 18 (8 vagas × 120 € = 960 €/mês), faltas em todos os serviços 89 → 62, chamadas só a ~23% das marcações. Os dois pressupostos (30% de faltas evitadas com lembrete + chamada; 120 € por vaga de TAC) estão em parametros.csv para validar. Depois, os contadores do que as regras fizeram nesta demonstração — cada um diz que caso o activa.",
         resultado:
-          "0 doentes remarcados uma 2.ª vez por troca (2 inevitáveis, sinalizadas), 3 doentes vulneráveis protegidos, 12/12 remarcações por avaria/ausência justificadas e validadas, 1 vaga libertada reaproveitada (13 dias ganhos), 2 deslocações evitadas (630 km), ~23% das marcações a ligar.",
+          "Depois do guião: 3 doentes vulneráveis protegidos (0 remarcados uma 2.ª vez), 1/1 vaga libertada reaproveitada (13 dias ganhos), 2 deslocações evitadas (630 km), 5/5 remarcações por avaria validadas, 1/1 falta com remarcação aceite, 1/1 vaga extra decidida.",
         acoes: [{ etiqueta: "Abrir Gestão", utilizadorId: "U12", caminho: "/gestao", alvo: '[data-tour="impacto"]' }],
       },
     ],

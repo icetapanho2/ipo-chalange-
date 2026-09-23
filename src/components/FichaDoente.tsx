@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPost, apiPut } from "../lib/api";
+import { apiGet, apiPost, apiPut, useVersaoDados } from "../lib/api";
 import { dataHoraPT, dataPT } from "../lib/datas";
 import {
   AlertTriangle,
@@ -299,7 +299,9 @@ export function FichaDoente({ doenteId, compacta = false, vistaInicial = "percur
       })
       .catch((e) => setErro(String(e)));
   }
-  useEffect(carregar, [doenteId]);
+  const versaoDados = useVersaoDados();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(carregar, [doenteId, versaoDados]);
 
   // Aberta em "perfil": o formulário de edição já vem aberto.
   useEffect(() => {

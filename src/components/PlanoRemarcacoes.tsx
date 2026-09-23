@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NomeDoente } from "./NomeDoente";
-import { apiGet, apiPost } from "../lib/api";
+import { apiGet, apiPost, useVersaoDados } from "../lib/api";
 import { dataHoraCurta } from "./PorqueEstaEscolha";
 import { AlertTriangle, ArrowRight, Building2, CalendarOff, CalendarPlus, Check, CheckCheck, ChevronDown, ChevronUp, Stethoscope, Shuffle, UserX, Wrench } from "lucide-react";
 
@@ -32,6 +32,7 @@ interface Proposta {
   alternativa_data_hora?: string;
   vaga_extra_sugerida?: string;
   resolucao?: string;
+  vaga_extra?: { estado: "PENDENTE" | "APROVADO" | "RECUSADO"; data_hora: string; motivo_recusa: string } | null;
 }
 
 export interface AccoesSemVaga {
@@ -100,7 +101,7 @@ function OutraSolucao({ p, accoes, aoFechar }: { p: Proposta; accoes: AccoesSemV
         <div className="rounded border border-indigo-100 bg-white p-2">
           <input type="datetime-local" value={dataHora} onChange={(e) => setDataHora(e.target.value)} className="mb-1.5 w-full rounded border border-slate-300 px-1.5 py-0.5 text-[11px]" />
           <button type="button" onClick={() => accoes.vagaExtra(p.proposta_id, dataHora)} disabled={!dataHora} className="flex w-full items-center justify-center gap-1 rounded bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-40">
-            <CalendarPlus className="h-3 w-3" /> Abrir vaga extra
+            <CalendarPlus className="h-3 w-3" /> Pedir vaga extra (a gestão aprova)
           </button>
         </div>
         <div className="rounded border border-indigo-100 bg-white p-2">
@@ -146,7 +147,7 @@ function ResolverSemVaga({ p, accoes }: { p: Proposta; accoes: AccoesSemVaga }) 
             onClick={() => accoes.vagaExtra(p.proposta_id, dataHora)}
             className="flex w-full items-center justify-center gap-1 rounded bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
           >
-            <CalendarPlus className="h-3 w-3" /> Resolvi com vaga extra
+            <CalendarPlus className="h-3 w-3" /> Pedir vaga extra (a gestão aprova)
           </button>
         </div>
         <div className="rounded border border-rose-100 bg-white p-2">
@@ -303,7 +304,17 @@ function LinhaProposta({
         <strong>Porquê:</strong> {p.justificacao}
       </p>
       {p.resolucao && <p className="mt-1 text-[11px] font-semibold text-emerald-800">✓ {p.resolucao}</p>}
-      {p.sem_vaga_a_tempo && p.estado === "PENDENTE" && <ResolverSemVaga p={p} accoes={accoes} />}
+      {p.vaga_extra?.estado === "PENDENTE" && (
+        <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-bold text-sky-800">
+          <CalendarPlus className="h-3.5 w-3.5" /> Vaga extra pedida à gestão para {dataHoraCurta(p.vaga_extra.data_hora)} — aguarda aprovação
+        </p>
+      )}
+      {p.vaga_extra?.estado === "RECUSADO" && p.estado === "PENDENTE" && (
+        <p className="mt-2 rounded bg-rose-50 px-2 py-1 text-xs text-rose-800">
+          <strong>A gestão recusou a vaga extra:</strong> {p.vaga_extra.motivo_recusa}. Resolver com outsourcing ou enviar ao médico.
+        </p>
+      )}
+      {p.sem_vaga_a_tempo && p.estado === "PENDENTE" && p.vaga_extra?.estado !== "PENDENTE" && <ResolverSemVaga p={p} accoes={accoes} />}
       {outra && !decidida && !p.sem_vaga_a_tempo && <OutraSolucao p={p} accoes={accoes} aoFechar={() => setOutra(false)} />}
       {p.avisos.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">
@@ -329,7 +340,9 @@ export function PlanoRemarcacoes({ aoMudar }: { aoMudar?: (mensagem: string) => 
   function recarregar() {
     apiGet<Resposta>("/servico/remarcacoes").then(setDados).catch((e) => setErro(String(e)));
   }
-  useEffect(recarregar, []);
+  const versaoDados = useVersaoDados();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(recarregar, [versaoDados]);
 
   async function decidir(id: string, aceitar: boolean) {
     setErro(null);
@@ -353,7 +366,7 @@ export function PlanoRemarcacoes({ aoMudar }: { aoMudar?: (mensagem: string) => 
     }
   }
   const accoes: AccoesSemVaga = {
-    vagaExtra: (id, dataHora) => executar(`/servico/remarcacoes/${id}/vaga-extra`, { dataHora }, "Resolvido com vaga extra: exame marcado a tempo da consulta. Alerta fechado."),
+    vagaExtra: (id, dataHora) => executar(`/servico/remarcacoes/${id}/pedir-vaga-extra`, { dataHora }, "Vaga extra pedida à gestão. Quando for aprovada, o exame fica marcado e o alerta fecha."),
     outsourcing: (id, nota) => executar(`/servico/remarcacoes/${id}/outsourcing`, { nota }, "Resolvido com outsourcing. Alerta fechado."),
     pedirMedico: (id) => executar(`/servico/remarcacoes/${id}/pedir-decisao-medico`, {}, "Enviado ao médico: vai decidir se avança com a consulta ou a adia."),
     escolher: (id, vagaId, dataHora) =>

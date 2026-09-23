@@ -96,6 +96,8 @@ class Store {
   propostasRemarcacao: PropostaRemarcacao[] = [];
   /** Médicos que desligaram o assistente que lê o "P/" do diário (ligado por omissão). */
   assistentePlanoDesligado: string[] = [];
+  /** Pedidos de vaga extra (administrativa → gestão). */
+  pedidosVagaExtra: import("./motor/vagaExtra.ts").PedidoVagaExtra[] = [];
 
   private contadores: Record<string, number> = {
     pedido: 0,
@@ -353,6 +355,7 @@ class Store {
     this.pesosPrioridadePorServico = {};
     this.indicePorServico = {};
     this.assistentePlanoDesligado = [];
+    this.pedidosVagaExtra = [];
     this.vagasLibertadas = [];
     this.ofertasAntecipacao = [];
     this.comunicacoesDoente = [];

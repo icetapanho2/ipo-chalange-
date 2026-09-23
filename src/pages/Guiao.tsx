@@ -229,7 +229,7 @@ export function Guiao() {
         <div>
           <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 text-xs text-slate-600 shadow-2xs">
             <strong className="text-slate-800">Como apresentar:</strong> carregar em \"Repor demo\" e seguir os casos por esta ordem. O Caso 1
-            mostra o circuito normal; os Casos 2 a 7 mostram problemas reais em que as regras de prioridade decidem; o último mostra o impacto
+            mostra o circuito normal; os Casos 2 a 6 mostram problemas reais em que as regras de prioridade decidem; o último mostra o impacto
             em números. Cada botão já troca para o perfil certo. Em <strong>"Fazer em modo tutorial"</strong> o ecrã escurece e fica destacado só
             o que interessa em cada passo, com o texto do que é e do que fazer (para sair: × no cartão).
           </div>

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { store as StoreType } from "../store.ts";
+import { store } from "../store.ts";
 import { agora } from "../clock.ts";
 import { apenasData, diferencaDias, formatarDataPt, isoData, parseIso, somarDias } from "../util.ts";
 import { aprovarPropostaTroca, rejeitarPropostaTroca, contarVagasLivres, encontrarVagaLivre, janelaAgendamento, marcarPedidoNaVaga } from "../motor/agendamento.ts";
@@ -18,6 +19,7 @@ import {
   escolherAlternativa,
 } from "../motor/propostasRemarcacao.ts";
 import { marcarOutsourcing, pedirDecisaoMedico } from "../motor/fluxo.ts";
+import { pedirVagaExtra, sugestaoVagaExtra, vagaExtraDoPedido } from "../motor/vagaExtra.ts";
 import { desmarcarAPedidoDoDoente, expirarOfertas, responderOferta } from "../motor/antecipacao.ts";
 import { encaixesSugeridos, listaChamadas, registarChamada } from "../motor/chamadas.ts";
 import { PESOS_PRIORIDADE_OMISSAO, pesosPrioridadeDoServico } from "../motor/prioridade.ts";
@@ -40,6 +42,121 @@ function mediana(valores: number[]): number | null {
   const ord = [...valores].sort((a, b) => a - b);
   const meio = Math.floor(ord.length / 2);
   return ord.length % 2 === 0 ? Math.round((ord[meio - 1] + ord[meio]) / 2) : ord[meio];
+}
+
+/**
+ * Estatísticas de um serviço num período (semana/mês/trimestre/todos), filtráveis por estádio e nível
+ * de prioridade — as mesmas para a administrativa (o seu serviço) e para a gestão (qualquer serviço).
+ */
+export function calcularEstatisticas(especialidade: string, q: { periodo?: unknown; estadio?: unknown; nivel?: unknown }) {
+    const hoje = apenasData(agora());
+    const DIAS: Record<string, number | null> = { semana: 7, mes: 30, trimestre: 90, todos: null };
+    const periodo = String(q.periodo ?? "mes") in DIAS ? String(q.periodo ?? "mes") : "mes";
+    const nDias = DIAS[periodo];
+    const lista = (q: unknown) => String(q ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+    const estadios = lista(q.estadio);
+    const niveis = lista(q.nivel);
+
+    const doDoente = new Map(store.doentes.map((d) => [d.doente_id, d]));
+    const base = store.pedidos.filter(
+      (p) =>
+        p.especialidade_destino === especialidade &&
+        (estadios.length === 0 || estadios.includes(doDoente.get(p.doente_id)?.estadio_cuidado ?? "")) &&
+        (niveis.length === 0 || niveis.includes(p.prioridade)),
+    );
+    const criado = (p: Pedido) => apenasData(parseIso(p.criado_em)).getTime();
+    const primeiro = base.reduce((m, p) => Math.min(m, criado(p)), hoje.getTime());
+    const inicio = nDias ? somarDias(hoje, -nDias) : new Date(primeiro);
+    const inicioAnterior = nDias ? somarDias(inicio, -nDias) : null;
+
+    interface Amostra { pedido: Pedido; dias: number; dentroPrazo: boolean; faltou: boolean; estadio: string }
+    function amostrasDe(pedidos: Pedido[]): Amostra[] {
+      const r: Amostra[] = [];
+      for (const p of pedidos) {
+        const ato = p.ato_id ? store.atosMedicos.find((a) => a.mvp_ato_id === p.ato_id) : undefined;
+        if (!ato) continue;
+        r.push({
+          pedido: p,
+          dias: diferencaDias(parseIso(ato.data_hora), parseIso(p.criado_em)),
+          dentroPrazo: parseIso(ato.data_hora).getTime() <= parseIso(p.prazo_limite).getTime(),
+          faltou: p.estado === "FALTOU" || ato.estado === "FALTOU",
+          estadio: doDoente.get(p.doente_id)?.estadio_cuidado ?? "",
+        });
+      }
+      return r;
+    }
+    const percent = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : null);
+    function resumo(pedidos: Pedido[]) {
+      const a = amostrasDe(pedidos);
+      return {
+        pedidos: pedidos.length,
+        marcados: a.length,
+        medianaDias: mediana(a.map((x) => x.dias)),
+        percentDentroPrazo: percent(a.filter((x) => x.dentroPrazo).length, a.length),
+        taxaFaltas: percent(a.filter((x) => x.faltou).length, a.length),
+        remarcados: pedidos.filter((p) => p.n_remarcacoes > 0).length,
+      };
+    }
+
+    const doPeriodo = base.filter((p) => criado(p) >= inicio.getTime() && criado(p) <= hoje.getTime());
+    const anterior = inicioAnterior ? base.filter((p) => criado(p) >= inicioAnterior.getTime() && criado(p) < inicio.getTime()) : [];
+    const amostras = amostrasDe(doPeriodo);
+
+    // Evolução: por dia na última semana, por semana nos outros períodos.
+    const passo = nDias === 7 ? 1 : 7;
+    const serie: { rotulo: string; pedidos: number; marcados: number; percentDentroPrazo: number | null; medianaDias: number | null }[] = [];
+    for (let t = new Date(inicio); t.getTime() <= hoje.getTime(); t = somarDias(t, passo)) {
+      const fim = somarDias(t, passo);
+      const fatia = doPeriodo.filter((p) => criado(p) >= t.getTime() && criado(p) < fim.getTime());
+      const r = resumo(fatia);
+      serie.push({ rotulo: formatarDataPt(t).slice(0, 5), pedidos: r.pedidos, marcados: r.marcados, percentDentroPrazo: r.percentDentroPrazo, medianaDias: r.medianaDias });
+    }
+
+    const porEstadio = ["NOVO", "PRE_TRATAMENTO", "EM_TRATAMENTO", "FOLLOW_UP"].map((chave) => ({
+      chave,
+      legivel: descreverEstadioCuidado(chave),
+      ...resumo(doPeriodo.filter((p) => (doDoente.get(p.doente_id)?.estadio_cuidado ?? "") === chave)),
+    }));
+    const porNivel = (["MP", "P", "N"] as const).map((chave) => ({
+      chave,
+      legivel: descreverPrioridade(chave),
+      ...resumo(doPeriodo.filter((p) => p.prioridade === chave)),
+    }));
+    const faixas = [
+      { rotulo: "0–3 dias", min: 0, max: 3 },
+      { rotulo: "4–7", min: 4, max: 7 },
+      { rotulo: "8–14", min: 8, max: 14 },
+      { rotulo: "15–30", min: 15, max: 30 },
+      { rotulo: "> 30", min: 31, max: Infinity },
+    ].map((f) => ({ rotulo: f.rotulo, n: amostras.filter((a) => a.dias >= f.min && a.dias <= f.max).length }));
+
+    const maisLentos = [...amostras]
+      .sort((a, b) => b.dias - a.dias)
+      .slice(0, 8)
+      .map((a) => ({
+        pedido_id: a.pedido.pedido_id,
+        doente_id: a.pedido.doente_id,
+        doente_nome: descreverDoente(a.pedido.doente_id),
+        descricao: descreverPedido(a.pedido),
+        prioridade: a.pedido.prioridade,
+        dias: a.dias,
+        dentro_prazo: a.dentroPrazo,
+        estadio_cuidado_legivel: descreverEstadioCuidado(a.estadio),
+      }));
+
+  return {
+    especialidade_legivel: descreverEspecialidade(especialidade),
+    periodo,
+    desde: isoData(inicio),
+    geral: resumo(doPeriodo),
+    anterior: inicioAnterior ? resumo(anterior) : null,
+    pendentesAgora: base.filter((p) => ["ACEITE", "SEM_VAGA", "EM_TRIAGEM", "FALTOU"].includes(p.estado)).length,
+    serie,
+    porEstadio,
+    porNivel,
+    faixas,
+    maisLentos,
+  };
 }
 
 export function criarRotasServico(store: typeof StoreType) {
@@ -65,6 +182,8 @@ export function criarRotasServico(store: typeof StoreType) {
       decisao_pendente: !!p.decisao_pendente,
       primeira_vaga: p.estado === "SEM_VAGA" ? primeiraVagaForaDoPrazo(p) : null,
       sem_sugestao: p.estado === "SEM_VAGA" && !primeiraVagaForaDoPrazo(p) ? porqueSemVaga(p) : "",
+      vaga_extra_sugerida: p.estado === "SEM_VAGA" ? sugestaoVagaExtra(p) : "",
+      vaga_extra: p.estado === "SEM_VAGA" ? vagaExtraDoPedido(p.pedido_id) ?? null : null,
       data_marcada: p.ato_id ? store.atosMedicos.find((a) => a.mvp_ato_id === p.ato_id)?.data_hora ?? "" : "",
       criado_em: p.criado_em,
     };
@@ -179,6 +298,7 @@ export function criarRotasServico(store: typeof StoreType) {
       descricao: pedido ? descreverPedido(pedido) : "Marcação sem pedido no sistema",
       prioridade: pedido?.prioridade ?? "",
       prazo_limite: pedido?.prazo_limite ?? "",
+      vaga_extra: p.estado === "PENDENTE" ? [...store.pedidosVagaExtra].reverse().find((v) => v.proposta_id === p.proposta_id) ?? null : null,
     };
   }
 
@@ -238,6 +358,44 @@ export function criarRotasServico(store: typeof StoreType) {
       return;
     }
     res.json({ ok: true, proposta: propostaRemarcacaoJson(p) });
+  });
+
+  // Vaga extra: a administrativa pede, a gestão decide (Gestão → "Pedidos de vaga extra").
+  router.post("/remarcacoes/:id/pedir-vaga-extra", (req, res) => {
+    const dataHora: string = req.body?.dataHora ?? "";
+    const proposta = store.propostasRemarcacao.find((p) => p.proposta_id === req.params.id && p.estado === "PENDENTE");
+    const pedido = store.pedidos.find((p) => p.pedido_id === proposta?.pedido_id);
+    if (!proposta || !pedido || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dataHora)) {
+      res.status(400).json({ erro: "Indique a data e hora da vaga extra." });
+      return;
+    }
+    const v = pedirVagaExtra(pedido, {
+      propostaId: proposta.proposta_id,
+      dataHora,
+      motivo: proposta.origem === "AVARIA" ? "Sem vaga a tempo depois da avaria/ausência" : "Sem vaga a tempo depois da falta",
+      utilizadorId: req.utilizadorId,
+      quando: agora(),
+    });
+    if (!v) {
+      res.status(409).json({ erro: "Já há uma vaga extra pedida para este doente." });
+      return;
+    }
+    res.json({ ok: true, pedido_vaga_extra: v });
+  });
+  router.post("/pedidos/:id/pedir-vaga-extra", (req, res) => {
+    const dataHora: string = req.body?.dataHora ?? "";
+    const especialidade = especialidadeDoUtilizador(req.utilizadorId);
+    const pedido = store.pedidos.find((p) => p.pedido_id === req.params.id && p.especialidade_destino === especialidade);
+    if (!pedido || pedido.estado !== "SEM_VAGA" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(dataHora)) {
+      res.status(400).json({ erro: "Pedido sem vaga não encontrado, ou falta a data e hora." });
+      return;
+    }
+    const v = pedirVagaExtra(pedido, { dataHora, motivo: `Sem vaga até ao prazo (${formatarDataPt(parseIso(pedido.prazo_limite))})`, utilizadorId: req.utilizadorId, quando: agora() });
+    if (!v) {
+      res.status(409).json({ erro: "Já há uma vaga extra pedida para este doente." });
+      return;
+    }
+    res.json({ ok: true, pedido_vaga_extra: v });
   });
 
   router.post("/remarcacoes/:id/vaga-extra", (req, res) => {
@@ -690,114 +848,7 @@ export function criarRotasServico(store: typeof StoreType) {
       res.status(400).json({ erro: "O perfil seleccionado não tem especialidade associada." });
       return;
     }
-    const hoje = apenasData(agora());
-    const DIAS: Record<string, number | null> = { semana: 7, mes: 30, trimestre: 90, todos: null };
-    const periodo = String(req.query.periodo ?? "mes") in DIAS ? String(req.query.periodo ?? "mes") : "mes";
-    const nDias = DIAS[periodo];
-    const lista = (q: unknown) => String(q ?? "").split(",").map((x) => x.trim()).filter(Boolean);
-    const estadios = lista(req.query.estadio);
-    const niveis = lista(req.query.nivel);
-
-    const doDoente = new Map(store.doentes.map((d) => [d.doente_id, d]));
-    const base = store.pedidos.filter(
-      (p) =>
-        p.especialidade_destino === especialidade &&
-        (estadios.length === 0 || estadios.includes(doDoente.get(p.doente_id)?.estadio_cuidado ?? "")) &&
-        (niveis.length === 0 || niveis.includes(p.prioridade)),
-    );
-    const criado = (p: Pedido) => apenasData(parseIso(p.criado_em)).getTime();
-    const primeiro = base.reduce((m, p) => Math.min(m, criado(p)), hoje.getTime());
-    const inicio = nDias ? somarDias(hoje, -nDias) : new Date(primeiro);
-    const inicioAnterior = nDias ? somarDias(inicio, -nDias) : null;
-
-    interface Amostra { pedido: Pedido; dias: number; dentroPrazo: boolean; faltou: boolean; estadio: string }
-    function amostrasDe(pedidos: Pedido[]): Amostra[] {
-      const r: Amostra[] = [];
-      for (const p of pedidos) {
-        const ato = p.ato_id ? store.atosMedicos.find((a) => a.mvp_ato_id === p.ato_id) : undefined;
-        if (!ato) continue;
-        r.push({
-          pedido: p,
-          dias: diferencaDias(parseIso(ato.data_hora), parseIso(p.criado_em)),
-          dentroPrazo: parseIso(ato.data_hora).getTime() <= parseIso(p.prazo_limite).getTime(),
-          faltou: p.estado === "FALTOU" || ato.estado === "FALTOU",
-          estadio: doDoente.get(p.doente_id)?.estadio_cuidado ?? "",
-        });
-      }
-      return r;
-    }
-    const percent = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : null);
-    function resumo(pedidos: Pedido[]) {
-      const a = amostrasDe(pedidos);
-      return {
-        pedidos: pedidos.length,
-        marcados: a.length,
-        medianaDias: mediana(a.map((x) => x.dias)),
-        percentDentroPrazo: percent(a.filter((x) => x.dentroPrazo).length, a.length),
-        taxaFaltas: percent(a.filter((x) => x.faltou).length, a.length),
-        remarcados: pedidos.filter((p) => p.n_remarcacoes > 0).length,
-      };
-    }
-
-    const doPeriodo = base.filter((p) => criado(p) >= inicio.getTime() && criado(p) <= hoje.getTime());
-    const anterior = inicioAnterior ? base.filter((p) => criado(p) >= inicioAnterior.getTime() && criado(p) < inicio.getTime()) : [];
-    const amostras = amostrasDe(doPeriodo);
-
-    // Evolução: por dia na última semana, por semana nos outros períodos.
-    const passo = nDias === 7 ? 1 : 7;
-    const serie: { rotulo: string; pedidos: number; marcados: number; percentDentroPrazo: number | null; medianaDias: number | null }[] = [];
-    for (let t = new Date(inicio); t.getTime() <= hoje.getTime(); t = somarDias(t, passo)) {
-      const fim = somarDias(t, passo);
-      const fatia = doPeriodo.filter((p) => criado(p) >= t.getTime() && criado(p) < fim.getTime());
-      const r = resumo(fatia);
-      serie.push({ rotulo: formatarDataPt(t).slice(0, 5), pedidos: r.pedidos, marcados: r.marcados, percentDentroPrazo: r.percentDentroPrazo, medianaDias: r.medianaDias });
-    }
-
-    const porEstadio = ["NOVO", "PRE_TRATAMENTO", "EM_TRATAMENTO", "FOLLOW_UP"].map((chave) => ({
-      chave,
-      legivel: descreverEstadioCuidado(chave),
-      ...resumo(doPeriodo.filter((p) => (doDoente.get(p.doente_id)?.estadio_cuidado ?? "") === chave)),
-    }));
-    const porNivel = (["MP", "P", "N"] as const).map((chave) => ({
-      chave,
-      legivel: descreverPrioridade(chave),
-      ...resumo(doPeriodo.filter((p) => p.prioridade === chave)),
-    }));
-    const faixas = [
-      { rotulo: "0–3 dias", min: 0, max: 3 },
-      { rotulo: "4–7", min: 4, max: 7 },
-      { rotulo: "8–14", min: 8, max: 14 },
-      { rotulo: "15–30", min: 15, max: 30 },
-      { rotulo: "> 30", min: 31, max: Infinity },
-    ].map((f) => ({ rotulo: f.rotulo, n: amostras.filter((a) => a.dias >= f.min && a.dias <= f.max).length }));
-
-    const maisLentos = [...amostras]
-      .sort((a, b) => b.dias - a.dias)
-      .slice(0, 8)
-      .map((a) => ({
-        pedido_id: a.pedido.pedido_id,
-        doente_id: a.pedido.doente_id,
-        doente_nome: descreverDoente(a.pedido.doente_id),
-        descricao: descreverPedido(a.pedido),
-        prioridade: a.pedido.prioridade,
-        dias: a.dias,
-        dentro_prazo: a.dentroPrazo,
-        estadio_cuidado_legivel: descreverEstadioCuidado(a.estadio),
-      }));
-
-    res.json({
-      especialidade_legivel: descreverEspecialidade(especialidade),
-      periodo,
-      desde: isoData(inicio),
-      geral: resumo(doPeriodo),
-      anterior: inicioAnterior ? resumo(anterior) : null,
-      pendentesAgora: base.filter((p) => ["ACEITE", "SEM_VAGA", "EM_TRIAGEM", "FALTOU"].includes(p.estado)).length,
-      serie,
-      porEstadio,
-      porNivel,
-      faixas,
-      maisLentos,
-    });
+    res.json(calcularEstatisticas(especialidade, req.query));
   });
 
   return router;

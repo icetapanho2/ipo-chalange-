@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NomeDoente } from "./NomeDoente";
-import { apiGet, apiPost } from "../lib/api";
+import { apiGet, apiPost, useVersaoDados } from "../lib/api";
 import { dataHoraCurta } from "./PorqueEstaEscolha";
 import { CalendarX2, Check, ChevronDown, ChevronUp, MessageSquare, Search, Sparkles, X } from "lucide-react";
 
@@ -69,7 +69,9 @@ export function VagasLibertadas({ aoMudar }: { aoMudar?: (mensagem: string) => v
     apiGet<Marcacao[]>("/servico/marcacoes").then(setMarcacoes).catch((e) => setErro(String(e)));
     apiGet<RespostaVagas>("/servico/vagas-libertadas").then(setVagas).catch((e) => setErro(String(e)));
   }
-  useEffect(recarregar, []);
+  const versaoDados = useVersaoDados();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(recarregar, [versaoDados]);
 
   async function desmarcar(pedidoId: string) {
     setErro(null);

@@ -419,3 +419,36 @@ Pedido do utilizador depois da revisão:
    `P/ colheita c/ jejum: hemog, bioq, creat, CEA, CA 19.9; TC TAP c/ contraste; cons. Onco; rev c/ exames comigo`
    → os 4 pedidos pré-seleccionados, com as mesmas marcações do guião (24/09 07:30, 14/10 08:20,
    21/10 08:30 e a interconsulta em triagem). O tutorial do Caso 1 mostra este passo.
+
+## 2026-09-23 — Revisão do guião para apresentar
+
+1. **Os ecrãs actualizam-se sozinhos.** O servidor tem uma "versão dos dados" que sobe a cada acção; o
+   frontend pergunta por ela a cada 1,5 s e recarrega o que está no ecrã (triagem, ficha, listas do
+   serviço, os meus pedidos, gestão, notificações). Um pedido submetido pelo médico aparece na triagem
+   aberta noutra janela em menos de 1 s, e a ficha passa a "marcado" sem recarregar.
+   Se o servidor mudar de instância (reinício ou mais de uma instância no Cloud Run/Railway — o estado é
+   em memória), aparece um aviso no topo. `railway.json` fica com 1 réplica; no Cloud Run, mínimo e
+   máximo = 1 (README). Foi a causa provável do pedido da Maria que "às vezes não aparecia".
+2. **Caso 1 com 3 pedidos:** `P/ TC TAP; cons. Onco; rev c/ exames comigo` → TC marcado (14/10 08:20),
+   próxima consulta marcada depois do TC (21/10 08:30) e pedido de consulta de Oncologia Médica para a
+   triagem. Os exames marcam-se logo (não passam por triagem); só os pedidos de consulta a outro serviço
+   e o Hospital de Dia vão à triagem. Aceite, a ficha fica "3 marcados". A Maria deixa de aparecer na
+   lista de chamadas (sem contraste); a colheita do António (caso 6) passa a 24/09 07:30.
+3. **Reencaminhar** só para serviços com triador (Oncologia Médica, Radioterapia, Hospital de Dia),
+   com o acto equivalente no destino; o triador de destino recebe a notificação.
+4. **Ficha:** "marcado depois do prazo" só é problema se houver vaga livre mais cedo; senão aparece como
+   informação ("fora do prazo, mas na primeira vaga possível") — ex.: a Helena depois de aceitar a vaga.
+5. **Guião:** saiu o caso da ausência do médico (férias); continua a funcionar e tem teste próprio.
+6. **Vaga extra passa pela gestão:** sem vaga a tempo, a administrativa escolhe entre pedir vaga extra
+   (horas extra), outsourcing ou enviar ao médico. A vaga extra chega à Gestão ("Pedidos de vaga extra
+   dos serviços", com notificação): aprovar marca logo e avisa serviço, médico e doente; recusar (com
+   motivo) devolve ao serviço, que resolve com outsourcing ou passa ao médico. Vale para "sem vaga no
+   prazo" e para remarcações sem vaga a tempo. Tudo nos eventos do pedido.
+7. **Impacto:** (a) por mês, antes → com as regras, as mesmas medidas lado a lado e o cálculo à vista —
+   os 960 € são 51 faltas no TAC em 60 dias ÷ 2 = 26/mês × 30% evitadas = 8 × 120 € (os dois
+   pressupostos estão em parametros.csv, a validar); (b) contadores do que as regras fizeram nesta demo,
+   a cinzento até o caso do guião que os activa ser feito.
+8. **Gestão → Comparar serviços:** tabela com todos os serviços lado a lado (pedidos, % no prazo, vs
+   período anterior, mediana, faltas, por marcar), com os mesmos filtros das administrativas (período,
+   estádio, nível); clicar num serviço mostra o detalhe igual ao da administrativa. Saíram os gráficos
+   estáticos antigos.

@@ -4,6 +4,8 @@ import { agora } from "../clock.ts";
 import { parseIso } from "../util.ts";
 import { descreverDoente, descreverEspecialidade, descreverPedido, descreverPrioridade, descreverTipoPedido } from "../apresentacao.ts";
 import type { Pedido } from "../types.ts";
+import { aprovarVagaExtra, listarVagasExtra, recusarVagaExtra } from "../motor/vagaExtra.ts";
+import { calcularEstatisticas } from "./servico.ts";
 
 function minutosEntre(a: string, b: string): number | null {
   if (!a || !b) return null;
@@ -30,6 +32,53 @@ export function criarRotasGestao(store: typeof StoreType) {
 
   router.get("/especialidades", (_req, res) => {
     res.json(store.especialidades);
+  });
+
+  // Estatísticas por serviço, com os mesmos filtros das administrativas (período, estádio, nível).
+  router.get("/estatisticas", (req, res) => {
+    const especialidade = String(req.query.especialidade ?? "");
+    if (!store.especialidades.some((e) => e.codigo === especialidade)) {
+      res.status(400).json({ erro: "Escolha um serviço." });
+      return;
+    }
+    res.json(calcularEstatisticas(especialidade, req.query));
+  });
+  // Comparar serviços lado a lado (os piores no prazo primeiro).
+  router.get("/comparar", (req, res) => {
+    const comPedidos = new Set(store.pedidos.map((p) => p.especialidade_destino));
+    const linhas = store.especialidades
+      .filter((e) => comPedidos.has(e.codigo))
+      .map((e) => {
+        const est = calcularEstatisticas(e.codigo, req.query);
+        return { codigo: e.codigo, legivel: e.descricao, ...est.geral, anteriorPercentDentroPrazo: est.anterior?.percentDentroPrazo ?? null, pendentesAgora: est.pendentesAgora };
+      })
+      .filter((l) => l.pedidos > 0 || l.pendentesAgora > 0)
+      .sort((a, b) => (a.percentDentroPrazo ?? 101) - (b.percentDentroPrazo ?? 101));
+    res.json(linhas);
+  });
+
+  // Pedidos de vaga extra das administrativas: a gestão aprova (marca logo) ou recusa (volta ao serviço).
+  router.get("/vagas-extra", (_req, res) => res.json(listarVagasExtra()));
+  router.post("/vagas-extra/:id/aprovar", (req, res) => {
+    const r = aprovarVagaExtra(req.params.id, req.utilizadorId, req.body?.dataHora, agora());
+    if (!r.ok) {
+      res.status(409).json({ erro: r.erro });
+      return;
+    }
+    res.json(r);
+  });
+  router.post("/vagas-extra/:id/recusar", (req, res) => {
+    const motivo = String(req.body?.motivo ?? "").trim();
+    if (!motivo) {
+      res.status(400).json({ erro: "Diga porquê (o serviço vê o motivo)." });
+      return;
+    }
+    const v = recusarVagaExtra(req.params.id, req.utilizadorId, motivo, agora());
+    if (!v) {
+      res.status(409).json({ erro: "Pedido de vaga extra não encontrado ou já decidido." });
+      return;
+    }
+    res.json({ ok: true });
   });
 
   router.get("/metricas", (req, res) => {

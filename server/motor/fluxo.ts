@@ -127,9 +127,33 @@ export function reencaminharTriagem(
   motivo: string,
   quando: Date = agora(),
 ): void {
-  registarEvento(pedido, "REENCAMINHAMENTO", "EM_TRIAGEM", utilizadorId, { motivo, dataHora: quando });
+  const origem = pedido.especialidade_destino;
+  // O acto passa a ser o equivalente no serviço de destino (a 1.ª consulta, ou a sessão no Hospital de Dia).
+  const actos = store.catalogoAtos.filter((a) => a.especialidade_codigo === novaEspecialidade);
+  const equivalente =
+    actos.find((a) => a.tipo_pedido === pedido.tipo_pedido) ?? actos.find((a) => a.tipo_pedido === "pedido_consulta" || a.tipo_pedido === "pedido_hd");
   pedido.especialidade_destino = novaEspecialidade;
+  if (equivalente) {
+    pedido.ato_codigo = equivalente.ato_codigo;
+    pedido.tipo_pedido = equivalente.tipo_pedido;
+  }
   pedido.decisao_triagem = "REENCAMINHADO";
+  registarEvento(pedido, "REENCAMINHAMENTO", "EM_TRIAGEM", utilizadorId, {
+    motivo,
+    detalhe: `Reencaminhado de ${descreverEspecialidade(origem)} para ${descreverEspecialidade(novaEspecialidade)}`,
+    dataHora: quando,
+  });
+  // Quem passa a ter o pedido é avisado (e o médico que o pediu fica a saber para onde foi).
+  notificar({
+    tipo: "PEDIDO_EM_TRIAGEM",
+    destinatarios: utilizadoresPorPerfil("TRIADOR", novaEspecialidade),
+    titulo: `Pedido reencaminhado para triagem: ${descreverPedido(pedido)}`,
+    mensagem: `${descreverDoente(pedido.doente_id)} · vindo de ${descreverEspecialidade(origem)}${motivo ? ` · ${motivo}` : ""}`,
+    pedidoId: pedido.pedido_id,
+    doenteId: pedido.doente_id,
+    consultaAtoId: pedido.consulta_origem_ato_id,
+    quando,
+  });
   recalcularAlertas(quando);
 }
 
