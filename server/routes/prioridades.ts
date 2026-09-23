@@ -5,7 +5,7 @@ import { apenasData, parseIso, somarDias } from "../util.ts";
 import { avaliarCandidatosTroca, janelaAgendamento } from "../motor/agendamento.ts";
 import { avaliarFactos, pesosCusto, type PesosCusto, type SobreposicaoFactos } from "../motor/remarcacao.ts";
 import { listaChamadas } from "../motor/chamadas.ts";
-import { abrirSessaoExtra, esperaPorEstadio, prazosEmRisco, previsaoSessaoExtra, type OpcoesSessaoExtra } from "../motor/capacidade.ts";
+import { abrirSessaoExtra, capacidadePorServico, esperaPorEstadio, prazosEmRisco, previsaoSessaoExtra, type OpcoesSessaoExtra } from "../motor/capacidade.ts";
 import { descreverDoente, descreverEspecialidade, descreverPedido } from "../apresentacao.ts";
 import type { CandidatoTroca, FactosCandidato } from "../types.ts";
 
@@ -86,6 +86,17 @@ export function criarRotasPrioridades(store: typeof StoreType) {
       },
       itens,
     });
+  });
+
+  // Gestor: onde pôr capacidade (por serviço) para uma sessão extra na data escolhida.
+  router.get("/capacidade", (req, res) => {
+    const data = String(req.query.data ?? "");
+    const hora = String(req.query.hora ?? "08:00");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{2}:\d{2}$/.test(hora)) {
+      res.status(400).json({ erro: "Indique a data e a hora da sessão." });
+      return;
+    }
+    res.json(capacidadePorServico(data, hora, agora()));
   });
 
   // R-M — sessão extra: pré-visualização (não altera nada) e abertura (cria vagas + ofertas por SMS).

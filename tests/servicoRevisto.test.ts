@@ -153,6 +153,21 @@ describe("Serviço revisto", () => {
     expect(notifs.filter((n) => n.tipo === "PEDIDO_MARCADO").length).toBeGreaterThanOrEqual(3);
   });
 
+  it("gestor: onde pôr capacidade — sessão extra de TAC ajuda, na cirurgia não (esperam pelo TAC), e bate certo com a pré-visualização", async () => {
+    await api("/api/repor-demo", "U12", {});
+    type L = { especialidade: string; sessao_extra_ajuda: number; a_espera_de_outro_servico: { servico: string; n: number }[]; trava_outros_servicos: number; recomendacao: string };
+    const linhas = (await api<L[]>("/api/prioridades/capacidade?data=2026-09-26&hora=08:00", "U12")).json;
+    const tac = linhas.find((l) => l.especialidade === "7000_2")!;
+    const cirurgia = linhas.find((l) => l.especialidade === "2102")!;
+    expect(cirurgia.sessao_extra_ajuda).toBe(0);
+    expect(cirurgia.a_espera_de_outro_servico.find((m) => m.servico.includes("TAC"))!.n).toBeGreaterThan(0);
+    expect(cirurgia.recomendacao).toContain("Sessão extra aqui não ajuda");
+    expect(tac.trava_outros_servicos).toBeGreaterThan(0);
+    const previsao = (await api<{ doentes: unknown[] }>("/api/prioridades/sessao-extra/previsao", "U12", { especialidade: "7000_2", data: "2026-09-26", horaInicio: "08:00", nVagas: 30 })).json;
+    expect(tac.sessao_extra_ajuda).toBeLessThanOrEqual(previsao.doentes.length);
+    expect(tac.sessao_extra_ajuda).toBeGreaterThan(0);
+  });
+
   it("validação, dicionário e tradutor já não existem", async () => {
     expect((await api("/api/validacao/consultas", "U03")).status).toBe(404);
     expect((await api("/api/dicionario", "U03")).status).toBe(404);

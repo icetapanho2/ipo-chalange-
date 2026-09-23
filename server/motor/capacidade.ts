@@ -2,6 +2,7 @@ import { store } from "../store.ts";
 import { agora } from "../clock.ts";
 import { apenasData, diferencaDias, formatarDataHoraPt, formatarDataPt, isoDataHora, parseIso, somarDias } from "../util.ts";
 import { avaliarCandidatosTroca, encontrarVagaLivre, janelaAgendamento } from "./agendamento.ts";
+import { dataConclusao, dependenciasDe } from "./dependencias.ts";
 import { libertarVaga, procurarAntecipaveis } from "./antecipacao.ts";
 import { descreverDoente, descreverEspecialidade, descreverPedido } from "../apresentacao.ts";
 import type { CandidatoAntecipacao, Vaga } from "../types.ts";
@@ -154,6 +155,108 @@ export function abrirSessaoExtra(o: OpcoesSessaoExtra, quando: Date = agora()) {
   const origem = `Sessão extra de ${formatarDataPt(parseIso(o.data))}`;
   const ofertas = vagas.map((v) => libertarVaga(v, quando, origem)).filter((x) => !!x);
   return { vagas: vagas.length, ofertas: ofertas.length };
+}
+
+// ------------------------------------------------------------------------------ onde pôr capacidade
+export interface CapacidadeServico {
+  especialidade: string;
+  especialidade_legivel: string;
+  em_risco: number;
+  /** vaga livre ou troca dentro do prazo: a administrativa do serviço trata (Para decidir). */
+  resolve_o_servico: number;
+  /** uma sessão extra neste serviço, na data escolhida, tira-os do atraso. */
+  sessao_extra_ajuda: number;
+  /** só podem ser feitos depois de exames/análises de outro serviço: sessão extra aqui não ajuda. */
+  a_espera_de_outro_servico: { servico: string; n: number }[];
+  /** nem sessão extra nem dependência (médico da continuidade, aviso curto para o doente). */
+  outros: { motivo: string; n: number }[];
+  /** pedidos de OUTROS serviços em risco que esperam por este (é aqui o estrangulamento). */
+  trava_outros_servicos: number;
+  recomendacao: string;
+}
+
+/**
+ * Para o gestor: onde está a falta de capacidade das próximas 2 semanas e onde uma sessão extra
+ * ajuda de facto. Um pedido que só se faz depois de exames de outro serviço não ganha nada com uma
+ * sessão extra no seu serviço — o estrangulamento é o exame. Usa as mesmas regras da pré-visualização
+ * da sessão extra (procurarAntecipaveis), por isso os números batem certo com ela.
+ */
+export function capacidadePorServico(dataSessao: string, horaInicio: string, quando: Date = agora()): CapacidadeServico[] {
+  const itens = prazosEmRisco(quando, 14);
+  const hoje = apenasData(quando);
+  const porServico = new Map<string, PrazoEmRisco[]>();
+  for (const i of itens) porServico.set(i.especialidade, [...(porServico.get(i.especialidade) ?? []), i]);
+  const travados = new Map<string, number>();
+  const resultado: CapacidadeServico[] = [];
+
+  for (const [especialidade, lista] of porServico) {
+    const vaga = vagasDaSessao({ especialidade, data: dataSessao, horaInicio, nVagas: 1 }, false)[0];
+    const candidatos = new Set(vaga ? procurarAntecipaveis(vaga, quando).map((c) => c.pedido_id) : []);
+    const diaSessao = parseIso(`${dataSessao}T${horaInicio}`);
+    const montante = new Map<string, number>();
+    const outros = new Map<string, number>();
+    let resolve = 0;
+    let ajuda = 0;
+    for (const i of lista) {
+      if (i.solucao === "VAGA_LIVRE" || i.solucao === "TROCA") {
+        resolve += 1;
+        continue;
+      }
+      if (candidatos.has(i.pedido_id)) {
+        ajuda += 1;
+        continue;
+      }
+      const pedido = store.pedidos.find((p) => p.pedido_id === i.pedido_id)!;
+      if (janelaAgendamento(pedido, hoje).inicio.getTime() > diaSessao.getTime()) {
+        // Espera por um requisito: conta no serviço desse requisito (o que acaba mais tarde).
+        let ultimo: { servico: string; codigo: string; data: number } | null = null;
+        for (const d of dependenciasDe(pedido)) {
+          const req = store.pedidos.find((p) => p.pedido_id === d.depende_de_pedido_id);
+          if (!req || req.especialidade_destino === especialidade) continue;
+          const data = dataConclusao(req)?.getTime() ?? Number.MAX_SAFE_INTEGER;
+          if (!ultimo || data > ultimo.data) ultimo = { servico: descreverEspecialidade(req.especialidade_destino), codigo: req.especialidade_destino, data };
+        }
+        if (ultimo) {
+          montante.set(ultimo.servico, (montante.get(ultimo.servico) ?? 0) + 1);
+          travados.set(ultimo.codigo, (travados.get(ultimo.codigo) ?? 0) + 1);
+        } else outros.set("só pode ser mais tarde (data mínima pedida pelo médico)", (outros.get("só pode ser mais tarde (data mínima pedida pelo médico)") ?? 0) + 1);
+        continue;
+      }
+      const motivo = i.data_hora_atual && parseIso(i.data_hora_atual).getTime() <= diaSessao.getTime()
+        ? "já está marcado antes desta data"
+        : pedido.continuidade_obrigatoria && vaga && pedido.medico_preferido_id && vaga.medico_id !== pedido.medico_preferido_id
+          ? "tem de ser com o seu médico, que não faz esta sessão"
+          : "aviso curto: o doente não aceita antecipação ou mora longe";
+      outros.set(motivo, (outros.get(motivo) ?? 0) + 1);
+    }
+    resultado.push({
+      especialidade,
+      especialidade_legivel: descreverEspecialidade(especialidade),
+      em_risco: lista.length,
+      resolve_o_servico: resolve,
+      sessao_extra_ajuda: ajuda,
+      a_espera_de_outro_servico: [...montante].map(([servico, n]) => ({ servico, n })),
+      outros: [...outros].map(([motivo, n]) => ({ motivo, n })),
+      trava_outros_servicos: 0,
+      recomendacao: "",
+    });
+  }
+
+  for (const r of resultado) {
+    r.trava_outros_servicos = travados.get(r.especialidade) ?? 0;
+    const montante = r.a_espera_de_outro_servico.reduce((s, m) => s + m.n, 0);
+    const partes: string[] = [];
+    if (r.sessao_extra_ajuda) partes.push(`Sessão extra com ${r.sessao_extra_ajuda} vaga(s) tira ${r.sessao_extra_ajuda} doente(s) do atraso.`);
+    if (montante && !r.sessao_extra_ajuda)
+      partes.push(`Sessão extra aqui não ajuda: ${montante} esperam por ${r.a_espera_de_outro_servico.map((m) => m.servico).join(" e ")}.`);
+    else if (montante) partes.push(`Outros ${montante} esperam por ${r.a_espera_de_outro_servico.map((m) => m.servico).join(" e ")}.`);
+    if (r.trava_outros_servicos) partes.push(`É aqui o estrangulamento de ${r.trava_outros_servicos} pedido(s) de outros serviços.`);
+    if (!partes.length && r.resolve_o_servico) partes.push("O serviço resolve com as vagas que tem (já está em \"Para decidir\").");
+    if (!partes.length) partes.push("Sem solução com sessão extra nesta data — ver os doentes.");
+    r.recomendacao = partes.join(" ");
+  }
+  // Primeiro onde a sessão extra ajuda e onde está o estrangulamento.
+  return resultado.sort((a, b) => b.sessao_extra_ajuda + b.trava_outros_servicos - (a.sessao_extra_ajuda + a.trava_outros_servicos) || b.em_risco - a.em_risco);
 }
 
 // ------------------------------------------------------------------------------ espera por estádio

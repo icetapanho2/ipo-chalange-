@@ -287,16 +287,16 @@ const CASOS: Caso[] = [
     titulo: "Gestão — antecipar em vez de apagar fogos",
     tipo: "impacto",
     problema:
-      "O que isto vale para quem gere: ver os prazos que vão falhar antes de falharem, saber quem ganha com uma sessão extra antes de a pagar, e os números do antes e do depois.",
+      "O que isto vale para quem gere: saber onde pôr capacidade antes de os prazos falharem (e onde uma sessão extra não resolve nada), quem ganha com ela antes de a pagar, e os números do antes e do depois.",
     passos: [
       {
-        titulo: "Prazos em risco e sessão extra",
+        titulo: "Onde pôr capacidade e sessão extra",
         descricao:
-          "Gestão: \"Prazos em risco nas próximas 2 semanas\" — cada pedido com a solução já proposta (vaga livre, troca, antecipar, ou sessão/vaga extra). Ao lado, \"Sessão extra\": TAC no sábado 26/09 às 08:00, 6 vagas.",
+          "Gestão: \"Onde falta capacidade — próximas 2 semanas\", por serviço: o que a administrativa resolve com as vagas que tem, o que só uma sessão extra resolve, e o que está parado à espera de exames de outro serviço. As consultas de Cirurgia em risco esperam pelo TAC e pelas análises: sessão extra de Cirurgia não adiantava — o estrangulamento é o TAC. \"Preparar sessão extra\" no TAC (sábado 26/09 às 08:00) mostra quem ganha com cada vaga.",
         resultado:
           "Das 6 vagas, só 2 têm quem ganhe com elas (Paula Ribeiro Nunes e Helena Duarte Matos, em diagnóstico e fora do prazo): o sistema diz para abrir só 2. \"Abrir a sessão\" cria as vagas e envia as ofertas por SMS.",
         acoes: [{ etiqueta: "Abrir Gestão", utilizadorId: "U12", caminho: "/gestao" }],
-        fala: "Antes de pagar horas extra, sabe-se quem ganha com elas — e quantas vagas chegam.",
+        fala: "Antes de pagar horas extra, sabe-se onde servem, quem ganha com elas e quantas vagas chegam — e onde não servem de nada.",
       },
       {
         titulo: "Impacto em números",

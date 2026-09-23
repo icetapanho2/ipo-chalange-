@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { FlaskConical, Gauge } from "lucide-react";
 import { PainelImpacto } from "../components/PainelImpacto";
-import { PrazosEmRisco, SessaoExtra } from "../components/CapacidadeGestao";
+import { OPCOES_SESSAO_INICIAIS, OndePorCapacidade, PrazosEmRisco, SessaoExtra, type OpcoesSessao } from "../components/CapacidadeGestao";
 import { apiGet } from "../lib/api";
 import { CATEGORIAS, ESTADO, SEQUENCIAL } from "../lib/paleta";
 
@@ -29,9 +29,6 @@ interface Metricas {
   prazoPorServico: GrupoPrazo[];
   pendentesPorServico: GrupoPendentes[];
   remarcacoesPorMotivo: { motivo: string; total: number }[];
-  consultasEmRisco: { detectadas: number; resolvidas: number };
-  curvaAprovacaoDirecta: { semana: string; percent: number; total: number }[];
-  triagem: { aceites: number; recusados: number; reencaminhados: number };
   impactoEstimado: { cromosMes: number; folhasMes: number; horasAdminDia: number };
 }
 
@@ -66,6 +63,13 @@ export function Gestao() {
   const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
   const [filtro, setFiltro] = useState("");
   const [erro, setErro] = useState<string | null>(null);
+  const [sessao, setSessao] = useState<OpcoesSessao>(OPCOES_SESSAO_INICIAIS);
+  const [versao, setVersao] = useState(0);
+
+  function preparar(especialidade: string, nVagas: number) {
+    setSessao({ ...sessao, especialidade, nVagas });
+    document.getElementById("sessao-extra")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
   useEffect(() => {
     apiGet<Especialidade[]>("/gestao/especialidades").then(setEspecialidades);
@@ -98,40 +102,49 @@ export function Gestao() {
             <FlaskConical className="h-3.5 w-3.5" />
             <span>Laboratório de prioridades</span>
           </Link>
-          <select
-            className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
-            value={filtro}
-            onChange={(e) => setFiltro(e.target.value)}
-          >
-            <option value="">Todos os serviços</option>
-            {especialidades.map((e) => (
-              <option key={e.codigo} value={e.codigo}>
-                {e.descricao}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
       {erro && <p className="mt-3 text-red-600">{erro}</p>}
-      {!metricas && !erro && <p className="mt-4 text-slate-500">A carregar métricas…</p>}
 
-      <div className="mt-4">
-        <h2 className="mb-2 text-sm font-semibold text-slate-600">Impacto das regras de prioridade e agendamento</h2>
-        <PainelImpacto />
-      </div>
+      <p className="mt-2 max-w-3xl text-xs text-slate-500">
+        O dia-a-dia de cada serviço (remarcações, vagas, chamadas) é da administrativa. Aqui fica só o que é do gestor: onde pôr capacidade, as
+        regras de prioridade do hospital e o impacto.
+      </p>
 
-      <div className="mt-4 space-y-4">
+      <section className="mt-4 space-y-3">
+        <h2 className="text-sm font-semibold text-slate-600">1 · Decidir capacidade</h2>
+        <OndePorCapacidade opcoes={sessao} versao={versao} aoPreparar={preparar} />
+        <SessaoExtra opcoes={sessao} setOpcoes={setSessao} aoAbrir={() => setVersao((v) => v + 1)} />
         <PrazosEmRisco />
-        <SessaoExtra />
-      </div>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="mb-2 text-sm font-semibold text-slate-600">2 · Impacto das regras de prioridade e agendamento</h2>
+        <PainelImpacto />
+      </section>
 
       {metricas && (
-        <>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <section className="mt-6">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-600">3 · Comparar serviços</h2>
+            <select
+              className="rounded border border-slate-300 bg-white px-2 py-1 text-sm"
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
+            >
+              <option value="">Todos os serviços</option>
+              {especialidades.map((e) => (
+                <option key={e.codigo} value={e.codigo}>
+                  {e.descricao}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <CartaoEstatistica titulo="Consulta → pedido no serviço" valor={metricas.tempos.consultaParaPedidoMin ?? "—"} sufixo="min" />
             <CartaoEstatistica titulo="Pedido → marcação" valor={metricas.tempos.pedidoParaMarcacaoMin ?? "—"} sufixo="min" />
-            <CartaoEstatistica titulo="Consultas em risco detectadas" valor={metricas.consultasEmRisco.detectadas} />
-            <CartaoEstatistica titulo="Consultas em risco resolvidas" valor={metricas.consultasEmRisco.resolvidas} />
+            <CartaoEstatistica titulo="Cromos eliminados / mês" valor={metricas.impactoEstimado.cromosMes.toLocaleString("pt-PT")} />
+            <CartaoEstatistica titulo="Horas administrativas / dia" valor={metricas.impactoEstimado.horasAdminDia} sufixo="h" />
           </div>
 
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -183,52 +196,9 @@ export function Gestao() {
               </ResponsiveContainer>
             </PainelGrafico>
 
-            <PainelGrafico titulo="Taxa de aprovação directa da IA (curva de aprendizagem)">
-              <ResponsiveContainer>
-                <LineChart data={metricas.curvaAprovacaoDirecta}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                  <XAxis dataKey="semana" tick={{ fontSize: 9 }} interval={1} />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} unit="%" />
-                  <Tooltip formatter={(v: number) => `${v}%`} />
-                  <Line type="monotone" dataKey="percent" stroke={SEQUENCIAL} strokeWidth={2} dot={{ r: 3 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </PainelGrafico>
-
-            <PainelGrafico titulo="Triagem: decisões">
-              <ResponsiveContainer>
-                <BarChart
-                  data={[
-                    { nome: "Aceites", total: metricas.triagem.aceites, cor: ESTADO.bom },
-                    { nome: "Recusados", total: metricas.triagem.recusados, cor: ESTADO.critico },
-                    { nome: "Reencaminhados", total: metricas.triagem.reencaminhados, cor: CATEGORIAS[1] },
-                  ]}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                  <XAxis dataKey="nome" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Bar dataKey="total" radius={[4, 4, 0, 0]}>
-                    {[ESTADO.bom, ESTADO.critico, CATEGORIAS[1]].map((cor, i) => (
-                      <Cell key={i} fill={cor} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </PainelGrafico>
           </div>
 
-          <div className="mt-4 rounded border border-slate-200 bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-slate-600">
-              Impacto estimado <span className="font-normal text-slate-400">(estimativa — parametros.csv)</span>
-            </h3>
-            <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <CartaoEstatistica titulo="Cromos eliminados / mês" valor={metricas.impactoEstimado.cromosMes.toLocaleString("pt-PT")} />
-              <CartaoEstatistica titulo="Folhas poupadas / mês" valor={metricas.impactoEstimado.folhasMes.toLocaleString("pt-PT")} />
-              <CartaoEstatistica titulo="Horas administrativas / dia" valor={metricas.impactoEstimado.horasAdminDia} sufixo="h" />
-            </div>
-          </div>
-        </>
+        </section>
       )}
     </div>
   );

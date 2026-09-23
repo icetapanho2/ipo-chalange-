@@ -363,3 +363,23 @@ Pedido do utilizador depois da revisão:
 5. **Confirmação da consulta** mostra o que aconteceu a cada pedido (marcado para quando / em triagem)
    e como ficou o perfil do doente. Teste de ponta a ponta: consulta → pedidos → triagem em primeiro →
    aceitação → ficha com tudo marcado e notificações ao médico.
+
+## 2026-09-23 — Notificações levam à acção; Gestão só com o que é do gestor
+
+1. **Título:** IPO-2030 · "Servir é dever".
+2. **Clicar numa notificação leva à acção**, não ao perfil: "para triagem" abre a fila de triagem com o
+   doente em primeiro e em destaque; avaria/remarcação/sem vaga abrem "Para decidir" do serviço; ao
+   médico, devolvidos/recusados/marcados abrem "Os meus pedidos" com o doente seleccionado.
+3. **Gestão repensada** (reflexão: o gestor não faz o trabalho da administrativa; decide capacidade,
+   regras do hospital e presta contas):
+   - **Onde falta capacidade — próximas 2 semanas**, por serviço: quantos em risco, quantos a
+     administrativa resolve com as vagas que tem, quantos só uma sessão extra resolve, e quantos estão
+     parados à espera de exames de outro serviço (o serviço desse exame fica marcado como
+     **estrangulamento**). Mesmas regras da pré-visualização da sessão extra, por isso os números batem
+     certo. "Preparar sessão extra" preenche a sessão extra com esse serviço e esse número de vagas.
+     Na demo: as 11 consultas de Cirurgia em risco esperam pelo TAC/análises — pagar horas extra de
+     Cirurgia não adiantava.
+   - A lista doente a doente dos prazos em risco fica recolhida (é trabalho do serviço).
+   - Saíram a curva de "aprovação directa da IA" (a extracção saiu da interface), o gráfico de
+     decisões da triagem e os cartões de "consultas em risco" (operacionais, já estão no serviço).
+     Ficam o impacto, as definições/laboratório de prioridades e a comparação entre serviços.
