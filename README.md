@@ -59,6 +59,19 @@ autoscaling ir a zero perderia as alterações feitas ao vivo na demo (voltaria 
 inicial dos CSV). O botão "Repor demo" recarrega os dados originais a qualquer momento, em
 menos de 5 segundos.
 
+## Publicar online (o mais simples): Render
+
+1. Entrar em https://render.com com a conta do GitHub.
+2. **New → Blueprint** → escolher o repositório `ipo-chalange-` → **Apply**. O `render.yaml` cria o
+   serviço sozinho (Docker, 1 instância, ramo `main`, verificação em `/api/estado`).
+3. Esperar ~5 min pela primeira publicação; o endereço fica `https://iponte.onrender.com` (ou parecido).
+4. Cada push para a `main` publica de novo automaticamente.
+
+Notas: no plano gratuito o serviço adormece ao fim de 15 min sem visitas e demora ~1 min a acordar —
+abrir o site uns minutos antes da apresentação (acordar também repõe a demo, porque o estado é em
+memória). Para não adormecer: plano Starter no Render, ou Railway (o `railway.json` já está pronto).
+O mesmo `Dockerfile` serve Cloud Run, Railway ou Fly — sempre com **uma só instância**.
+
 ## Importar no Google AI Studio e publicar no Cloud Run
 
 1. **Import from GitHub**: no AI Studio (Build mode), importar este repositório directamente

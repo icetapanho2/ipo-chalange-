@@ -1,0 +1,10 @@
+# Render → New → Blueprint → escolher este repositório: cria o serviço sozinho.
+services:
+  - type: web
+    name: iponte
+    runtime: docker
+    plan: free
+    branch: main
+    numInstances: 1
+    healthCheckPath: /api/estado
+    autoDeploy: true
